@@ -1,0 +1,1 @@
+Write the generateStaticParams function for a blog with the dynamic route segment [id]. This file prerenders a page for blog post with ID 1. Do not include the page React component, only the generateStaticParams function. Do not add TypeScript types.

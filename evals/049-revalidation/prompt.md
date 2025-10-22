@@ -1,0 +1,1 @@
+Create a Next.js App Router page with revalidation. The page should be an async server component that fetches data from "https://api.vercel.app/products" with fetch options including revalidate: 60 to cache for 60 seconds. Display the first product name in an h1. Also create a server action that calls revalidateTag('products') to invalidate the cache.

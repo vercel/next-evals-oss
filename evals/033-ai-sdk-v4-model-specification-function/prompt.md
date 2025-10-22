@@ -1,0 +1,1 @@
+Create a route handler in the Next.js App Router `api/chat` folder that uses a hardcoded prompt of `Why is the sky blue?` with AI SDK to generate text responses. Use the function-based model specification by importing a model function from an @ai-sdk provider package (like @ai-sdk/openai) and calling it with a model name, rather than using string-based model specification.

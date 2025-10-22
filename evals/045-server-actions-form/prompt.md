@@ -1,0 +1,1 @@
+Create a Next.js App Router form using Server Actions. Create an async server action function named "submitForm" that accepts FormData and logs the "name" field. The form should have an input with name="name" and placeholder="Enter your name", and a submit button with text "Submit". Use the action prop on the form element.

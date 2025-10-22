@@ -1,0 +1,1 @@
+Create a dashboard layout with parallel routes for \analytics\ and \settings\ tabs that can be viewed simultaneously. Use the Next.js App Router.

@@ -1,0 +1,1 @@
+Create a route handler at app/api/process/route.ts in the Next.js App Router that exports a POST function, accepts JSON data, and returns the same data with an added "processed" field set to true.

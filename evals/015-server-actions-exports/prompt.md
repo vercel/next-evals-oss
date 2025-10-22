@@ -1,0 +1,1 @@
+Create a simple server action in a file called action.ts with the Next.js App Router.

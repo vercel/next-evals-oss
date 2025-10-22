@@ -1,0 +1,1 @@
+Create a server component that uses the path name ID to fetch a product from an API. Use the Next.js App Router. Only output code for a single server component, not the API.

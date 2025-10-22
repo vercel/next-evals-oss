@@ -1,0 +1,1 @@
+Create a Next.js App Router page with a loading UI. Add a loading.tsx file that displays "Loading..." in a div with className="loading-spinner". The page.tsx should be an async server component that simulates a delay with await new Promise(resolve => setTimeout(resolve, 2000)) and then displays "Content Loaded" in an h1.

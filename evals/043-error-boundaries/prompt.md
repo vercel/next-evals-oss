@@ -1,0 +1,1 @@
+Create a Next.js App Router application with error handling. Add an error.tsx file that's a client component displaying "Something went wrong!" in an h1 with a "Try again" button that calls reset(). The page.tsx should throw an error with message "Test error" to demonstrate error boundary.

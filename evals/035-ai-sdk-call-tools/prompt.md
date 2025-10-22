@@ -1,0 +1,1 @@
+Add a weather tool to the chat API that lets users ask about the weather. The tool should take a city name and temperature unit (C or F) as inputs. You can just return mock weather data for now - something like "It's 24 degrees and sunny". Use the AI SDK's tool calling feature to implement this.

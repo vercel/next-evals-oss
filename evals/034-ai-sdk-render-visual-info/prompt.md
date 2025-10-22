@@ -1,0 +1,3 @@
+Build a chat interface that renders visual React components for weather information instead of text responses. The server side is already implemented with AI SDK 5 and includes a `getWeatherInformation` tool that returns weather data.
+
+Update the client side to use proper AI SDK 5 React hooks and create visual weather components that display current temperature and weekly forecast with a clean, modern UI. When the assistant calls the weather tool, it should render a beautiful weather component on the client instead of showing text. Build a polished chat interface with message input, chat history, and proper loading states during tool execution.

@@ -1,0 +1,1 @@
+Show a single file example of useSearchParams being correctly used with Suspense. Only output the component code using useSearchParams and nothing else. Use the Next.js App Router.

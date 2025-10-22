@@ -1,0 +1,1 @@
+Write a client component which calls a server action to set cookies on click. Be concise and only output the client component file, assume the others exist.

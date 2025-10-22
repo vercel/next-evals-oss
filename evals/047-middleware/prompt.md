@@ -1,0 +1,1 @@
+Create a Next.js middleware that adds a custom header "X-Custom-Header" with value "middleware-test" to all responses. The middleware should also log the request pathname. Create the middleware.ts file in the root directory with proper NextResponse handling.

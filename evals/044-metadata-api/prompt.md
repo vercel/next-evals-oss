@@ -1,0 +1,1 @@
+Create a Next.js App Router page using the Metadata API. Export a metadata object with title "My App", description "Welcome to my application", and openGraph with title "My App OG" and description "OG Description". The page should render "Metadata Example" in an h1.

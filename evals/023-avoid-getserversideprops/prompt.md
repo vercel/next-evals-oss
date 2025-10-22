@@ -1,0 +1,1 @@
+The UserDashboard component needs to fetch user-specific data that changes on each request (like current user preferences from /api/user/preferences). Implement this component to fetch and display this dynamic data, ensuring the data is fetched fresh on each request. Follow the existing patterns in this App Router codebase.

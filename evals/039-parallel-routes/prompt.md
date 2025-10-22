@@ -1,0 +1,1 @@
+Create a Next.js App Router page with parallel routes. Implement a dashboard layout that has two parallel route slots: @analytics showing "Analytics Dashboard" in a div with className="analytics", and @team showing "Team Overview" in a div with className="team". The main layout should render both slots side by side.
