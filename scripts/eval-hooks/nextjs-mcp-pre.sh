@@ -15,9 +15,9 @@ echo "   Output directory: $OUTPUT_DIR"
 cat > "$OUTPUT_DIR/.mcp.json" <<EOF
 {
   "mcpServers": {
-    "nextjs-dev-$EVAL_NAME": {
-      "type": "http",
-      "url": "http://localhost:$PORT/_next/mcp"
+    "next-devtools": {
+      "command": "npx",
+      "args": ["-y", "next-devtools-mcp@latest"]
     }
   }
 }
