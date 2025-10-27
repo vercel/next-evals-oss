@@ -26,6 +26,8 @@ export interface ClaudeCodeResult {
     pixelDifference?: number;
     error?: string;
   };
+  evalPath?: string;
+  timestamp?: string;
 }
 
 export interface ClaudeCodeEvalOptions {
@@ -43,6 +45,8 @@ export interface ClaudeCodeEvalOptions {
     postEval?: string;
   };
   visualDiff?: boolean;
+  outputFormat?: string;
+  outputFile?: string;
 }
 
 export class ClaudeCodeRunner {
