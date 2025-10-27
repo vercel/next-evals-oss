@@ -226,6 +226,11 @@ export class ClaudeCodeRunner {
         env.ANTHROPIC_API_KEY = this.apiKey;
       }
 
+      // Enhance the prompt with additional instructions (similar to cursor-agent)
+      const enhancedPrompt = `${prompt}
+
+IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependencies have already been installed. Do not run build, test, or dev server commands. Just write the code files. DO Not ask any followup questions either.`;
+
       // Spawn Claude Code process with --print flag for non-interactive mode
       // Additional flags to ensure it works well in automation:
       // --dangerously-skip-permissions: bypass file/execution permission prompts
@@ -233,7 +238,7 @@ export class ClaudeCodeRunner {
       const args = [
         '--print',
         '--dangerously-skip-permissions',
-        prompt
+        enhancedPrompt
       ];
 
       if (this.verbose) {
