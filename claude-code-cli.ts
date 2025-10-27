@@ -29,6 +29,8 @@ function parseCliArgs(args: string[]) {
       values.timeout = args[++i];
     } else if (arg === "--api-key") {
       values["api-key"] = args[++i];
+    } else if (arg === "--output-file") {
+      values["output-file"] = args[++i];
     } else if (!arg.startsWith("-")) {
       positionals.push(arg);
     }
@@ -54,6 +56,7 @@ Options:
       --debug             Persist output folders for debugging (don't clean up)
   -t, --timeout <ms>      Timeout in milliseconds (default: 600000 = 10 minutes)
       --api-key <key>     Anthropic API key (or use ANTHROPIC_API_KEY env var)
+      --output-file <path> Write results to JSON file (only with --all)
 
 Examples:
   # Run a specific eval
@@ -70,6 +73,9 @@ Examples:
 
   # Debug mode - keep output folders for inspection
   bun claude-code-cli.ts --eval 001-server-component --debug
+
+  # Write results to JSON file when running all evals
+  bun claude-code-cli.ts --all --output-file results.json
 `);
 }
 
@@ -278,21 +284,12 @@ async function main() {
     return;
   }
 
-  // Check for API key
-  const apiKey = values["api-key"] || process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.error("❌ Error: Anthropic API key is required.");
-    console.error(
-      "Set ANTHROPIC_API_KEY environment variable or use --api-key option."
-    );
-    process.exit(1);
-  }
 
   const evalOptions = {
     verbose: values.verbose || false,
     debug: values.debug || false,
     timeout: values.timeout ? parseInt(values.timeout) : 600000, // 10 minutes default
-    apiKey,
+  //  apiKey,
   };
 
   if (values.all) {
@@ -330,6 +327,25 @@ async function main() {
     }
 
     displayResultsTable(results);
+
+    // Write all results to file if outputFile is specified
+    if (values["output-file"]) {
+      try {
+        await fs.writeFile(
+          values["output-file"],
+          JSON.stringify(results, null, 2),
+          "utf-8"
+        );
+        console.log(`\n📝 All results written to: ${values["output-file"]}`);
+      } catch (error) {
+        console.error(
+          `⚠️  Failed to write results to file: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+
     return;
   }
 
