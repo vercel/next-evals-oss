@@ -298,6 +298,8 @@ function parseCliArgs(args: string[]) {
       values["with-hooks"] = args[++i];
     } else if (arg === "--with-visual-diff") {
       values["with-visual-diff"] = true;
+    } else if (arg === "--capture-conversation") {
+      values["capture-conversation"] = true;
     } else if (!arg.startsWith("-")) {
       positionals.push(arg);
     }
@@ -336,6 +338,7 @@ Options:
       --dev-server-port   Port for dev server (default: 4000, auto-increments for concurrent evals)
       --with-hooks <name> Use eval hooks from scripts/eval-hooks/<name>-pre.sh and <name>-post.sh
       --with-visual-diff  Enable visual regression testing with screenshot comparison
+      --capture-conversation  [Claude Code only] Capture full conversation with tool calls to JSONL
 
 Examples:
   # Run all evals with LLMs
@@ -1506,6 +1509,7 @@ async function main() {
           : undefined,
         hooks,
         visualDiff: values["with-visual-diff"] || false,
+        captureConversation: values["capture-conversation"] || false,
       };
 
       if (values.all) {

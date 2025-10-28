@@ -47,6 +47,7 @@ export interface ClaudeCodeEvalOptions {
   visualDiff?: boolean;
   outputFormat?: string;
   outputFile?: string;
+  captureConversation?: boolean;
 }
 
 export class ClaudeCodeRunner {
@@ -58,6 +59,7 @@ export class ClaudeCodeRunner {
   private devServer?: { enabled: boolean; command?: string; port?: number };
   private hooks?: { preEval?: string; postEval?: string };
   private visualDiff: boolean;
+  private captureConversation: boolean;
 
   constructor(options: ClaudeCodeEvalOptions = {}) {
     this.verbose = options.verbose || false;
@@ -66,6 +68,7 @@ export class ClaudeCodeRunner {
     this.devServer = options.devServer;
     this.hooks = options.hooks;
     this.visualDiff = options.visualDiff || false;
+    this.captureConversation = options.captureConversation || false;
   }
 
   async runClaudeCodeEval(
@@ -239,11 +242,14 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       // Additional flags to ensure it works well in automation:
       // --dangerously-skip-permissions: bypass file/execution permission prompts
       // --print: non-interactive mode that prints response and exits
-      const args = [
-        '--print',
-        '--dangerously-skip-permissions',
-        enhancedPrompt
-      ];
+      const args = ['--print', '--dangerously-skip-permissions'];
+
+      // Add conversation capture flags if enabled
+      if (this.captureConversation) {
+        args.push('--verbose', '--output-format', 'stream-json');
+      }
+
+      args.push(enhancedPrompt);
 
       if (this.verbose) {
         console.log('🚀 Spawning claude process with:');
@@ -297,7 +303,7 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
         });
       }, timeout);
 
-      claudeProcess.on('exit', (code, signal) => {
+      claudeProcess.on('exit', async (code, signal) => {
         clearTimeout(timeoutId);
         this.processes.delete(processId);
 
@@ -306,21 +312,66 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
           console.log(`Claude Code finished with code: ${code}, signal: ${signal}`);
         }
 
+        // Parse JSONL to extract human-readable summary and save files (if conversation capture is enabled)
+        let finalResult = '';
+        if (this.captureConversation) {
+          try {
+            // Save full JSONL conversation (with tool calls)
+            const jsonlFile = path.join(projectDir, 'claude-conversation.jsonl');
+            await fs.writeFile(jsonlFile, stdout);
+
+            // Parse JSONL to extract human-readable summary
+            const lines = stdout.trim().split('\n');
+            const messages: any[] = [];
+
+            for (const line of lines) {
+              try {
+                const msg = JSON.parse(line);
+                messages.push(msg);
+                if (msg.type === 'result') {
+                  finalResult = msg.result || '';
+                }
+              } catch (e) {
+                // Skip invalid JSON lines
+              }
+            }
+
+            // Save human-readable summary
+            const summaryFile = path.join(projectDir, 'claude-output.txt');
+            const summary = `=== Claude Code Output ===\n` +
+              `Exit Code: ${code}\n` +
+              `Signal: ${signal}\n\n` +
+              `=== FINAL RESULT ===\n${finalResult}\n\n` +
+              `=== STDERR ===\n${stderr}\n\n` +
+              `Full conversation with tool calls saved to: claude-conversation.jsonl\n`;
+            await fs.writeFile(summaryFile, summary);
+
+            if (this.verbose) {
+              console.log(`📝 Conversation saved to ${jsonlFile}`);
+              console.log(`📝 Summary saved to ${summaryFile}`);
+            }
+          } catch (error) {
+            if (this.verbose) {
+              console.error(`Failed to save output files: ${error}`);
+            }
+          }
+        }
+
         if (signal) {
           resolve({
             success: false,
-            output: stdout,
+            output: this.captureConversation && finalResult ? finalResult : stdout,
             error: `Claude Code process killed by signal ${signal}`
           });
         } else if (code === 0) {
           resolve({
             success: true,
-            output: stdout
+            output: this.captureConversation && finalResult ? finalResult : stdout
           });
         } else {
           resolve({
             success: false,
-            output: stdout,
+            output: this.captureConversation && finalResult ? finalResult : stdout,
             error: stderr || `Claude Code process exited with code ${code}`
           });
         }
