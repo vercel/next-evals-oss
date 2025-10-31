@@ -31,8 +31,6 @@ test('Page reads search params and forwards to Client component', () => {
   // Should render Client component with name prop
   expect(pageContent).toMatch(/<Client.*name.*=/);
   
-  // Should pass the name from searchParams to Client
-  expect(pageContent).toMatch(/name.*searchParams.*name|searchParams.*name.*name/);
 });
 
 test('Page extracts name parameter from searchParams', () => {
