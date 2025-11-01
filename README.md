@@ -101,7 +101,19 @@ bun claude-code-cli.ts --eval 001-server-component --verbose
 
 # Debug mode - keep output folders
 bun claude-code-cli.ts --eval 001-server-component --debug
+
+# Capture full conversation with tool calls (Claude Code only)
+bun claude-code-cli.ts --eval 001-server-component --capture-conversation
 ```
+
+**Conversation Capture (Claude Code only):**
+
+Use the `--capture-conversation` flag to save the full conversation including all tool calls in JSONL format:
+
+- `claude-conversation.jsonl` - Complete conversation with all tool calls and responses in JSONL format
+- `claude-output.txt` - Human-readable summary of the evaluation
+
+These files are saved in the output directory (`output-claude-code/`).
 
 #### Claude Code with Dev Server and Hooks
 
