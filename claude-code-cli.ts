@@ -29,6 +29,10 @@ function parseCliArgs(args: string[]) {
       values.timeout = args[++i];
     } else if (arg === "--api-key") {
       values["api-key"] = args[++i];
+    } else if (arg === "--pre-eval") {
+      values["pre-eval"] = args[++i];
+    } else if (arg === "--post-eval") {
+      values["post-eval"] = args[++i];
     } else if (arg === "--output-file") {
       values["output-file"] = args[++i];
     } else if (!arg.startsWith("-")) {
@@ -56,6 +60,8 @@ Options:
       --debug             Persist output folders for debugging (don't clean up)
   -t, --timeout <ms>      Timeout in milliseconds (default: 600000 = 10 minutes)
       --api-key <key>     Anthropic API key (or use ANTHROPIC_API_KEY env var)
+      --pre-eval <script> Path to bash script to run before eval starts
+      --post-eval <script> Path to bash script to run after eval completes
       --output-file <path> Write results to JSON file (only with --all)
 
 Examples:
@@ -73,6 +79,11 @@ Examples:
 
   # Debug mode - keep output folders for inspection
   bun claude-code-cli.ts --eval 001-server-component --debug
+
+  # Run with hooks for MCP setup
+  bun claude-code-cli.ts --eval 001-server-component \\
+    --pre-eval ./scripts/eval-hooks/nextjs-mcp-pre.sh \\
+    --post-eval ./scripts/eval-hooks/nextjs-mcp-post.sh
 
   # Write results to JSON file when running all evals
   bun claude-code-cli.ts --all --output-file results.json
@@ -284,12 +295,22 @@ async function main() {
     return;
   }
 
+  // Check for API key
+  const apiKey = values["api-key"] || process.env.ANTHROPIC_API_KEY;
 
   const evalOptions = {
     verbose: values.verbose || false,
     debug: values.debug || false,
     timeout: values.timeout ? parseInt(values.timeout) : 600000, // 10 minutes default
-  //  apiKey,
+    apiKey,
+    ...(values["pre-eval"] || values["post-eval"]
+      ? {
+          hooks: {
+            preEval: values["pre-eval"],
+            postEval: values["post-eval"],
+          },
+        }
+      : {}),
   };
 
   if (values.all) {

@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import { existsSync } from "fs";
 import path from "path";
 import { spawn, ChildProcess } from "child_process";
 import { performance } from "perf_hooks";
@@ -239,7 +240,12 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       // Additional flags to ensure it works well in automation:
       // --dangerously-skip-permissions: bypass file/execution permission prompts
       // --print: non-interactive mode that prints response and exits
+      // --mcp-config: load MCP servers from .mcp.json if it exists
+      const mcpConfigPath = path.join(projectDir, '.mcp.json');
+      const mcpConfigExists = existsSync(mcpConfigPath);
+
       const args = [
+        ...(mcpConfigExists ? ['--mcp-config', mcpConfigPath] : []),
         '--print',
         '--dangerously-skip-permissions',
         enhancedPrompt
@@ -393,25 +399,9 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
         console.log("Running lint...");
       }
 
-      // Check if .eslintrc.json exists, create a basic one if not
-      const eslintConfigPath = path.join(projectDir, ".eslintrc.json");
-      const eslintConfigExists = await fs
-        .stat(eslintConfigPath)
-        .then(() => true)
-        .catch(() => false);
-
-      if (!eslintConfigExists) {
-        const basicEslintConfig = {
-          extends: "next/core-web-vitals",
-        };
-        await fs.writeFile(
-          eslintConfigPath,
-          JSON.stringify(basicEslintConfig, null, 2),
-        );
-      }
-
+      // Use eslint directly (template includes eslint.config.mjs)
       lintOutput = await this.execCommand(
-        `cd "${projectDir}" && ${nodeModulesPath}/next lint`,
+        `cd "${projectDir}" && ${nodeModulesPath}/eslint .`,
         30000
       );
       lintSuccess = true;
