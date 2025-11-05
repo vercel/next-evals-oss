@@ -33,6 +33,8 @@ function parseCliArgs(args: string[]) {
       values["pre-eval"] = args[++i];
     } else if (arg === "--post-eval") {
       values["post-eval"] = args[++i];
+    } else if (arg === "--output-file") {
+      values["output-file"] = args[++i];
     } else if (!arg.startsWith("-")) {
       positionals.push(arg);
     }
@@ -60,6 +62,7 @@ Options:
       --api-key <key>     Anthropic API key (or use ANTHROPIC_API_KEY env var)
       --pre-eval <script> Path to bash script to run before eval starts
       --post-eval <script> Path to bash script to run after eval completes
+      --output-file <path> Write results to JSON file (only with --all)
 
 Examples:
   # Run a specific eval
@@ -81,6 +84,9 @@ Examples:
   bun claude-code-cli.ts --eval 001-server-component \\
     --pre-eval ./scripts/eval-hooks/nextjs-mcp-pre.sh \\
     --post-eval ./scripts/eval-hooks/nextjs-mcp-post.sh
+
+  # Write results to JSON file when running all evals
+  bun claude-code-cli.ts --all --output-file results.json
 `);
 }
 
@@ -292,7 +298,6 @@ async function main() {
   // Check for API key
   const apiKey = values["api-key"] || process.env.ANTHROPIC_API_KEY;
 
-
   const evalOptions = {
     verbose: values.verbose || false,
     debug: values.debug || false,
@@ -343,6 +348,25 @@ async function main() {
     }
 
     displayResultsTable(results);
+
+    // Write all results to file if outputFile is specified
+    if (values["output-file"]) {
+      try {
+        await fs.writeFile(
+          values["output-file"],
+          JSON.stringify(results, null, 2),
+          "utf-8"
+        );
+        console.log(`\n📝 All results written to: ${values["output-file"]}`);
+      } catch (error) {
+        console.error(
+          `⚠️  Failed to write results to file: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+
     return;
   }
 
