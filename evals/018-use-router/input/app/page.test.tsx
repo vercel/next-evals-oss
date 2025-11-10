@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import Page from './page';
 
@@ -18,63 +18,186 @@ vi.mock('next/navigation', () => {
   };
 });
 
+// Helper function to find imported components from a file
+function getImportedComponents(fileContent: string): string[] {
+  const importRegex = /import\s+(?:{[^}]*}|\w+)\s+from\s+['"]\.\/([^'"]+)['"]/g;
+  const imports: string[] = [];
+  let match;
+  while ((match = importRegex.exec(fileContent)) !== null) {
+    imports.push(match[1]);
+  }
+  return imports;
+}
+
+// Helper function to check if useRouter exists in file or its imports
+function hasUseRouterInFileOrImports(
+  filePath: string
+): { found: boolean; inMainFile: boolean; inImportedFile: boolean; clientDirectiveFound: boolean } {
+  const fileContent = readFileSync(filePath, 'utf-8');
+  const appDir = join(process.cwd(), 'app');
+
+  // Check main file
+  const hasUseRouterInMain = /useRouter\s*\(\s*\)/.test(fileContent);
+  const hasClientDirectiveInMain = /['"]use client['"];?/.test(fileContent);
+  const importsUseRouterInMain = /import.*useRouter.*from.*['"]next\/navigation['"]/.test(fileContent);
+
+  if (hasUseRouterInMain || importsUseRouterInMain) {
+    return {
+      found: true,
+      inMainFile: true,
+      inImportedFile: false,
+      clientDirectiveFound: hasClientDirectiveInMain
+    };
+  }
+
+  // Check imported components
+  const imports = getImportedComponents(fileContent);
+  for (const importPath of imports) {
+    // Try different extensions
+    const possiblePaths = [
+      join(appDir, `${importPath}.tsx`),
+      join(appDir, `${importPath}.ts`),
+      join(appDir, importPath, 'index.tsx'),
+      join(appDir, importPath, 'index.ts'),
+    ];
+
+    for (const possiblePath of possiblePaths) {
+      if (existsSync(possiblePath)) {
+        const importedContent = readFileSync(possiblePath, 'utf-8');
+        const hasUseRouter = /useRouter\s*\(\s*\)/.test(importedContent) ||
+                             /import.*useRouter.*from.*['"]next\/navigation['"]/.test(importedContent);
+        const hasClientDirective = /['"]use client['"];?/.test(importedContent);
+
+        if (hasUseRouter) {
+          return {
+            found: true,
+            inMainFile: false,
+            inImportedFile: true,
+            clientDirectiveFound: hasClientDirective
+          };
+        }
+      }
+    }
+  }
+
+  return { found: false, inMainFile: false, inImportedFile: false, clientDirectiveFound: false };
+}
+
+// Helper function to check if router methods are used in file or its imports
+function hasRouterMethodsInFileOrImports(filePath: string): boolean {
+  const fileContent = readFileSync(filePath, 'utf-8');
+  const appDir = join(process.cwd(), 'app');
+
+  // Check main file
+  const usesRouterMethodsInMain =
+    fileContent.includes('.push(') ||
+    fileContent.includes('.replace(') ||
+    fileContent.includes('.back(') ||
+    fileContent.includes('.forward(') ||
+    fileContent.includes('.refresh(');
+
+  if (usesRouterMethodsInMain) {
+    return true;
+  }
+
+  // Check imported components
+  const imports = getImportedComponents(fileContent);
+  for (const importPath of imports) {
+    const possiblePaths = [
+      join(appDir, `${importPath}.tsx`),
+      join(appDir, `${importPath}.ts`),
+    ];
+
+    for (const possiblePath of possiblePaths) {
+      if (existsSync(possiblePath)) {
+        const importedContent = readFileSync(possiblePath, 'utf-8');
+        if (
+          importedContent.includes('.push(') ||
+          importedContent.includes('.replace(') ||
+          importedContent.includes('.back(') ||
+          importedContent.includes('.forward(') ||
+          importedContent.includes('.refresh(')
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+// Helper function to check for Pages Router API usage
+function usesPagesRouterAPI(filePath: string): boolean {
+  const fileContent = readFileSync(filePath, 'utf-8');
+  const appDir = join(process.cwd(), 'app');
+
+  // Check main file
+  const usesPagesRouterInMain =
+    /from ['"]next\/router['"]/.test(fileContent) ||
+    /router\.pathname|router\.query|router\.asPath/.test(fileContent);
+
+  if (usesPagesRouterInMain) {
+    return true;
+  }
+
+  // Check imported components
+  const imports = getImportedComponents(fileContent);
+  for (const importPath of imports) {
+    const possiblePaths = [
+      join(appDir, `${importPath}.tsx`),
+      join(appDir, `${importPath}.ts`),
+    ];
+
+    for (const possiblePath of possiblePaths) {
+      if (existsSync(possiblePath)) {
+        const importedContent = readFileSync(possiblePath, 'utf-8');
+        if (
+          /from ['"]next\/router['"]/.test(importedContent) ||
+          /router\.pathname|router\.query|router\.asPath/.test(importedContent)
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 test('Page renders correctly', () => {
   render(<Page />);
   expect(screen.getByRole('button', { name: 'Navigate' })).toBeDefined();
 });
 
-test('Page is a client component', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
-  // Should have 'use client' directive since useRouter requires client component
-  expect(pageContent).toMatch(/['"]use client['"];?/);
+test('useRouter is used in page.tsx or extracted component', () => {
+  const pagePath = join(process.cwd(), 'app', 'page.tsx');
+  const result = hasUseRouterInFileOrImports(pagePath);
+
+  expect(result.found).toBe(true);
 });
 
-test('Page imports and uses useRouter hook', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
+test('Component using useRouter has client directive', () => {
+  const pagePath = join(process.cwd(), 'app', 'page.tsx');
+  const result = hasUseRouterInFileOrImports(pagePath);
 
-  // Should import useRouter from next/navigation
-  expect(pageContent).toMatch(
-    /import.*useRouter.*from ['"]next\/navigation['"]/
-  );
-
-  // Should call useRouter hook
-  expect(pageContent).toMatch(/useRouter\s*\(\s*\)/);
+  // The component that uses useRouter must have 'use client'
+  expect(result.clientDirectiveFound).toBe(true);
 });
 
-test('Page uses router functionality', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
+test('Implementation uses router functionality', () => {
+  const pagePath = join(process.cwd(), 'app', 'page.tsx');
+  const usesRouterMethods = hasRouterMethodsInFileOrImports(pagePath);
 
   // Should use router methods like push, replace, back, forward, refresh
-  const usesRouterMethods =
-    pageContent.includes('.push(') ||
-    pageContent.includes('.replace(') ||
-    pageContent.includes('.back(') ||
-    pageContent.includes('.forward(') ||
-    pageContent.includes('.refresh(');
-
   expect(usesRouterMethods).toBe(true);
 });
 
-test('Page does not use Pages Router API', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
+test('Implementation does not use Pages Router API', () => {
+  const pagePath = join(process.cwd(), 'app', 'page.tsx');
+  const usesPagesRouter = usesPagesRouterAPI(pagePath);
 
   // Should NOT import from next/router (Pages Router)
-  expect(pageContent).not.toMatch(/from ['"]next\/router['"]/);
-
   // Should NOT use Pages Router patterns
-  expect(pageContent).not.toMatch(
-    /router\.pathname|router\.query|router\.asPath/
-  );
+  expect(usesPagesRouter).toBe(false);
 });
