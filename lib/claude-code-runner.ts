@@ -48,6 +48,7 @@ export interface ClaudeCodeEvalOptions {
   visualDiff?: boolean;
   outputFormat?: string;
   outputFile?: string;
+  extraPrompt?: string;
 }
 
 export class ClaudeCodeRunner {
@@ -717,7 +718,17 @@ export async function runClaudeCodeEval(
     throw new Error(`No prompt.md file found in ${evalPath}`);
   }
 
-  const prompt = await fs.readFile(promptFile, "utf8");
+  let prompt = await fs.readFile(promptFile, "utf8");
+
+  // Read extra prompt from file if specified (append to end)
+  if (options.extraPrompt) {
+    try {
+      const extraPrompt = await fs.readFile(options.extraPrompt, "utf8");
+      prompt = `${prompt}\n\n${extraPrompt}`;
+    } catch (error) {
+      throw new Error(`Failed to read extra prompt file: ${error}`);
+    }
+  }
 
   let outputDir: string;
   let worktreePath: string | undefined;
