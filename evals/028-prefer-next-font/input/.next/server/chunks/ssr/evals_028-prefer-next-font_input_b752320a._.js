@@ -1,0 +1,3 @@
+module.exports=[49776,a=>{a.n(a.i(51268))},20846,a=>{a.n(a.i(9884))},63399,a=>{a.n(a.i(41975))},98547,a=>{a.n(a.i(85573))},84889,a=>{"use strict";var b=a.i(91711);function c(){return(0,b.jsxs)("header",{children:[(0,b.jsx)("h1",{children:"My Personal Blog"}),(0,b.jsx)("p",{children:"Thoughts, ideas, and musings"})]})}function d(){return(0,b.jsxs)("div",{children:[(0,b.jsx)("h1",{children:"My Blog"}),(0,b.jsx)("p",{children:"Welcome to my personal blog where I share my thoughts and ideas."}),(0,b.jsx)(c,{}),(0,b.jsxs)("article",{children:[(0,b.jsx)("h2",{children:"Latest Post"}),(0,b.jsx)("p",{children:"This is the content of my latest blog post..."})]})]})}a.s(["default",()=>d],84889)}];
+
+//# sourceMappingURL=evals_028-prefer-next-font_input_b752320a._.js.map

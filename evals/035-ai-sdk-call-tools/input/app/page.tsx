@@ -1,17 +1,14 @@
 'use client';
 
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { useChat } from 'ai';
 import { useState } from 'react';
 import type { ChatMessage } from './api/chat/route';
 
 export default function Page() {
   const [input, setInput] = useState('');
 
-  const { messages, sendMessage } = useChat<ChatMessage>({
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-    }),
+  const { messages, handleSubmit, handleInputChange, isLoading } = useChat<ChatMessage>({
+    api: '/api/chat',
   });
 
   return (

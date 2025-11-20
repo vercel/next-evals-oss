@@ -8,7 +8,7 @@ test('Dynamic route directory structure exists', () => {
   const entries = readdirSync(appDir, { withFileTypes: true });
 
   const hasDynamicRoute = entries.some(
-    (entry: any) =>
+    (entry: unknown) =>
       entry.isDirectory() &&
       entry.name.startsWith('[') &&
       entry.name.endsWith(']')
@@ -22,7 +22,7 @@ test('Dynamic route has server component with params', () => {
   const entries = readdirSync(appDir, { withFileTypes: true });
 
   const dynamicRoute = entries.find(
-    (entry: any) =>
+    (entry: unknown) =>
       entry.isDirectory() &&
       entry.name.startsWith('[') &&
       entry.name.endsWith(']')
@@ -55,7 +55,7 @@ test('Server component uses pathname parameter for API call', () => {
   const entries = readdirSync(appDir, { withFileTypes: true });
 
   const dynamicRoute = entries.find(
-    (entry: any) =>
+    (entry: unknown) =>
       entry.isDirectory() &&
       entry.name.startsWith('[') &&
       entry.name.endsWith(']')
@@ -82,7 +82,7 @@ test('Server component displays fetched product data', () => {
   const entries = readdirSync(appDir, { withFileTypes: true });
 
   const dynamicRoute = entries.find(
-    (entry: any) =>
+    (entry: unknown) =>
       entry.isDirectory() &&
       entry.name.startsWith('[') &&
       entry.name.endsWith(']')
