@@ -16,15 +16,15 @@ test('Intercepting route page shows modal', () => {
   const interceptingPagePath = join(process.cwd(), 'app', '(.)photo', '[id]', 'page.tsx');
   if (existsSync(interceptingPagePath)) {
     const content = readFileSync(interceptingPagePath, 'utf-8');
-    
+
     // Should have modal className
     expect(content).toMatch(/className=["']modal["']/);
-    
+
     // Should show Modal text
     expect(content).toMatch(/Modal/);
-    
-    // Should handle params.id
-    expect(content).toMatch(/params\.id|params\[['"]id['"]\]/);
+
+    // Should handle params.id (supports multiple patterns: params.id, destructuring, or variable assignment)
+    expect(content).toMatch(/params\.id|params\[['"]id['"]\]|{\s*id\s*}.*params|\.id\s*}/);
   }
 });
 
@@ -32,15 +32,15 @@ test('Regular route page shows full page', () => {
   const regularPagePath = join(process.cwd(), 'app', 'photo', '[id]', 'page.tsx');
   if (existsSync(regularPagePath)) {
     const content = readFileSync(regularPagePath, 'utf-8');
-    
+
     // Should have page className
     expect(content).toMatch(/className=["']page["']/);
-    
+
     // Should show Page text
     expect(content).toMatch(/Page/);
-    
-    // Should handle params.id
-    expect(content).toMatch(/params\.id|params\[['"]id['"]\]/);
+
+    // Should handle params.id (supports multiple patterns: params.id, destructuring, or variable assignment)
+    expect(content).toMatch(/params\.id|params\[['"]id['"]\]|{\s*id\s*}.*params|\.id\s*}/);
   }
 });
 
