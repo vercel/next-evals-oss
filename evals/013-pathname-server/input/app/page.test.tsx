@@ -2,34 +2,39 @@ import { expect, test } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
+// Helper function to recursively find dynamic routes
+function findDynamicRoute(dir: string): string | null {
+  const entries = readdirSync(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith('[') && entry.name.endsWith(']')) {
+      return join(dir, entry.name);
+    }
+
+    // Recursively search subdirectories (but skip node_modules, .next, etc.)
+    if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules') {
+      const result = findDynamicRoute(join(dir, entry.name));
+      if (result) return result;
+    }
+  }
+
+  return null;
+}
+
 test('Dynamic route directory structure exists', () => {
-  // Check for dynamic route like [id] or [productId]
+  // Check for dynamic route like [id] or [productId] (recursively)
   const appDir = join(process.cwd(), 'app');
-  const entries = readdirSync(appDir, { withFileTypes: true });
+  const dynamicRoutePath = findDynamicRoute(appDir);
 
-  const hasDynamicRoute = entries.some(
-    (entry: any) =>
-      entry.isDirectory() &&
-      entry.name.startsWith('[') &&
-      entry.name.endsWith(']')
-  );
-
-  expect(hasDynamicRoute).toBe(true);
+  expect(dynamicRoutePath).not.toBeNull();
 });
 
 test('Dynamic route has server component with params', () => {
   const appDir = join(process.cwd(), 'app');
-  const entries = readdirSync(appDir, { withFileTypes: true });
+  const dynamicRoutePath = findDynamicRoute(appDir);
 
-  const dynamicRoute = entries.find(
-    (entry: any) =>
-      entry.isDirectory() &&
-      entry.name.startsWith('[') &&
-      entry.name.endsWith(']')
-  );
-
-  if (dynamicRoute) {
-    const pagePath = join(appDir, dynamicRoute.name, 'page.tsx');
+  if (dynamicRoutePath) {
+    const pagePath = join(dynamicRoutePath, 'page.tsx');
     expect(existsSync(pagePath)).toBe(true);
 
     const pageContent = readFileSync(pagePath, 'utf-8');
@@ -52,17 +57,10 @@ test('Dynamic route has server component with params', () => {
 
 test('Server component uses pathname parameter for API call', () => {
   const appDir = join(process.cwd(), 'app');
-  const entries = readdirSync(appDir, { withFileTypes: true });
+  const dynamicRoutePath = findDynamicRoute(appDir);
 
-  const dynamicRoute = entries.find(
-    (entry: any) =>
-      entry.isDirectory() &&
-      entry.name.startsWith('[') &&
-      entry.name.endsWith(']')
-  );
-
-  if (dynamicRoute) {
-    const pagePath = join(appDir, dynamicRoute.name, 'page.tsx');
+  if (dynamicRoutePath) {
+    const pagePath = join(dynamicRoutePath, 'page.tsx');
     const pageContent = readFileSync(pagePath, 'utf-8');
 
     // Should use the parameter in the API URL
@@ -79,17 +77,10 @@ test('Server component uses pathname parameter for API call', () => {
 
 test('Server component displays fetched product data', () => {
   const appDir = join(process.cwd(), 'app');
-  const entries = readdirSync(appDir, { withFileTypes: true });
+  const dynamicRoutePath = findDynamicRoute(appDir);
 
-  const dynamicRoute = entries.find(
-    (entry: any) =>
-      entry.isDirectory() &&
-      entry.name.startsWith('[') &&
-      entry.name.endsWith(']')
-  );
-
-  if (dynamicRoute) {
-    const pagePath = join(appDir, dynamicRoute.name, 'page.tsx');
+  if (dynamicRoutePath) {
+    const pagePath = join(dynamicRoutePath, 'page.tsx');
     const pageContent = readFileSync(pagePath, 'utf-8');
 
     // Should display product information
