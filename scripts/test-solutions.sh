@@ -2,7 +2,7 @@
 
 set -e
 
-echo "Testing codex outputs..."
+echo "Testing solutions..."
 echo ""
 
 failed=0
@@ -11,12 +11,12 @@ skipped=0
 
 for eval_dir in evals/*/; do
   eval_name=$(basename "$eval_dir")
-  codex_dir="${eval_dir}solution"
+  solution_dir="${eval_dir}solution"
 
-  if [ -d "$codex_dir" ]; then
+  if [ -d "$solution_dir" ]; then
     echo "Testing $eval_name..."
 
-    cd "$codex_dir"
+    cd "$solution_dir"
 
     if ! npm run build; then
       echo "❌ Build failed for $eval_name"
@@ -36,8 +36,8 @@ done
 
 echo ""
 echo "========================================="
-echo "Codex test results:"
+echo "Solution test results:"
 echo "  Tested: $tested"
 echo "  Skipped: $skipped"
 echo "========================================="
-echo "✅ All codex outputs built successfully!"
+echo "✅ All solutions built successfully!"
