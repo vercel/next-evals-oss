@@ -1,11 +1,11 @@
-import { expect, test } from "vitest";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { expect, test } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
-test("Page is an async server component", () => {
+test('Page is an async server component', () => {
   const pageContent = readFileSync(
-    join(process.cwd(), "app", "page.tsx"),
-    "utf-8"
+    join(process.cwd(), 'app', 'page.tsx'),
+    'utf-8'
   );
 
   // Should be an async function (server component)
@@ -14,13 +14,13 @@ test("Page is an async server component", () => {
   );
 
   // Should NOT have 'use client' directive
-  expect(pageContent).not.toMatch(/['"]use client['"];?/);
+  expect(pageContent).not.toMatch(/['']use client[''];?/);
 });
 
-test("Page fetches from correct API endpoint", () => {
+test('Page fetches from correct API endpoint', () => {
   const pageContent = readFileSync(
-    join(process.cwd(), "app", "page.tsx"),
-    "utf-8"
+    join(process.cwd(), 'app', 'page.tsx'),
+    'utf-8'
   );
 
   // Should fetch from the correct URL
@@ -33,10 +33,10 @@ test("Page fetches from correct API endpoint", () => {
   expect(pageContent).toMatch(/await.*fetch|fetch.*await/);
 });
 
-test("Page renders first product in h1 tag", () => {
+test('Page renders first product in h1 tag', () => {
   const pageContent = readFileSync(
-    join(process.cwd(), "app", "page.tsx"),
-    "utf-8"
+    join(process.cwd(), 'app', 'page.tsx'),
+    'utf-8'
   );
 
   // Should access first product (array[0] or similar)
@@ -49,17 +49,17 @@ test("Page renders first product in h1 tag", () => {
   expect(pageContent).toMatch(/\.name\b/);
 });
 
-test("Page handles JSON response correctly", () => {
+test('Page handles JSON response correctly', () => {
   const pageContent = readFileSync(
-    join(process.cwd(), "app", "page.tsx"),
-    "utf-8"
+    join(process.cwd(), 'app', 'page.tsx'),
+    'utf-8'
   );
 
   // Should parse JSON response
   expect(pageContent).toMatch(/\.json\(\)/);
 
   // Should handle the JSON parsing asynchronously (either awaited or returned from async function)
-  // This accepts both: "await response.json()" and "return response.json()" in async functions
+  // This accepts both: 'await response.json()' and 'return response.json()' in async functions
   const hasJsonCall = /\.json\(\)/.test(pageContent);
   const hasAsyncFunction = /async\s+function/.test(pageContent);
   expect(hasJsonCall && hasAsyncFunction).toBe(true);
