@@ -9,19 +9,22 @@ vi.mock('./actions', () => ({
 
 test('Page has form with username input and server action', async () => {
   render(<Page />);
-  
+
   // Should have a form
   const form = screen.getByTestId('cookie-form');
   expect(form).toBeDefined();
-  
+
   // Should have username input
-  const usernameInput = screen.getByLabelText(/username/i) || screen.getByPlaceholderText(/username/i) || screen.getByDisplayValue('');
+  const usernameInput =
+    screen.getByLabelText(/username/i) ||
+    screen.getByPlaceholderText(/username/i) ||
+    screen.getByDisplayValue('');
   expect(usernameInput).toBeDefined();
-  
+
   // Should have submit button
-  const submitButton = screen.getByRole('button', { name: /submit/i }) || screen.getByRole('button');
+  const submitButton = form.querySelector('button[type="submit"]');
   expect(submitButton).toBeDefined();
-  
+
   // Test form interaction
   fireEvent.change(usernameInput, { target: { value: 'testuser' } });
   expect(usernameInput.value).toBe('testuser');
