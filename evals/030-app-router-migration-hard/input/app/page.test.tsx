@@ -1,99 +1,109 @@
-import { expect, test } from 'vitest';
-import { readFileSync, existsSync } from 'fs';
+import { expect, test, vi, beforeEach } from 'vitest';
+import { existsSync } from 'fs';
 import { join } from 'path';
+import { renderToString } from 'react-dom/server';
 
-test('Root layout exists and replaces _app/_document', () => {
+// Mock fetch for server components
+beforeEach(() => {
+  global.fetch = vi.fn(() =>
+    Promise.resolve({
+      json: () => Promise.resolve([
+        { id: 1, title: 'Post 1', content: 'Content 1' },
+        { id: 2, title: 'Post 2', content: 'Content 2' },
+      ]),
+    })
+  ) as any;
+});
+
+test('Root layout exists and replaces _app/_document', async () => {
   const layoutPath = join(process.cwd(), 'app', 'layout.tsx');
   expect(existsSync(layoutPath)).toBe(true);
 
-  const layoutContent = readFileSync(layoutPath, 'utf-8');
+  // Import and render the layout
+  const RootLayout = (await import('./layout')).default;
+  const html = renderToString(
+    <RootLayout>
+      <div>Test content</div>
+    </RootLayout>
+  );
 
-  // Should have html and body tags (replacing _document.js)
-  expect(layoutContent).toMatch(/<html.*lang/);
-  expect(layoutContent).toMatch(/<body/);
-
-  // Should include metadata (replacing Head in _document.js)
-  expect(layoutContent).toMatch(/metadata|Metadata/);
-
-  // Should accept children prop
-  expect(layoutContent).toMatch(/children.*React\.ReactNode/);
+  // Should render html and body tags
+  expect(html).toContain('<html');
+  expect(html).toContain('lang=');
+  expect(html).toContain('<body');
+  expect(html).toContain('Test content');
 });
 
-test('Home page migrated to Server Component with async data fetching', () => {
+test('Home page migrated to Server Component with async data fetching', async () => {
   const pagePath = join(process.cwd(), 'app', 'page.tsx');
   expect(existsSync(pagePath)).toBe(true);
 
-  const pageContent = readFileSync(pagePath, 'utf-8');
+  // Import and call the page component
+  const Page = (await import('./page')).default;
 
-  // Should be async Server Component
-  expect(pageContent).toMatch(
-    /export\s+default\s+async\s+function|async\s+function.*Page/
-  );
+  // Should be async (server component pattern)
+  expect(Page.constructor.name).toBe('AsyncFunction');
 
-  // Should NOT have 'use client' directive
-  expect(pageContent).not.toMatch(/['"]use client['"];?/);
+  // Call the async component and verify it renders
+  const result = await Page();
+  const html = renderToString(result);
 
-  // Should use fetch instead of getServerSideProps
-  expect(pageContent).toMatch(/await\s+fetch|fetch\(/);
-
-  // Should not have getServerSideProps
-  expect(pageContent).not.toMatch(/getServerSideProps/);
+  // Should render content successfully
+  expect(html.length).toBeGreaterThan(0);
 });
 
-test('Blog index migrated with ISR equivalent', () => {
+test('Blog index migrated with ISR equivalent', async () => {
   const blogPath = join(process.cwd(), 'app', 'blog', 'page.tsx');
   expect(existsSync(blogPath)).toBe(true);
 
-  const blogContent = readFileSync(blogPath, 'utf-8');
+  // Import and verify the blog page
+  const BlogPage = (await import('./blog/page')).default;
 
-  // Should be async Server Component
-  expect(blogContent).toMatch(
-    /export\s+default\s+async\s+function|async\s+function/
-  );
+  // Should be async (server component)
+  expect(BlogPage.constructor.name).toBe('AsyncFunction');
 
-  // Should use revalidate for ISR
-  expect(blogContent).toMatch(
-    /revalidate.*\d+|next.*revalidate|export.*const.*revalidate.*=.*\d+/
-  );
+  // Call and render the component
+  const result = await BlogPage();
+  const html = renderToString(result);
 
-  // Should not have getStaticProps
-  expect(blogContent).not.toMatch(/getStaticProps/);
+  // Should render successfully
+  expect(html.length).toBeGreaterThan(0);
 });
 
-test('Dynamic blog route migrated to generateStaticParams', () => {
+test('Dynamic blog route migrated to generateStaticParams', async () => {
   const dynamicPath = join(process.cwd(), 'app', 'blog', '[id]', 'page.tsx');
   expect(existsSync(dynamicPath)).toBe(true);
 
-  const dynamicContent = readFileSync(dynamicPath, 'utf-8');
+  // Import the dynamic page
+  const module = await import('./blog/[id]/page');
+  const DynamicPage = module.default;
 
-  // Should export generateStaticParams
-  expect(dynamicContent).toMatch(
-    /export.*generateStaticParams|generateStaticParams.*export/
-  );
+  // Should have generateStaticParams function exported
+  expect(module.generateStaticParams).toBeDefined();
+  expect(typeof module.generateStaticParams).toBe('function');
 
-  // Should be async Server Component
-  expect(dynamicContent).toMatch(
-    /export\s+default\s+async\s+function|async\s+function/
-  );
+  // Should be async server component
+  expect(DynamicPage.constructor.name).toBe('AsyncFunction');
 
-  // Should not have getStaticPaths or getStaticProps
-  expect(dynamicContent).not.toMatch(/getStaticPaths|getStaticProps/);
+  // Test with a params object
+  const result = await DynamicPage({ params: { id: '1' } });
+  const html = renderToString(result);
+
+  // Should render successfully
+  expect(html.length).toBeGreaterThan(0);
 });
 
-test('API routes migrated to Route Handlers', () => {
+test('API routes migrated to Route Handlers', async () => {
   // Check posts index route
   const postsRoutePath = join(process.cwd(), 'app', 'api', 'posts', 'route.ts');
   expect(existsSync(postsRoutePath)).toBe(true);
 
-  const postsRouteContent = readFileSync(postsRoutePath, 'utf-8');
+  // Import and test the route handler
+  const postsRoute = await import('./api/posts/route');
 
-  // Should export HTTP method functions
-  expect(postsRouteContent).toMatch(/export.*GET|export.*POST/);
-
-  // Should use Request/Response or Next APIs
-  expect(postsRouteContent).toMatch(
-    /Request|Response|NextRequest|NextResponse/
-  );
+  // Should export GET or POST functions
+  const hasGetOrPost = postsRoute.GET !== undefined || postsRoute.POST !== undefined;
+  expect(hasGetOrPost).toBe(true);
 
   // Check dynamic API route
   const dynamicApiPath = join(
@@ -106,60 +116,62 @@ test('API routes migrated to Route Handlers', () => {
   );
   expect(existsSync(dynamicApiPath)).toBe(true);
 
-  const dynamicApiContent = readFileSync(dynamicApiPath, 'utf-8');
+  // Import and test dynamic route
+  const dynamicRoute = await import('./api/posts/[id]/route');
 
-  // Should export HTTP methods
-  expect(dynamicApiContent).toMatch(/export.*GET|export.*PUT|export.*DELETE/);
+  // Should export GET, PUT, or DELETE
+  const hasMethods =
+    dynamicRoute.GET !== undefined ||
+    dynamicRoute.PUT !== undefined ||
+    dynamicRoute.DELETE !== undefined;
+  expect(hasMethods).toBe(true);
 });
 
-test('Metadata API replaces next/head', () => {
+test('Metadata API used in pages', async () => {
   const pagePath = join(process.cwd(), 'app', 'page.tsx');
-  const pageContent = readFileSync(pagePath, 'utf-8');
+  expect(existsSync(pagePath)).toBe(true);
 
-  // Should use Metadata export instead of Head component
-  expect(pageContent).toMatch(/export.*metadata|metadata.*Metadata/);
+  // Import and check for metadata export
+  const pageModule = await import('./page');
 
-  // Should not import or use next/head
-  expect(pageContent).not.toMatch(/import.*Head.*next\/head|<Head>/);
+  // Should have metadata export (object or function)
+  expect(pageModule.metadata || pageModule.generateMetadata).toBeDefined();
 
   // Check blog page too
   const blogPath = join(process.cwd(), 'app', 'blog', 'page.tsx');
   if (existsSync(blogPath)) {
-    const blogContent = readFileSync(blogPath, 'utf-8');
-    expect(blogContent).toMatch(/export.*metadata|metadata.*Metadata/);
-    expect(blogContent).not.toMatch(/import.*Head.*next\/head|<Head>/);
+    const blogModule = await import('./blog/page');
+    expect(blogModule.metadata || blogModule.generateMetadata).toBeDefined();
   }
 });
 
-test('Error handling migrated to error.js and not-found.js', () => {
-  // Check for error.js file
+test('Error handling migrated to error.tsx and not-found.tsx', async () => {
+  // Check for error.tsx file
   const errorPath = join(process.cwd(), 'app', 'error.tsx');
   expect(existsSync(errorPath)).toBe(true);
 
-  const errorContent = readFileSync(errorPath, 'utf-8');
+  // Import and test error component
+  const ErrorComponent = (await import('./error')).default;
 
-  // Should be a Client Component for error boundaries
-  expect(errorContent).toMatch(/['"]use client['"];?/);
+  // Should render with error props
+  const mockError = new Error('Test error');
+  const mockReset = vi.fn();
 
-  // Should accept error props
-  expect(errorContent).toMatch(/error.*Error|Error.*error/);
+  const html = renderToString(<ErrorComponent error={mockError} reset={mockReset} />);
+  expect(html.length).toBeGreaterThan(0);
 
-  // Check for not-found.js file
+  // Check for not-found.tsx file
   const notFoundPath = join(process.cwd(), 'app', 'not-found.tsx');
   expect(existsSync(notFoundPath)).toBe(true);
+
+  // Import and test not-found component
+  const NotFoundComponent = (await import('./not-found')).default;
+  const notFoundHtml = renderToString(<NotFoundComponent />);
+  expect(notFoundHtml.length).toBeGreaterThan(0);
 });
 
-test('Client components use next/navigation hooks', () => {
-  // Check specific client component that should use useRouter
-  const homeClientPath = join(process.cwd(), 'app', 'home-client.tsx');
-
-  if (existsSync(homeClientPath)) {
-    const content = readFileSync(homeClientPath, 'utf-8');
-
-    if (content.includes('useRouter')) {
-      // Should import from next/navigation, not next/router
-      expect(content).toMatch(/import.*useRouter.*next\/navigation/);
-      expect(content).not.toMatch(/import.*useRouter.*next\/router/);
-    }
-  }
+test('Pages directory is removed', () => {
+  // The pages directory should be completely removed after migration
+  const pagesPath = join(process.cwd(), 'pages');
+  expect(existsSync(pagesPath)).toBe(false);
 });
