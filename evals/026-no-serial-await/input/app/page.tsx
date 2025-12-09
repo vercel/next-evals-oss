@@ -2,13 +2,22 @@ import Dashboard from './Dashboard';
 
 // Good example: parallel data fetching
 async function getParallelData() {
-  const [users, posts, stats] = await Promise.all([
-    fetch('https://api.example.com/users').then(r => r.json()),
-    fetch('https://api.example.com/posts').then(r => r.json()),
-    fetch('https://api.example.com/stats').then(r => r.json())
-  ]);
-  
-  return { users, posts, stats };
+  try {
+    const [users, posts, stats] = await Promise.all([
+      fetch('https://api.example.com/users').then(r => r.json()),
+      fetch('https://api.example.com/posts').then(r => r.json()),
+      fetch('https://api.example.com/stats').then(r => r.json())
+    ]);
+
+    return { users, posts, stats };
+  } catch {
+    // Return mock data for build time
+    return {
+      users: [{ id: 1, name: 'User 1' }],
+      posts: [{ id: 1, title: 'Post 1' }],
+      stats: { views: 1000 }
+    };
+  }
 }
 
 export default async function Page() {

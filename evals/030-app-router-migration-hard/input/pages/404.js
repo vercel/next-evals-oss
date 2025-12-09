@@ -8,12 +8,12 @@ export default function Custom404() {
     <>
       <Head>
         <title>404 - Page Not Found</title>
-        <meta name="description" content="The page you're looking for doesn't exist" />
+        <meta name="description" content="The page you&apos;re looking for doesn&apos;t exist" />
       </Head>
-      
+
       <div className="error-page">
         <h1>404 - Page Not Found</h1>
-        <p>The page you're looking for doesn't exist.</p>
+        <p>The page you&apos;re looking for doesn&apos;t exist.</p>
         <button onClick={() => router.push('/')}>
           Go Back Home
         </button>

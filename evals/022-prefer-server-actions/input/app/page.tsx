@@ -3,15 +3,12 @@ import ContactForm from './ContactForm';
 // Example of existing server action
 async function updateProfile(formData: FormData) {
   'use server';
-  
+
   const name = formData.get('name') as string;
   const email = formData.get('email') as string;
-  
+
   // Simulate database update
   console.log('Updating profile:', { name, email });
-  
-  // Return success
-  return { success: true };
 }
 
 export default function Page() {

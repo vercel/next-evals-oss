@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AppProvider } from '../components/AppProvider';
 import '../styles/globals.css';
 
@@ -8,8 +9,8 @@ export default function MyApp({ Component, pageProps }) {
         <header>
           <h1>My Blog</h1>
           <nav>
-            <a href="/">Home</a>
-            <a href="/blog">Blog</a>
+            <Link href="/">Home</Link>
+            <Link href="/blog">Blog</Link>
           </nav>
         </header>
         <main>

@@ -3,6 +3,6 @@
 // Should call use(data) to unwrap the promise
 // Should output the data as JSON in a div with data-testid="client-data"
 
-export default function ClientComponent({ data }: { data: Promise<any> }) {
+export default function ClientComponent({ data }: { data: Promise<unknown> }) {
   return <div>Client component not implemented</div>;
 }
