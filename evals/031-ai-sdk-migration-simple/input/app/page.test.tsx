@@ -39,7 +39,8 @@ test('AI SDK Chat Route handler uses correct imports and exports', () => {
   // Should import required functions from AI SDK
   expect(routeContent).toMatch(/import.*convertToModelMessages.*from\s+['"]ai['"]/);
   expect(routeContent).toMatch(/import.*streamText.*from\s+['"]ai['"]/);
-  expect(routeContent).toMatch(/import.*type\s+UIMessage.*from\s+['"]ai['"]/);
+  // Accept both 'import { type UIMessage }' and 'import { UIMessage }' - both are valid TypeScript
+  expect(routeContent).toMatch(/import.*UIMessage.*from\s+['"]ai['"]/);
 
   // Should export POST function
   expect(routeContent).toMatch(/export\s+(async\s+)?function\s+POST/);

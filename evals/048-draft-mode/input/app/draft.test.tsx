@@ -49,10 +49,12 @@ test('API route enables draft mode and redirects', () => {
   const apiPath = join(process.cwd(), 'app', 'api', 'draft', 'route.ts');
   if (existsSync(apiPath)) {
     const content = readFileSync(apiPath, 'utf-8');
-    
-    // Should enable draft mode
-    expect(content).toMatch(/draftMode\(\)\.enable\(\)/);
-    
+
+    // Should enable draft mode using async pattern (Next.js 15+)
+    // draftMode() returns a Promise in Next.js 15+, must be awaited
+    expect(content).toMatch(/await\s+draftMode\(\)/);
+    expect(content).toMatch(/\.enable\(\)/);
+
     // Should import and use redirect
     expect(content).toMatch(/import.*redirect.*from\s+['"]next\/navigation['"]/);
     expect(content).toMatch(/redirect\(['"]\/['"]\)/);
