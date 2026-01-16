@@ -737,7 +737,7 @@ export async function runClaudeCodeEval(
   evalPath: string,
   options: ClaudeCodeEvalOptions = {},
   useWorktree: boolean = false,
-  isRetry: boolean = false
+  attemptNumber: number = 0 // 0 = first attempt, 1 = first retry, etc.
 ): Promise<ClaudeCodeResult> {
   const evalsDir = path.join(process.cwd(), "evals");
   const fullEvalPath = path.join(evalsDir, evalPath);
@@ -773,6 +773,9 @@ export async function runClaudeCodeEval(
   let outputDir: string;
   let worktreePath: string | undefined;
   let worktreeInputDir: string;
+
+  // Generate a unique timestamp for this run to ensure isolation
+  const runTimestamp = Date.now();
 
   if (useWorktree) {
     // Create a git worktree for isolated execution
@@ -819,41 +822,40 @@ export async function runClaudeCodeEval(
     // Use flattened paths within the worktree
     // Copy input files directly to worktree root to avoid deep nesting
     worktreeInputDir = inputDir; // Still read from original location
+    const attemptSuffix = attemptNumber > 0 ? `-attempt${attemptNumber + 1}` : '';
     const outputFolderName = options.outputSuffix
-      ? `output-claude-code-${options.outputSuffix}`
-      : "output-claude-code";
+      ? `output-claude-code-${options.outputSuffix}-${runTimestamp}${attemptSuffix}`
+      : `output-claude-code-${runTimestamp}${attemptSuffix}`;
     outputDir = path.join(worktreePath, outputFolderName);
   } else {
     worktreeInputDir = inputDir;
+    const attemptSuffix = attemptNumber > 0 ? `-attempt${attemptNumber + 1}` : '';
     const outputFolderName = options.outputSuffix
-      ? `output-claude-code-${options.outputSuffix}`
-      : "output-claude-code";
+      ? `output-claude-code-${options.outputSuffix}-${runTimestamp}${attemptSuffix}`
+      : `output-claude-code-${runTimestamp}${attemptSuffix}`;
     outputDir = path.join(fullEvalPath, outputFolderName);
   }
 
   const runner = new ClaudeCodeRunner(options);
 
+  const maxRetries = 4; // Total 5 attempts (1 initial + 4 retries)
+
   try {
     const result = await runner.runClaudeCodeEval(worktreeInputDir, outputDir, prompt, evalPath, options.timeout);
 
-    // If test didn't fully pass and this isn't already a retry, give it a second chance
+    // If test didn't fully pass and we have retries remaining, try again
     const fullyPassed = result.buildSuccess && result.lintSuccess && result.testSuccess;
-    if (!fullyPassed && !isRetry) {
+    if (!fullyPassed && attemptNumber < maxRetries) {
       if (options.verbose) {
-        console.log(`\n🔄 Test didn't fully pass, retrying once...`);
+        console.log(`\n🔄 Test didn't fully pass, retrying (attempt ${attemptNumber + 2}/${maxRetries + 1})...`);
       } else {
-        process.stdout.write(`🔄 Retrying...`);
+        process.stdout.write(`🔄 Retry ${attemptNumber + 1}...`);
       }
 
       // Cleanup current runner before retry
       await runner.cleanup();
 
-      // Clean up the output directory so retry starts fresh
-      try {
-        await fs.rm(outputDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup errors
-      }
+      // Keep the output directory for debugging (each retry gets its own folder)
 
       // Cleanup worktree if used
       if (worktreePath) {
@@ -872,8 +874,8 @@ export async function runClaudeCodeEval(
         }
       }
 
-      // Retry the eval
-      const retryResult = await runClaudeCodeEval(evalPath, options, useWorktree, true);
+      // Retry the eval with incremented attempt number
+      const retryResult = await runClaudeCodeEval(evalPath, options, useWorktree, attemptNumber + 1);
 
       // Return the better result (prefer the one that passed more checks)
       const originalScore = (result.buildSuccess ? 1 : 0) + (result.lintSuccess ? 1 : 0) + (result.testSuccess ? 1 : 0);
