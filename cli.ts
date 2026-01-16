@@ -331,7 +331,7 @@ Options:
       --debug             Persist output folders for debugging (don't clean up)
   -t, --threads <num>     Number of worker threads (default: 1, max: CPU cores)
       --all-models        Run single eval with all models (default: only first model)
-      --claude-code       Use Claude Code agent instead of LLM models
+      --claude-code       Use Claude Code agent instead of LLM models (always dry, no Braintrust)
       --compare-nextjs-docs  Run Claude Code with and without Next.js docs side-by-side
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
       --api-key <key>     Anthropic API key for Claude Code (or use ANTHROPIC_API_KEY env var)
@@ -1534,9 +1534,10 @@ async function main() {
         const threads = Math.max(1, requestedThreads);
 
         if (threads > 1) {
-          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs (${threads} in parallel)...\n`);
+          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs`);
+          console.log(`   (${threads} evals in parallel × 2 modes = ${threads * 2} concurrent runs)\n`);
         } else {
-          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs...\n`);
+          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs (2 concurrent runs per eval)...\n`);
         }
 
         const comparisonResults: Array<{
@@ -1549,18 +1550,21 @@ async function main() {
 
         // Helper function to run comparison for a single eval
         const runComparisonForEval = async (evalPath: string) => {
-          console.log(` ▶ ${evalPath}`);
+          const evalStart = performance.now();
+          process.stdout.write(` ▶ ${evalPath} ...`);
 
           // Run both modes in parallel with different output folders
+          // No worktrees needed - each mode writes to its own output directory
           const [ccResult, ccNextjsDocsResult] = await Promise.all([
-            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: false }, threads > 1),
-            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: true, outputSuffix: "nextjs-docs" }, threads > 1),
+            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: false }, false),
+            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: true, outputSuffix: "nextjs-docs" }, false),
           ]);
 
           const ccSuccess = ccResult.success && ccResult.buildSuccess && ccResult.lintSuccess && ccResult.testSuccess;
           const ccNextjsSuccess = ccNextjsDocsResult.success && ccNextjsDocsResult.buildSuccess && ccNextjsDocsResult.lintSuccess && ccNextjsDocsResult.testSuccess;
+          const duration = ((performance.now() - evalStart) / 1000).toFixed(1);
 
-          console.log(`   Claude Code: ${ccSuccess ? '✅' : '❌'} | + Next.js Docs: ${ccNextjsSuccess ? '✅' : '❌'}`);
+          process.stdout.write(`\r ▶ ${evalPath} [${duration}s] CC: ${ccSuccess ? '✅' : '❌'} | +Docs: ${ccNextjsSuccess ? '✅' : '❌'}     \n`);
 
           return {
             evalPath,
@@ -1637,12 +1641,12 @@ async function main() {
         const allEvals = await getAllEvals(agentEvalsOnly);
         const evalType = agentEvalsOnly ? "agent evals" : "evals";
 
-        // Use git worktrees for concurrent execution
+        // Parallel execution (no worktrees needed - each eval has its own output directory)
         const requestedThreads = values.threads ? parseInt(values.threads) : 1;
         const threads = requestedThreads;
 
         if (threads > 1) {
-          console.log(`🔀 Using git worktrees for concurrent execution (${threads} at a time)\n`);
+          console.log(`🔀 Running ${threads} evals in parallel\n`);
         }
 
         console.log(
@@ -1680,13 +1684,13 @@ async function main() {
             }
           }
         } else {
-          // Concurrent execution with limit using worktrees
+          // Concurrent execution with limit
           const runBatch = async (batch: string[]) => {
             return Promise.all(
               batch.map(async (evalPath) => {
                 try {
                   console.log(` ▶ ${evalPath}`);
-                  const result = await runClaudeCodeEval(evalPath, claudeOptions, true); // Use worktrees
+                  const result = await runClaudeCodeEval(evalPath, claudeOptions, false);
 
                   const success =
                     result.success &&
@@ -1803,12 +1807,12 @@ async function main() {
           process.exit(1);
         }
 
-        // Determine concurrency using git worktrees
+        // Parallel execution (no worktrees needed - each eval has its own output directory)
         const requestedThreads = values.threads ? parseInt(values.threads) : 1;
         const threads = requestedThreads;
 
         if (threads > 1) {
-          console.log(`🔀 Using git worktrees for concurrent execution (${threads} at a time)\n`);
+          console.log(`🔀 Running ${threads} evals in parallel\n`);
         }
         console.log(`🤖 Running ${evalNames.length} Claude Code evals...\n`);
 
@@ -1843,13 +1847,13 @@ async function main() {
             }
           }
         } else {
-          // Concurrent execution with limit using worktrees
+          // Concurrent execution with limit
           const runBatch = async (batch: string[]) => {
             return Promise.all(
               batch.map(async (evalPath) => {
                 try {
                   console.log(` ▶ ${evalPath}`);
-                  const result = await runClaudeCodeEval(evalPath, claudeOptions, true); // Use worktrees
+                  const result = await runClaudeCodeEval(evalPath, claudeOptions, false);
 
                   const success =
                     result.success &&
