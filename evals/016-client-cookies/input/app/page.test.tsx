@@ -1,16 +1,22 @@
 import { expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import Page from './page';
 
-test('Page is a client component', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
-  // Should have 'use client' directive
-  expect(pageContent).toMatch(/['"]use client['"];?/);
+test('App has a client component with use client directive', () => {
+  const appDir = join(process.cwd(), 'app');
+
+  // Check all .tsx files in app directory for 'use client' directive
+  // The model may create a separate client component file (valid pattern)
+  const tsxFiles = readdirSync(appDir).filter(f => f.endsWith('.tsx'));
+
+  const hasClientDirective = tsxFiles.some(file => {
+    const content = readFileSync(join(appDir, file), 'utf-8');
+    return /['"]use client['"];?/.test(content);
+  });
+
+  expect(hasClientDirective).toBe(true);
 });
 
 test('Page has clickable element that calls server action', () => {
@@ -39,16 +45,23 @@ test('Page has button that can be clicked', () => {
 });
 
 test('Server action sets cookies', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
+  const appDir = join(process.cwd(), 'app');
+
+  // Check all .ts and .tsx files for cookie logic
+  // The model may put server actions in a separate file (e.g., actions.ts)
+  const codeFiles = readdirSync(appDir).filter(
+    f => f.endsWith('.ts') || f.endsWith('.tsx')
   );
 
-  // Look for evidence of cookie setting in imported actions or inline functions
-  const hasCookieLogic =
-    pageContent.includes('cookies()') ||
-    pageContent.includes('set(') ||
-    pageContent.includes('cookie');
+  const hasCookieLogic = codeFiles.some(file => {
+    const content = readFileSync(join(appDir, file), 'utf-8');
+    return (
+      content.includes('cookies()') ||
+      content.includes('cookies(') ||
+      content.includes('.set(') ||
+      content.includes('cookie')
+    );
+  });
 
   expect(hasCookieLogic).toBe(true);
 });
