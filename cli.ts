@@ -276,6 +276,8 @@ function parseCliArgs(args: string[]) {
       values["agent-evals"] = true;
     } else if (arg === "--claude-code") {
       values["claude-code"] = true;
+    } else if (arg === "--compare-nextjs-docs") {
+      values["compare-nextjs-docs"] = true;
     } else if (arg === "-e" || arg === "--eval") {
       values.eval = args[++i];
     } else if (arg === "--evals") {
@@ -330,6 +332,7 @@ Options:
   -t, --threads <num>     Number of worker threads (default: 1, max: CPU cores)
       --all-models        Run single eval with all models (default: only first model)
       --claude-code       Use Claude Code agent instead of LLM models
+      --compare-nextjs-docs  Run Claude Code with and without Next.js docs side-by-side
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
       --api-key <key>     Anthropic API key for Claude Code (or use ANTHROPIC_API_KEY env var)
       --dev-server-cmd    Command to start dev server (default: "npm run dev")
@@ -1507,6 +1510,126 @@ async function main() {
         hooks,
         visualDiff: values["with-visual-diff"] || false,
       };
+
+      // Compare mode: run both Claude Code and Claude Code + Next.js Docs side by side
+      if (values["compare-nextjs-docs"]) {
+        const agentEvalsOnly = values["agent-evals"] || false;
+        let evalsToRun: string[];
+
+        if (values.all) {
+          evalsToRun = await getAllEvals(agentEvalsOnly);
+        } else if (values.evals) {
+          evalsToRun = values.evals.split(",").map((e: string) => e.trim());
+        } else {
+          const singleEval = values.eval || positionals[0];
+          if (!singleEval) {
+            console.error("❌ Error: No eval specified for comparison mode.");
+            process.exit(1);
+          }
+          evalsToRun = [singleEval];
+        }
+
+        // Parse threads option for parallel execution
+        const requestedThreads = values.threads ? parseInt(values.threads) : 1;
+        const threads = Math.max(1, requestedThreads);
+
+        if (threads > 1) {
+          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs (${threads} in parallel)...\n`);
+        } else {
+          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs...\n`);
+        }
+
+        const comparisonResults: Array<{
+          evalPath: string;
+          claudeCode: ClaudeCodeResult;
+          claudeCodeNextjsDocs: ClaudeCodeResult;
+        }> = [];
+
+        const startTime = performance.now();
+
+        // Helper function to run comparison for a single eval
+        const runComparisonForEval = async (evalPath: string) => {
+          console.log(` ▶ ${evalPath}`);
+
+          // Run both modes in parallel with different output folders
+          const [ccResult, ccNextjsDocsResult] = await Promise.all([
+            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: false }, threads > 1),
+            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: true, outputSuffix: "nextjs-docs" }, threads > 1),
+          ]);
+
+          const ccSuccess = ccResult.success && ccResult.buildSuccess && ccResult.lintSuccess && ccResult.testSuccess;
+          const ccNextjsSuccess = ccNextjsDocsResult.success && ccNextjsDocsResult.buildSuccess && ccNextjsDocsResult.lintSuccess && ccNextjsDocsResult.testSuccess;
+
+          console.log(`   Claude Code: ${ccSuccess ? '✅' : '❌'} | + Next.js Docs: ${ccNextjsSuccess ? '✅' : '❌'}`);
+
+          return {
+            evalPath,
+            claudeCode: ccResult,
+            claudeCodeNextjsDocs: ccNextjsDocsResult,
+          };
+        };
+
+        if (threads === 1) {
+          // Sequential execution
+          for (const evalPath of evalsToRun) {
+            const result = await runComparisonForEval(evalPath);
+            comparisonResults.push(result);
+          }
+        } else {
+          // Parallel execution in batches
+          for (let i = 0; i < evalsToRun.length; i += threads) {
+            const batch = evalsToRun.slice(i, i + threads);
+            const batchResults = await Promise.all(batch.map(runComparisonForEval));
+            comparisonResults.push(...batchResults);
+          }
+        }
+
+        // Display side-by-side results table
+        console.log("\n📊 Comparison Results:");
+        console.log("═".repeat(100));
+
+        const header = `| ${"Eval".padEnd(30)} | Claude Code | CC + Next.js Docs |`;
+        const separator = `|${"-".repeat(32)}|-------------|-------------------|`;
+
+        console.log(header);
+        console.log(separator);
+
+        let ccPassed = 0;
+        let ccNextjsPassed = 0;
+
+        for (const { evalPath, claudeCode, claudeCodeNextjsDocs } of comparisonResults) {
+          const ccSuccess = claudeCode.success && claudeCode.buildSuccess && claudeCode.lintSuccess && claudeCode.testSuccess;
+          const ccNextjsSuccess = claudeCodeNextjsDocs.success && claudeCodeNextjsDocs.buildSuccess && claudeCodeNextjsDocs.lintSuccess && claudeCodeNextjsDocs.testSuccess;
+
+          if (ccSuccess) ccPassed++;
+          if (ccNextjsSuccess) ccNextjsPassed++;
+
+          const ccEmoji = ccSuccess ? "✅✅✅" : `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}`;
+          const ccNextjsEmoji = ccNextjsSuccess ? "✅✅✅" : `${claudeCodeNextjsDocs.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.testSuccess ? "✅" : "❌"}`;
+
+          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(11)} | ${ccNextjsEmoji.padEnd(17)} |`);
+        }
+
+        console.log(separator);
+        console.log(`| ${"TOTAL".padEnd(30)} | ${ccPassed}/${comparisonResults.length} passed  | ${ccNextjsPassed}/${comparisonResults.length} passed     |`);
+        console.log("═".repeat(100));
+
+        console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test");
+
+        const wallClockTime = ((performance.now() - startTime) / 1000).toFixed(1);
+        console.log(`\n⏱️  Total time: ${wallClockTime}s`);
+
+        // Show improvement if Next.js docs helped
+        if (ccNextjsPassed > ccPassed) {
+          console.log(`\n🎉 Next.js Docs improved ${ccNextjsPassed - ccPassed} eval(s)!`);
+        } else if (ccNextjsPassed === ccPassed) {
+          console.log(`\n📊 Both modes performed equally.`);
+        } else {
+          console.log(`\n⚠️  Claude Code alone performed better by ${ccPassed - ccNextjsPassed} eval(s).`);
+        }
+
+        process.exit(ccNextjsPassed >= ccPassed ? 0 : 1);
+      }
 
       if (values.all) {
         // Run all evals with Claude Code

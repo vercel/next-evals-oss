@@ -48,6 +48,8 @@ export interface ClaudeCodeEvalOptions {
   visualDiff?: boolean;
   outputFormat?: string;
   outputFile?: string;
+  nextjsDocs?: boolean;
+  outputSuffix?: string; // Custom suffix for output folder (e.g., "nextjs-docs" -> "output-claude-code-nextjs-docs")
 }
 
 export class ClaudeCodeRunner {
@@ -59,6 +61,7 @@ export class ClaudeCodeRunner {
   private devServer?: { enabled: boolean; command?: string; port?: number };
   private hooks?: { preEval?: string; postEval?: string };
   private visualDiff: boolean;
+  private nextjsDocs: boolean;
 
   constructor(options: ClaudeCodeEvalOptions = {}) {
     this.verbose = options.verbose || false;
@@ -67,6 +70,7 @@ export class ClaudeCodeRunner {
     this.devServer = options.devServer;
     this.hooks = options.hooks;
     this.visualDiff = options.visualDiff || false;
+    this.nextjsDocs = options.nextjsDocs || false;
   }
 
   async runClaudeCodeEval(
@@ -119,6 +123,11 @@ export class ClaudeCodeRunner {
 
       // Ensure shared dependencies are available
       await ensureSharedDependencies(this.verbose);
+
+      // Run next-skills to generate CLAUDE.md with Next.js docs if enabled
+      if (this.nextjsDocs) {
+        await this.runNextSkills(outputDir);
+      }
 
       // Start dev server if enabled
       if (this.devServer?.enabled) {
@@ -617,6 +626,46 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     });
   }
 
+  private async runNextSkills(projectDir: string): Promise<void> {
+    process.stdout.write(`📚 Running next-skills to generate CLAUDE.md...`);
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('npx', ['@judegao/next-skills@latest', '--experimental-claude-md'], {
+        cwd: projectDir,
+        stdio: this.verbose ? 'inherit' : 'pipe'
+      });
+
+      let output = '';
+
+      if (!this.verbose) {
+        proc.stdout?.on('data', (data) => {
+          output += data.toString();
+        });
+        proc.stderr?.on('data', (data) => {
+          output += data.toString();
+        });
+      }
+
+      proc.on('exit', (code) => {
+        if (code === 0) {
+          console.log(` ✅`);
+          resolve();
+        } else {
+          console.log(` ❌`);
+          if (this.verbose) {
+            console.log(`next-skills output: ${output}`);
+          }
+          reject(new Error(`next-skills exited with code ${code}`));
+        }
+      });
+
+      proc.on('error', (error) => {
+        console.log(` ❌`);
+        reject(new Error(`Failed to run next-skills: ${error.message}`));
+      });
+    });
+  }
+
   private async runHookScript(
     script: string,
     outputDir: string,
@@ -768,10 +817,16 @@ export async function runClaudeCodeEval(
     // Use flattened paths within the worktree
     // Copy input files directly to worktree root to avoid deep nesting
     worktreeInputDir = inputDir; // Still read from original location
-    outputDir = path.join(worktreePath, "output-claude-code");
+    const outputFolderName = options.outputSuffix
+      ? `output-claude-code-${options.outputSuffix}`
+      : "output-claude-code";
+    outputDir = path.join(worktreePath, outputFolderName);
   } else {
     worktreeInputDir = inputDir;
-    outputDir = path.join(fullEvalPath, "output-claude-code");
+    const outputFolderName = options.outputSuffix
+      ? `output-claude-code-${options.outputSuffix}`
+      : "output-claude-code";
+    outputDir = path.join(fullEvalPath, outputFolderName);
   }
 
   const runner = new ClaudeCodeRunner(options);

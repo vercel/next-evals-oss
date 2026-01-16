@@ -35,6 +35,8 @@ function parseCliArgs(args: string[]) {
       values["post-eval"] = args[++i];
     } else if (arg === "--output-file") {
       values["output-file"] = args[++i];
+    } else if (arg === "--nextjs-docs") {
+      values["nextjs-docs"] = true;
     } else if (!arg.startsWith("-")) {
       positionals.push(arg);
     }
@@ -63,6 +65,7 @@ Options:
       --pre-eval <script> Path to bash script to run before eval starts
       --post-eval <script> Path to bash script to run after eval completes
       --output-file <path> Write results to JSON file (only with --all)
+      --nextjs-docs       Run next-skills to generate CLAUDE.md with Next.js docs before eval
 
 Examples:
   # Run a specific eval
@@ -127,8 +130,9 @@ function formatDuration(ms: number): string {
   }
 }
 
-function displayResult(evalPath: string, result: ClaudeCodeResult) {
-  console.log("\n📊 Claude Code Results:");
+function displayResult(evalPath: string, result: ClaudeCodeResult, nextjsDocs: boolean = false) {
+  const mode = nextjsDocs ? "Claude Code + Next.js Docs" : "Claude Code";
+  console.log(`\n📊 ${mode} Results:`);
   console.log("═".repeat(80));
 
   const evalColWidth = Math.max(25, evalPath.length);
@@ -168,15 +172,15 @@ function displayResult(evalPath: string, result: ClaudeCodeResult) {
     }
 
     if (!result.buildSuccess && result.buildOutput) {
-      console.log(`Build Error:\n${result.buildOutput.slice(-1000)}`);
+      console.log(`Build Error:\n${result.buildOutput.slice(-3000)}`);
     }
 
     if (!result.lintSuccess && result.lintOutput) {
-      console.log(`Lint Error:\n${result.lintOutput.slice(-1000)}`);
+      console.log(`Lint Error:\n${result.lintOutput.slice(-3000)}`);
     }
 
     if (!result.testSuccess && result.testOutput) {
-      console.log(`Test Error:\n${result.testOutput.slice(-1000)}`);
+      console.log(`Test Error:\n${result.testOutput.slice(-3000)}`);
     }
   }
 
@@ -184,10 +188,12 @@ function displayResult(evalPath: string, result: ClaudeCodeResult) {
 }
 
 function displayResultsTable(
-  results: { evalPath: string; result: ClaudeCodeResult }[]
+  results: { evalPath: string; result: ClaudeCodeResult }[],
+  nextjsDocs: boolean = false
 ) {
   const totalTests = results.length;
-  console.log(`\n📊 Claude Code Results Summary (${totalTests} Tests):`);
+  const mode = nextjsDocs ? "Claude Code + Next.js Docs" : "Claude Code";
+  console.log(`\n📊 ${mode} Results Summary (${totalTests} Tests):`);
   console.log("═".repeat(120));
 
   const header = `| ${"Eval".padEnd(
@@ -242,15 +248,15 @@ function displayResultsTable(
       }
 
       if (!result.buildSuccess && result.buildOutput) {
-        errors.buildError = result.buildOutput.slice(-500);
+        errors.buildError = result.buildOutput.slice(-1500);
       }
 
       if (!result.lintSuccess && result.lintOutput) {
-        errors.lintError = result.lintOutput.slice(-500);
+        errors.lintError = result.lintOutput.slice(-1500);
       }
 
       if (!result.testSuccess && result.testOutput) {
-        errors.testError = result.testOutput.slice(-500);
+        errors.testError = result.testOutput.slice(-1500);
       }
 
       failedEvals.push(errors);
@@ -303,6 +309,7 @@ async function main() {
     debug: values.debug || false,
     timeout: values.timeout ? parseInt(values.timeout) : 600000, // 10 minutes default
     apiKey,
+    nextjsDocs: values["nextjs-docs"] || false,
     ...(values["pre-eval"] || values["post-eval"]
       ? {
           hooks: {
@@ -315,7 +322,8 @@ async function main() {
 
   if (values.all) {
     const allEvals = await getAllEvals();
-    console.log(`Running ${allEvals.length} evals with Claude Code...\n`);
+    const mode = evalOptions.nextjsDocs ? "Claude Code + Next.js Docs" : "Claude Code";
+    console.log(`Running ${allEvals.length} evals with ${mode}...\n`);
 
     const results: { evalPath: string; result: ClaudeCodeResult }[] = [];
 
@@ -347,7 +355,7 @@ async function main() {
       }
     }
 
-    displayResultsTable(results);
+    displayResultsTable(results, evalOptions.nextjsDocs);
 
     // Write all results to file if outputFile is specified
     if (values["output-file"]) {
@@ -382,11 +390,12 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`🚀 Running Claude Code eval: ${evalPath}`);
+  const mode = evalOptions.nextjsDocs ? "Claude Code + Next.js Docs" : "Claude Code";
+  console.log(`🚀 Running ${mode} eval: ${evalPath}`);
 
   try {
     const result = await runClaudeCodeEval(evalPath, evalOptions);
-    displayResult(evalPath, result);
+    displayResult(evalPath, result, evalOptions.nextjsDocs);
 
     const success =
       result.success &&
