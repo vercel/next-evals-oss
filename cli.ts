@@ -622,20 +622,30 @@ async function displaySingleResult(
       const buildSuccess = result?.evaluationResults?.buildSuccess ?? false;
       const lintSuccess = result?.evaluationResults?.lintSuccess ?? false;
       const testSuccess = result?.evaluationResults?.testSuccess ?? false;
+      const retryStatus = result?.evaluationResults?.retryStatus;
 
       const build = buildSuccess ? "✅" : "❌";
       const lint = lintSuccess ? "✅" : "❌";
       const test = testSuccess ? "✅" : "❌";
 
+      // Format retry status indicator
+      let retryIndicator = '';
+      if (retryStatus === 'retry-passed') {
+        retryIndicator = ' 🔄✅';
+      } else if (retryStatus === 'retry-failed') {
+        retryIndicator = ' 🔄❌';
+      }
+
       // Emojis take 2 character widths each, so pad accordingly
-      // 3 emojis = 6 visual chars, so we need (modelColWidth - 3) spaces to reach modelColWidth visual chars
-      const emojiString = build + lint + test;
-      const paddingNeeded = modelColWidth - 3; // 3 emojis counted as 3 chars but display as 6
+      const emojiString = build + lint + test + retryIndicator;
+      // Calculate padding: 3 base emojis = 6 visual, retry adds space(1) + 2 emojis(4) = 5 more
+      const retryVisualWidth = retryIndicator ? 5 : 0;
+      const paddingNeeded = Math.max(0, modelColWidth - 3 - (retryIndicator ? 3 : 0)); // account for retry indicator string length
       const row = `| ${evalPath.padEnd(evalColWidth)} | ${emojiString.padEnd(
         paddingNeeded
       )} |`;
       console.log(row);
-      console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test");
+      console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test, 🔄✅ = Retry Passed, 🔄❌ = Retry Failed");
 
       // Display errors if any
       if (!buildSuccess || !lintSuccess || !testSuccess) {
@@ -1592,8 +1602,8 @@ async function main() {
         console.log("\n📊 Comparison Results:");
         console.log("═".repeat(100));
 
-        const header = `| ${"Eval".padEnd(30)} | Claude Code | CC + Next.js Docs |`;
-        const separator = `|${"-".repeat(32)}|-------------|-------------------|`;
+        const header = `| ${"Eval".padEnd(30)} | ${"Claude Code".padEnd(16)} | ${"CC + Next.js Docs".padEnd(22)} |`;
+        const separator = `|${"-".repeat(32)}|${"-".repeat(18)}|${"-".repeat(24)}|`;
 
         console.log(header);
         console.log(separator);
@@ -1608,17 +1618,21 @@ async function main() {
           if (ccSuccess) ccPassed++;
           if (ccNextjsSuccess) ccNextjsPassed++;
 
-          const ccEmoji = ccSuccess ? "✅✅✅" : `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}`;
-          const ccNextjsEmoji = ccNextjsSuccess ? "✅✅✅" : `${claudeCodeNextjsDocs.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.testSuccess ? "✅" : "❌"}`;
+          // Build retry indicators
+          const ccRetry = claudeCode.retryStatus === 'retry-passed' ? '🔄✅' : claudeCode.retryStatus === 'retry-failed' ? '🔄❌' : '';
+          const ccNextjsRetry = claudeCodeNextjsDocs.retryStatus === 'retry-passed' ? '🔄✅' : claudeCodeNextjsDocs.retryStatus === 'retry-failed' ? '🔄❌' : '';
 
-          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(11)} | ${ccNextjsEmoji.padEnd(17)} |`);
+          const ccEmoji = `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}${ccRetry ? ' ' + ccRetry : ''}`;
+          const ccNextjsEmoji = `${claudeCodeNextjsDocs.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.testSuccess ? "✅" : "❌"}${ccNextjsRetry ? ' ' + ccNextjsRetry : ''}`;
+
+          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(16)} | ${ccNextjsEmoji.padEnd(22)} |`);
         }
 
         console.log(separator);
-        console.log(`| ${"TOTAL".padEnd(30)} | ${ccPassed}/${comparisonResults.length} passed  | ${ccNextjsPassed}/${comparisonResults.length} passed     |`);
+        console.log(`| ${"TOTAL".padEnd(30)} | ${`${ccPassed}/${comparisonResults.length} passed`.padEnd(16)} | ${`${ccNextjsPassed}/${comparisonResults.length} passed`.padEnd(22)} |`);
         console.log("═".repeat(100));
 
-        console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test");
+        console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test, 🔄✅ = Retry Passed, 🔄❌ = Retry Failed");
 
         const wallClockTime = ((performance.now() - startTime) / 1000).toFixed(1);
         console.log(`\n⏱️  Total time: ${wallClockTime}s`);
@@ -1970,6 +1984,7 @@ async function main() {
             buildOutput: result.buildOutput,
             lintOutput: result.lintOutput,
             testOutput: result.testOutput,
+            retryStatus: result.retryStatus,
           },
         };
 

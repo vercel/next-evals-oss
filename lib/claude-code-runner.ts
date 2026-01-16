@@ -29,6 +29,7 @@ export interface ClaudeCodeResult {
   };
   evalPath?: string;
   timestamp?: string;
+  retryStatus?: 'no-retry' | 'retry-passed' | 'retry-failed';
 }
 
 export interface ClaudeCodeEvalOptions {
@@ -735,7 +736,8 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
 export async function runClaudeCodeEval(
   evalPath: string,
   options: ClaudeCodeEvalOptions = {},
-  useWorktree: boolean = false
+  useWorktree: boolean = false,
+  isRetry: boolean = false
 ): Promise<ClaudeCodeResult> {
   const evalsDir = path.join(process.cwd(), "evals");
   const fullEvalPath = path.join(evalsDir, evalPath);
@@ -833,7 +835,64 @@ export async function runClaudeCodeEval(
 
   try {
     const result = await runner.runClaudeCodeEval(worktreeInputDir, outputDir, prompt, evalPath, options.timeout);
-    return result;
+
+    // If test didn't fully pass and this isn't already a retry, give it a second chance
+    const fullyPassed = result.buildSuccess && result.lintSuccess && result.testSuccess;
+    if (!fullyPassed && !isRetry) {
+      if (options.verbose) {
+        console.log(`\n🔄 Test didn't fully pass, retrying once...`);
+      } else {
+        process.stdout.write(`🔄 Retrying...`);
+      }
+
+      // Cleanup current runner before retry
+      await runner.cleanup();
+
+      // Clean up the output directory so retry starts fresh
+      try {
+        await fs.rm(outputDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      // Cleanup worktree if used
+      if (worktreePath) {
+        try {
+          const { spawn } = await import("child_process");
+          await new Promise<void>((resolve) => {
+            const proc = spawn("git", ["worktree", "remove", "--force", worktreePath], {
+              cwd: process.cwd(),
+              stdio: "pipe"
+            });
+            proc.on("exit", () => resolve());
+            proc.on("error", () => resolve());
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+
+      // Retry the eval
+      const retryResult = await runClaudeCodeEval(evalPath, options, useWorktree, true);
+
+      // Return the better result (prefer the one that passed more checks)
+      const originalScore = (result.buildSuccess ? 1 : 0) + (result.lintSuccess ? 1 : 0) + (result.testSuccess ? 1 : 0);
+      const retryScore = (retryResult.buildSuccess ? 1 : 0) + (retryResult.lintSuccess ? 1 : 0) + (retryResult.testSuccess ? 1 : 0);
+
+      if (retryScore > originalScore) {
+        if (!options.verbose) {
+          process.stdout.write(` ✅\n`);
+        }
+        return { ...retryResult, retryStatus: 'retry-passed' as const };
+      } else {
+        if (!options.verbose) {
+          process.stdout.write(` ❌\n`);
+        }
+        return { ...result, retryStatus: 'retry-failed' as const };
+      }
+    }
+
+    return { ...result, retryStatus: 'no-retry' as const };
   } finally {
     await runner.cleanup();
 

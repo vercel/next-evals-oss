@@ -7,6 +7,7 @@ export interface EvalResult {
     lintSuccess: boolean;
     testSuccess: boolean;
     duration?: number;
+    retryStatus?: 'no-retry' | 'retry-passed' | 'retry-failed';
   };
 }
 
@@ -27,13 +28,15 @@ export function formatClaudeCodeResultsTable(results: EvalResult[]): string {
 
   const scoreText = `${buildPassed}/${lintPassed}/${testPassed} (${buildPct}%, ${lintPct}%, ${testPct}%)`;
 
-  // Calculate max visual width for emoji rows with timing
+  // Calculate max visual width for emoji rows with timing and retry indicator
   // Emojis display as 2 visual chars each but count as 1 string char
   const maxEmojiVisualWidth = Math.max(
     ...results.map(r => {
       const timeStr = r.result.duration ? `(${(r.result.duration / 1000).toFixed(1)}s)` : '';
-      // Visual width: 3 emojis * 2 = 6, plus optional space and time string
-      return timeStr ? 6 + 1 + timeStr.length : 6;
+      const hasRetryIndicator = r.result.retryStatus && r.result.retryStatus !== 'no-retry';
+      // Visual width: 3 emojis * 2 = 6, + retry indicator (space + 2 emojis = 5), + optional space and time string
+      const retryWidth = hasRetryIndicator ? 5 : 0;
+      return timeStr ? 6 + retryWidth + 1 + timeStr.length : 6 + retryWidth;
     })
   );
 
@@ -55,19 +58,30 @@ export function formatClaudeCodeResultsTable(results: EvalResult[]): string {
     const lint = result.lintSuccess ? "✅" : "❌";
     const test = result.testSuccess ? "✅" : "❌";
 
+    // Format retry status indicator
+    let retryIndicator = '';
+    if (result.retryStatus === 'retry-passed') {
+      retryIndicator = ' 🔄✅';
+    } else if (result.retryStatus === 'retry-failed') {
+      retryIndicator = ' 🔄❌';
+    }
+
     // Format duration - show nothing if not available
     const timeStr = result.duration ? `(${(result.duration / 1000).toFixed(1)}s)` : '';
 
     // Build emoji string
-    const emojiString = timeStr ? `${build}${lint}${test} ${timeStr}` : `${build}${lint}${test}`;
+    const emojiString = timeStr
+      ? `${build}${lint}${test}${retryIndicator} ${timeStr}`
+      : `${build}${lint}${test}${retryIndicator}`;
 
-    // Calculate visual width: 3 emojis * 2 = 6 visual, + optional space and time string
-    const emojiVisualWidth = timeStr ? 6 + 1 + timeStr.length : 6;
+    // Calculate visual width: 3 emojis * 2 = 6 visual, + retry indicator (4 visual if present), + optional space and time string
+    const retryVisualWidth = retryIndicator ? 5 : 0; // space + 2 emojis = 1 + 4 = 5
+    const emojiVisualWidth = timeStr ? 6 + retryVisualWidth + 1 + timeStr.length : 6 + retryVisualWidth;
 
     // Pad to match visual width of model column
     // modelColWidth is the target visual width
     // We have emojiVisualWidth so far, need to add spaces to reach modelColWidth visual width
-    const visualPaddingNeeded = modelColWidth - emojiVisualWidth;
+    const visualPaddingNeeded = Math.max(0, modelColWidth - emojiVisualWidth);
     const row = `| ${evalPath.padEnd(evalColWidth)} | ${emojiString}${' '.repeat(visualPaddingNeeded)} |`;
     lines.push(row);
   }
