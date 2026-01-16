@@ -140,9 +140,6 @@ export class ClaudeCodeRunner {
         await this.runHookScript(this.hooks.preEval, outputDir, evalName);
       }
 
-      // Show progress indicator
-      process.stdout.write(`🤖 Running Claude Code...`);
-
       if (this.verbose) {
         console.log(`\n🤖 Running Claude Code on ${outputDir}...`);
         console.log(`📝 Prompt: ${prompt}`);
@@ -151,11 +148,6 @@ export class ClaudeCodeRunner {
 
       // Run Claude Code with the prompt
       const claudeResult = await this.executeClaudeCode(outputDir, prompt, timeout);
-
-      // Clear progress indicator
-      if (!this.verbose) {
-        process.stdout.write(`\r🤖 Running Claude Code... ✅\n`);
-      }
 
       if (!claudeResult.success) {
         return {
@@ -541,8 +533,6 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     // Update the port in devServer config so hooks can use it
     this.devServer.port = port;
 
-    process.stdout.write(`🚀 Starting dev server: ${command} on port ${port}...`);
-
     return new Promise((resolve, reject) => {
       const [cmd, ...args] = command.split(' ');
 
@@ -568,7 +558,6 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
           str.includes('Local:') ||
           str.includes(`http://localhost:${port}`)
         ) {
-          console.log(` ✅`);
           this.devServerProcess?.stdout?.off('data', onData);
           this.devServerProcess?.stderr?.off('data', onData);
           resolve();
@@ -628,8 +617,6 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
   }
 
   private async runNextSkills(projectDir: string): Promise<void> {
-    process.stdout.write(`📚 Running next-skills to generate CLAUDE.md...`);
-
     return new Promise((resolve, reject) => {
       const proc = spawn('npx', ['@judegao/next-skills@latest', '--experimental-claude-md'], {
         cwd: projectDir,
@@ -649,10 +636,8 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
 
       proc.on('exit', (code) => {
         if (code === 0) {
-          console.log(` ✅`);
           resolve();
         } else {
-          console.log(` ❌`);
           if (this.verbose) {
             console.log(`next-skills output: ${output}`);
           }
@@ -675,11 +660,6 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     const port = this.devServer?.port || 3000;
     const evalDir = path.dirname(path.dirname(outputDir)); // Go up from output dir to eval dir
 
-    // Determine if this is pre or post hook based on the script path
-    const hookType = script.includes('pre') ? 'Pre-eval' : 'Post-eval';
-    const hookName = path.basename(script);
-    process.stdout.write(`🪝 ${hookType} hook: ${hookName}...`);
-
     return new Promise((resolve, reject) => {
       const hookProcess = spawn('bash', [script], {
         env: {
@@ -694,10 +674,8 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
 
       hookProcess.on('exit', (code) => {
         if (code === 0) {
-          console.log(` ✅`);
           resolve();
         } else {
-          console.log(` ❌`);
           reject(new Error(`Hook script exited with code ${code}`));
         }
       });
@@ -848,8 +826,6 @@ export async function runClaudeCodeEval(
     if (!fullyPassed && attemptNumber < maxRetries) {
       if (options.verbose) {
         console.log(`\n🔄 Test didn't fully pass, retrying (attempt ${attemptNumber + 2}/${maxRetries + 1})...`);
-      } else {
-        process.stdout.write(`🔄 Retry ${attemptNumber + 1}...`);
       }
 
       // Cleanup current runner before retry
@@ -882,14 +858,8 @@ export async function runClaudeCodeEval(
       const retryScore = (retryResult.buildSuccess ? 1 : 0) + (retryResult.lintSuccess ? 1 : 0) + (retryResult.testSuccess ? 1 : 0);
 
       if (retryScore > originalScore) {
-        if (!options.verbose) {
-          process.stdout.write(` ✅\n`);
-        }
         return { ...retryResult, retryStatus: 'retry-passed' as const };
       } else {
-        if (!options.verbose) {
-          process.stdout.write(` ❌\n`);
-        }
         return { ...result, retryStatus: 'retry-failed' as const };
       }
     }
