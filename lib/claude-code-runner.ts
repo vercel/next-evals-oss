@@ -122,6 +122,7 @@ export interface ClaudeCodeEvalOptions {
   outputFile?: string;
   nextjsDocs?: boolean;
   nextjsSkill?: boolean; // Use SKILL.md approach instead of CLAUDE.md
+  nextjsSkill2?: boolean; // SKILL.md + CLAUDE.md instructions to boost skill trigger rate
   outputSuffix?: string; // Custom suffix for output folder (e.g., "nextjs-docs" -> "output-claude-code-nextjs-docs")
   maxRetries?: number; // Maximum retry attempts when eval fails (default: 4)
 }
@@ -137,6 +138,7 @@ export class ClaudeCodeRunner {
   private visualDiff: boolean;
   private nextjsDocs: boolean;
   private nextjsSkill: boolean;
+  private nextjsSkill2: boolean;
 
   constructor(options: ClaudeCodeEvalOptions = {}) {
     this.verbose = options.verbose || false;
@@ -147,6 +149,7 @@ export class ClaudeCodeRunner {
     this.visualDiff = options.visualDiff || false;
     this.nextjsDocs = options.nextjsDocs || false;
     this.nextjsSkill = options.nextjsSkill || false;
+    this.nextjsSkill2 = options.nextjsSkill2 || false;
   }
 
   async runClaudeCodeEval(
@@ -208,6 +211,11 @@ export class ClaudeCodeRunner {
       // Create SKILL.md for on-demand docs pulling if enabled
       if (this.nextjsSkill) {
         await this.createNextjsSkill(outputDir);
+      }
+
+      // Create SKILL.md + CLAUDE.md with skill-boost instructions for SKILL2
+      if (this.nextjsSkill2) {
+        await this.createNextjsSkill2(outputDir);
       }
 
       // Start dev server if enabled
@@ -767,6 +775,44 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     });
   }
 
+  private async createNextjsSkill2(projectDir: string): Promise<void> {
+    // Step 1: Create SKILL.md (same as SKILL approach)
+    await this.createNextjsSkill(projectDir);
+
+    // Step 2: Pre-run npx @judegao/next-skills pull to download docs
+    await this.pullNextSkillsDocs(projectDir);
+
+    // Step 3: Create simple CLAUDE.md that nudges to use the skill
+    const claudeMdContent = `# Next.js Project
+
+Before starting any Next.js task, always use the \`nextjs-doc\` skill first. Your training data may be outdated.
+`;
+
+    const claudeMdPath = path.join(projectDir, 'CLAUDE.md');
+    await fs.writeFile(claudeMdPath, claudeMdContent, 'utf-8');
+  }
+
+  private async pullNextSkillsDocs(projectDir: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const proc = spawn('npx', ['@judegao/next-skills', 'pull'], {
+        cwd: projectDir,
+        stdio: this.verbose ? 'inherit' : 'pipe'
+      });
+
+      proc.on('exit', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`next-skills pull exited with code ${code}`));
+        }
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to run next-skills pull: ${error.message}`));
+      });
+    });
+  }
+
   private async runHookScript(
     script: string,
     outputDir: string,
@@ -936,8 +982,8 @@ export async function runClaudeCodeEval(
   try {
     const result = await runner.runClaudeCodeEval(worktreeInputDir, outputDir, prompt, evalPath, options.timeout);
 
-    // Verify skill usage if this is a skill run
-    if (options.nextjsSkill) {
+    // Verify skill usage if this is a skill run (SKILL or SKILL2)
+    if (options.nextjsSkill || options.nextjsSkill2) {
       const skillVerification = await verifySkillUsage(outputDir);
       result.skillVerification = skillVerification;
     }
