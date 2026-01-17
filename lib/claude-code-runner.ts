@@ -9,19 +9,19 @@ import { captureAndCompare } from "./visual-diff";
 
 /**
  * Verify that the SKILL.md approach was actually used by checking the conversation transcript.
- * Looks for:
- * 1. `npx @judegao/next-skills pull` command being executed
- * 2. Doc files (.mdx) being read from the temp docs path
+ * With eager loading (docs bundled in skill folder), looks for:
+ * 1. Skill invocation (e.g., `Skill (/nextjs-docs)` in the conversation)
+ * 2. Doc files (.mdx) being read from the bundled skill docs path
  */
 export async function verifySkillUsage(outputDir: string): Promise<{
   skillUsed: boolean;
-  pullCommandExecuted: boolean;
+  skillInvoked: boolean;
   docsRead: boolean;
   docsFilesRead: string[];
 }> {
   const result = {
     skillUsed: false,
-    pullCommandExecuted: false,
+    skillInvoked: false,
     docsRead: false,
     docsFilesRead: [] as string[],
   };
@@ -47,22 +47,33 @@ export async function verifySkillUsage(outputDir: string): Promise<{
     const transcriptPath = path.join(claudeProjectsDir, jsonlFile);
     const content = await fs.readFile(transcriptPath, 'utf-8');
 
-    // Check for pull command execution
-    if (content.includes('npx @judegao/next-skills pull') || content.includes('next-skills pull')) {
-      result.pullCommandExecuted = true;
+    // Check for skill invocation - look for Skill tool being called with nextjs-docs
+    // Patterns: `Skill (/nextjs-docs)`, `"skill": "nextjs-docs"`, `skill: "nextjs-docs"`
+    if (content.includes('Skill (/nextjs-docs)') ||
+        content.includes('Skill (/nextjs-doc)') ||
+        content.includes('"skill":"nextjs-docs"') ||
+        content.includes('"skill": "nextjs-docs"') ||
+        content.includes('"skill":"nextjs-doc"') ||
+        content.includes('"skill": "nextjs-doc"')) {
+      result.skillInvoked = true;
     }
 
-    // Check for docs being read - look for .mdx files in next-skills temp paths
-    const mdxMatches = content.match(/\/(?:tmp|var\/folders)[^"]*next-skills[^"]*\.mdx/g);
-    if (mdxMatches && mdxMatches.length > 0) {
+    // Check for docs being read - look for .mdx files in:
+    // 1. Bundled docs: .claude/skills/*/docs/
+    // 2. Lazy-loaded docs: /tmp/next-skills-*/ or /var/folders/*/T/next-skills-*/
+    const bundledMdxMatches = content.match(/[^"]*\.claude\/skills\/[^"]*\.mdx/g);
+    const lazyMdxMatches = content.match(/\/(?:tmp|var\/folders)[^"]*next-skills[^"]*\.mdx/g);
+
+    const allMdxMatches = [...(bundledMdxMatches || []), ...(lazyMdxMatches || [])];
+    if (allMdxMatches.length > 0) {
       result.docsRead = true;
       // Extract unique file names
-      const uniqueFiles = [...new Set(mdxMatches.map(p => path.basename(p)))];
+      const uniqueFiles = [...new Set(allMdxMatches.map(p => path.basename(p)))];
       result.docsFilesRead = uniqueFiles;
     }
 
-    // Skill is considered "used" if pull was executed
-    result.skillUsed = result.pullCommandExecuted;
+    // Skill is considered "used" if it was invoked
+    result.skillUsed = result.skillInvoked;
 
   } catch (error) {
     // Silently fail - verification is best-effort
@@ -97,7 +108,7 @@ export interface ClaudeCodeResult {
   retryStatus?: 'no-retry' | 'retry-passed' | 'retry-failed';
   skillVerification?: {
     skillUsed: boolean;
-    pullCommandExecuted: boolean;
+    skillInvoked: boolean;
     docsRead: boolean;
     docsFilesRead: string[];
   };
@@ -779,10 +790,7 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     // Step 1: Create SKILL.md (same as SKILL approach)
     await this.createNextjsSkill(projectDir);
 
-    // Step 2: Pre-run npx @judegao/next-skills pull to download docs
-    await this.pullNextSkillsDocs(projectDir);
-
-    // Step 3: Create simple CLAUDE.md that nudges to use the skill
+    // Step 2: Create simple CLAUDE.md that nudges to use the skill
     const claudeMdContent = `# Next.js Project
 
 Before starting any Next.js task, always use the \`nextjs-doc\` skill first. Your training data may be outdated.
@@ -790,27 +798,6 @@ Before starting any Next.js task, always use the \`nextjs-doc\` skill first. You
 
     const claudeMdPath = path.join(projectDir, 'CLAUDE.md');
     await fs.writeFile(claudeMdPath, claudeMdContent, 'utf-8');
-  }
-
-  private async pullNextSkillsDocs(projectDir: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const proc = spawn('npx', ['@judegao/next-skills', 'pull'], {
-        cwd: projectDir,
-        stdio: this.verbose ? 'inherit' : 'pipe'
-      });
-
-      proc.on('exit', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`next-skills pull exited with code ${code}`));
-        }
-      });
-
-      proc.on('error', (error) => {
-        reject(new Error(`Failed to run next-skills pull: ${error.message}`));
-      });
-    });
   }
 
   private async runHookScript(

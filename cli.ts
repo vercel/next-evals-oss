@@ -1647,12 +1647,12 @@ async function main() {
           // Build skill verification indicators
           const skillVerified = claudeCodeNextjsSkill.skillVerification;
           const skillIndicator = skillVerified
-            ? (skillVerified.pullCommandExecuted ? (skillVerified.docsRead ? '📚' : '📥') : '⚠️')
+            ? (skillVerified.skillInvoked ? (skillVerified.docsRead ? '📚' : '📥') : '⚠️')
             : '';
 
           const skill2Verified = claudeCodeNextjsSkill2.skillVerification;
           const skill2Indicator = skill2Verified
-            ? (skill2Verified.pullCommandExecuted ? (skill2Verified.docsRead ? '📚' : '📥') : '⚠️')
+            ? (skill2Verified.skillInvoked ? (skill2Verified.docsRead ? '📚' : '📥') : '⚠️')
             : '';
 
           const ccEmoji = `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}${ccRetry ? ' ' + ccRetry : ''}`;
