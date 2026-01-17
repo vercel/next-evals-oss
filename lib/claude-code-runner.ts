@@ -1,10 +1,75 @@
 import fs from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import path from "path";
 import { spawn, ChildProcess } from "child_process";
 import { performance } from "perf_hooks";
+import { homedir } from "os";
 import { copyFolder, ensureSharedDependencies } from "./eval-runner";
 import { captureAndCompare } from "./visual-diff";
+
+/**
+ * Verify that the SKILL.md approach was actually used by checking the conversation transcript.
+ * Looks for:
+ * 1. `npx @judegao/next-skills pull` command being executed
+ * 2. Doc files (.mdx) being read from the temp docs path
+ */
+export async function verifySkillUsage(outputDir: string): Promise<{
+  skillUsed: boolean;
+  pullCommandExecuted: boolean;
+  docsRead: boolean;
+  docsFilesRead: string[];
+}> {
+  const result = {
+    skillUsed: false,
+    pullCommandExecuted: false,
+    docsRead: false,
+    docsFilesRead: [] as string[],
+  };
+
+  try {
+    // Convert output dir to Claude projects path format
+    // e.g., /Users/judegao/code/projects/next-evals-oss/evals/012-parallel-routes/output-claude-code-nextjs-skill-123
+    // becomes: -Users-judegao-code-projects-next-evals-oss-evals-012-parallel-routes-output-claude-code-nextjs-skill-123
+    const projectPathEncoded = outputDir.replace(/\//g, '-');
+    const claudeProjectsDir = path.join(homedir(), '.claude', 'projects', projectPathEncoded);
+
+    if (!existsSync(claudeProjectsDir)) {
+      return result;
+    }
+
+    // Find the .jsonl transcript file
+    const files = readdirSync(claudeProjectsDir);
+    const jsonlFile = files.find(f => f.endsWith('.jsonl'));
+    if (!jsonlFile) {
+      return result;
+    }
+
+    const transcriptPath = path.join(claudeProjectsDir, jsonlFile);
+    const content = await fs.readFile(transcriptPath, 'utf-8');
+
+    // Check for pull command execution
+    if (content.includes('npx @judegao/next-skills pull') || content.includes('next-skills pull')) {
+      result.pullCommandExecuted = true;
+    }
+
+    // Check for docs being read - look for .mdx files in next-skills temp paths
+    const mdxMatches = content.match(/\/(?:tmp|var\/folders)[^"]*next-skills[^"]*\.mdx/g);
+    if (mdxMatches && mdxMatches.length > 0) {
+      result.docsRead = true;
+      // Extract unique file names
+      const uniqueFiles = [...new Set(mdxMatches.map(p => path.basename(p)))];
+      result.docsFilesRead = uniqueFiles;
+    }
+
+    // Skill is considered "used" if pull was executed
+    result.skillUsed = result.pullCommandExecuted;
+
+  } catch (error) {
+    // Silently fail - verification is best-effort
+  }
+
+  return result;
+}
 
 // Global port allocator for concurrent eval runs
 let nextAvailablePort = 4000;
@@ -30,6 +95,12 @@ export interface ClaudeCodeResult {
   evalPath?: string;
   timestamp?: string;
   retryStatus?: 'no-retry' | 'retry-passed' | 'retry-failed';
+  skillVerification?: {
+    skillUsed: boolean;
+    pullCommandExecuted: boolean;
+    docsRead: boolean;
+    docsFilesRead: string[];
+  };
 }
 
 export interface ClaudeCodeEvalOptions {
@@ -50,7 +121,9 @@ export interface ClaudeCodeEvalOptions {
   outputFormat?: string;
   outputFile?: string;
   nextjsDocs?: boolean;
+  nextjsSkill?: boolean; // Use SKILL.md approach instead of CLAUDE.md
   outputSuffix?: string; // Custom suffix for output folder (e.g., "nextjs-docs" -> "output-claude-code-nextjs-docs")
+  maxRetries?: number; // Maximum retry attempts when eval fails (default: 4)
 }
 
 export class ClaudeCodeRunner {
@@ -63,6 +136,7 @@ export class ClaudeCodeRunner {
   private hooks?: { preEval?: string; postEval?: string };
   private visualDiff: boolean;
   private nextjsDocs: boolean;
+  private nextjsSkill: boolean;
 
   constructor(options: ClaudeCodeEvalOptions = {}) {
     this.verbose = options.verbose || false;
@@ -72,6 +146,7 @@ export class ClaudeCodeRunner {
     this.hooks = options.hooks;
     this.visualDiff = options.visualDiff || false;
     this.nextjsDocs = options.nextjsDocs || false;
+    this.nextjsSkill = options.nextjsSkill || false;
   }
 
   async runClaudeCodeEval(
@@ -128,6 +203,11 @@ export class ClaudeCodeRunner {
       // Run next-skills to generate CLAUDE.md with Next.js docs if enabled
       if (this.nextjsDocs) {
         await this.runNextSkills(outputDir);
+      }
+
+      // Create SKILL.md for on-demand docs pulling if enabled
+      if (this.nextjsSkill) {
+        await this.createNextjsSkill(outputDir);
       }
 
       // Start dev server if enabled
@@ -652,6 +732,41 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     });
   }
 
+  private async createNextjsSkill(projectDir: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const proc = spawn('npx', ['@judegao/next-skills@latest', '--agent', 'claude'], {
+        cwd: projectDir,
+        stdio: this.verbose ? 'inherit' : 'pipe'
+      });
+
+      let output = '';
+
+      if (!this.verbose) {
+        proc.stdout?.on('data', (data) => {
+          output += data.toString();
+        });
+        proc.stderr?.on('data', (data) => {
+          output += data.toString();
+        });
+      }
+
+      proc.on('exit', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          if (this.verbose) {
+            console.log(`next-skills --agent claude output: ${output}`);
+          }
+          reject(new Error(`next-skills --agent claude exited with code ${code}`));
+        }
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to run next-skills --agent claude: ${error.message}`));
+      });
+    });
+  }
+
   private async runHookScript(
     script: string,
     outputDir: string,
@@ -816,10 +931,16 @@ export async function runClaudeCodeEval(
 
   const runner = new ClaudeCodeRunner(options);
 
-  const maxRetries = 4; // Total 5 attempts (1 initial + 4 retries)
+  const maxRetries = options.maxRetries ?? 4; // Total (1 initial + maxRetries) attempts
 
   try {
     const result = await runner.runClaudeCodeEval(worktreeInputDir, outputDir, prompt, evalPath, options.timeout);
+
+    // Verify skill usage if this is a skill run
+    if (options.nextjsSkill) {
+      const skillVerification = await verifySkillUsage(outputDir);
+      result.skillVerification = skillVerification;
+    }
 
     // If test didn't fully pass and we have retries remaining, try again
     const fullyPassed = result.buildSuccess && result.lintSuccess && result.testSuccess;

@@ -288,6 +288,8 @@ function parseCliArgs(args: string[]) {
       values.prompt = args[++i];
     } else if (arg === "-t" || arg === "--threads") {
       values.threads = args[++i];
+    } else if (arg === "--retries") {
+      values.retries = args[++i];
     } else if (arg === "--claude-timeout") {
       values["claude-timeout"] = args[++i];
     } else if (arg === "--api-key") {
@@ -333,6 +335,7 @@ Options:
       --all-models        Run single eval with all models (default: only first model)
       --claude-code       Use Claude Code agent instead of LLM models (always dry, no Braintrust)
       --compare-nextjs-docs  Run Claude Code with and without Next.js docs side-by-side
+      --retries <n>       Maximum retry attempts when eval fails (default: 4, so 5 total attempts)
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
       --api-key <key>     Anthropic API key for Claude Code (or use ANTHROPIC_API_KEY env var)
       --dev-server-cmd    Command to start dev server (default: "npm run dev")
@@ -1519,6 +1522,7 @@ async function main() {
           : undefined,
         hooks,
         visualDiff: values["with-visual-diff"] || false,
+        maxRetries: values.retries ? parseInt(values.retries) : undefined,
       };
 
       // Compare mode: run both Claude Code and Claude Code + Next.js Docs side by side
@@ -1543,17 +1547,15 @@ async function main() {
         const requestedThreads = values.threads ? parseInt(values.threads) : 1;
         const threads = Math.max(1, requestedThreads);
 
-        if (threads > 1) {
-          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs`);
-          console.log(`   (${threads} evals in parallel × 2 modes = ${threads * 2} concurrent runs)\n`);
-        } else {
-          console.log(`🔬 Running ${evalsToRun.length} evals comparing Claude Code vs Claude Code + Next.js Docs (2 concurrent runs per eval)...\n`);
-        }
+        const maxRetries = values.retries ? parseInt(values.retries) : 4;
+        console.log(`🔬 Running ${evalsToRun.length} eval(s) comparing: Claude Code vs +CLAUDE.md vs +SKILL.md`);
+        console.log(`   (3 runs per eval, up to ${maxRetries + 1} attempts each, ${threads} concurrent)\n`);
 
-        const comparisonResults: Array<{
+        let comparisonResults: Array<{
           evalPath: string;
           claudeCode: ClaudeCodeResult;
           claudeCodeNextjsDocs: ClaudeCodeResult;
+          claudeCodeNextjsSkill: ClaudeCodeResult;
         }> = [];
 
         const startTime = performance.now();
@@ -1561,25 +1563,26 @@ async function main() {
         // Helper function to run comparison for a single eval
         const runComparisonForEval = async (evalPath: string) => {
           const evalStart = performance.now();
-          process.stdout.write(` ▶ ${evalPath} ...`);
 
-          // Run both modes in parallel with different output folders
-          // No worktrees needed - each mode writes to its own output directory
-          const [ccResult, ccNextjsDocsResult] = await Promise.all([
+          // Run all three modes in parallel with different output folders
+          const [ccResult, ccNextjsDocsResult, ccNextjsSkillResult] = await Promise.all([
             runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: false }, false),
             runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsDocs: true, outputSuffix: "nextjs-docs" }, false),
+            runClaudeCodeEval(evalPath, { ...claudeOptions, nextjsSkill: true, outputSuffix: "nextjs-skill" }, false),
           ]);
 
           const ccSuccess = ccResult.success && ccResult.buildSuccess && ccResult.lintSuccess && ccResult.testSuccess;
           const ccNextjsSuccess = ccNextjsDocsResult.success && ccNextjsDocsResult.buildSuccess && ccNextjsDocsResult.lintSuccess && ccNextjsDocsResult.testSuccess;
+          const ccSkillSuccess = ccNextjsSkillResult.success && ccNextjsSkillResult.buildSuccess && ccNextjsSkillResult.lintSuccess && ccNextjsSkillResult.testSuccess;
           const duration = ((performance.now() - evalStart) / 1000).toFixed(1);
 
-          process.stdout.write(`\r ▶ ${evalPath} [${duration}s] CC: ${ccSuccess ? '✅' : '❌'} | +Docs: ${ccNextjsSuccess ? '✅' : '❌'}     \n`);
+          console.log(` ▶ ${evalPath} [${duration}s] CC: ${ccSuccess ? '✅' : '❌'} | +Docs: ${ccNextjsSuccess ? '✅' : '❌'} | +Skill: ${ccSkillSuccess ? '✅' : '❌'}`);
 
           return {
             evalPath,
             claudeCode: ccResult,
             claudeCodeNextjsDocs: ccNextjsDocsResult,
+            claudeCodeNextjsSkill: ccNextjsSkillResult,
           };
         };
 
@@ -1607,53 +1610,66 @@ async function main() {
 
         // Display side-by-side results table
         console.log("\n📊 Comparison Results:");
-        console.log("═".repeat(100));
+        console.log("═".repeat(120));
 
-        const header = `| ${"Eval".padEnd(30)} | ${"Claude Code".padEnd(16)} | ${"CC + Next.js Docs".padEnd(22)} |`;
-        const separator = `|${"-".repeat(32)}|${"-".repeat(18)}|${"-".repeat(24)}|`;
+        const header = `| ${"Eval".padEnd(30)} | ${"Claude Code".padEnd(16)} | ${"+CLAUDE.md".padEnd(16)} | ${"+SKILL.md".padEnd(16)} |`;
+        const separator = `|${"-".repeat(32)}|${"-".repeat(18)}|${"-".repeat(18)}|${"-".repeat(18)}|`;
 
         console.log(header);
         console.log(separator);
 
         let ccPassed = 0;
         let ccNextjsPassed = 0;
+        let ccSkillPassed = 0;
 
-        for (const { evalPath, claudeCode, claudeCodeNextjsDocs } of comparisonResults) {
+        for (const { evalPath, claudeCode, claudeCodeNextjsDocs, claudeCodeNextjsSkill } of comparisonResults) {
           const ccSuccess = claudeCode.success && claudeCode.buildSuccess && claudeCode.lintSuccess && claudeCode.testSuccess;
           const ccNextjsSuccess = claudeCodeNextjsDocs.success && claudeCodeNextjsDocs.buildSuccess && claudeCodeNextjsDocs.lintSuccess && claudeCodeNextjsDocs.testSuccess;
+          const ccSkillSuccess = claudeCodeNextjsSkill.success && claudeCodeNextjsSkill.buildSuccess && claudeCodeNextjsSkill.lintSuccess && claudeCodeNextjsSkill.testSuccess;
 
           if (ccSuccess) ccPassed++;
           if (ccNextjsSuccess) ccNextjsPassed++;
+          if (ccSkillSuccess) ccSkillPassed++;
 
           // Build retry indicators
           const ccRetry = claudeCode.retryStatus === 'retry-passed' ? '🔄✅' : claudeCode.retryStatus === 'retry-failed' ? '🔄❌' : '';
           const ccNextjsRetry = claudeCodeNextjsDocs.retryStatus === 'retry-passed' ? '🔄✅' : claudeCodeNextjsDocs.retryStatus === 'retry-failed' ? '🔄❌' : '';
+          const ccSkillRetry = claudeCodeNextjsSkill.retryStatus === 'retry-passed' ? '🔄✅' : claudeCodeNextjsSkill.retryStatus === 'retry-failed' ? '🔄❌' : '';
+
+          // Build skill verification indicator
+          const skillVerified = claudeCodeNextjsSkill.skillVerification;
+          const skillIndicator = skillVerified
+            ? (skillVerified.pullCommandExecuted ? (skillVerified.docsRead ? '📚' : '📥') : '⚠️')
+            : '';
 
           const ccEmoji = `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}${ccRetry ? ' ' + ccRetry : ''}`;
           const ccNextjsEmoji = `${claudeCodeNextjsDocs.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.testSuccess ? "✅" : "❌"}${ccNextjsRetry ? ' ' + ccNextjsRetry : ''}`;
+          const ccSkillEmoji = `${claudeCodeNextjsSkill.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill.testSuccess ? "✅" : "❌"}${ccSkillRetry ? ' ' + ccSkillRetry : ''}${skillIndicator ? ' ' + skillIndicator : ''}`;
 
-          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(16)} | ${ccNextjsEmoji.padEnd(22)} |`);
+          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(16)} | ${ccNextjsEmoji.padEnd(16)} | ${ccSkillEmoji.padEnd(16)} |`);
         }
 
         console.log(separator);
-        console.log(`| ${"TOTAL".padEnd(30)} | ${`${ccPassed}/${comparisonResults.length} passed`.padEnd(16)} | ${`${ccNextjsPassed}/${comparisonResults.length} passed`.padEnd(22)} |`);
-        console.log("═".repeat(100));
+        console.log(`| ${"TOTAL".padEnd(30)} | ${`${ccPassed}/${comparisonResults.length}`.padEnd(16)} | ${`${ccNextjsPassed}/${comparisonResults.length}`.padEnd(16)} | ${`${ccSkillPassed}/${comparisonResults.length}`.padEnd(16)} |`);
+        console.log("═".repeat(120));
 
         console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test, 🔄✅ = Retry Passed, 🔄❌ = Retry Failed");
+        console.log("   Skill: 📚 = Docs pulled & read, 📥 = Pulled only, ⚠️ = Skill not used");
 
         const wallClockTime = ((performance.now() - startTime) / 1000).toFixed(1);
         console.log(`\n⏱️  Total time: ${wallClockTime}s`);
 
-        // Show improvement if Next.js docs helped
-        if (ccNextjsPassed > ccPassed) {
-          console.log(`\n🎉 Next.js Docs improved ${ccNextjsPassed - ccPassed} eval(s)!`);
-        } else if (ccNextjsPassed === ccPassed) {
-          console.log(`\n📊 Both modes performed equally.`);
-        } else {
-          console.log(`\n⚠️  Claude Code alone performed better by ${ccPassed - ccNextjsPassed} eval(s).`);
+        // Show improvement summary
+        const best = Math.max(ccPassed, ccNextjsPassed, ccSkillPassed);
+        if (ccSkillPassed === best && ccSkillPassed > ccPassed) {
+          console.log(`\n🎉 SKILL.md approach performed best with ${ccSkillPassed - ccPassed} more pass(es) than baseline!`);
+        } else if (ccNextjsPassed === best && ccNextjsPassed > ccPassed) {
+          console.log(`\n🎉 CLAUDE.md approach performed best with ${ccNextjsPassed - ccPassed} more pass(es) than baseline!`);
+        } else if (ccPassed >= ccNextjsPassed && ccPassed >= ccSkillPassed) {
+          console.log(`\n📊 Baseline Claude Code performed best or equal.`);
         }
 
-        process.exit(ccNextjsPassed >= ccPassed ? 0 : 1);
+        process.exit(Math.max(ccNextjsPassed, ccSkillPassed) >= ccPassed ? 0 : 1);
       }
 
       if (values.all) {
@@ -1674,7 +1690,7 @@ async function main() {
           `🤖 Running ${allEvals.length} ${evalType} with Claude Code...\n`
         );
 
-        const results: { evalPath: string; result: ClaudeCodeResult }[] = [];
+        let results: { evalPath: string; result: ClaudeCodeResult }[] = [];
         const startTime = performance.now();
 
         // Run evals with concurrency limit
@@ -1847,7 +1863,7 @@ async function main() {
         }
         console.log(`🤖 Running ${evalNames.length} Claude Code evals...\n`);
 
-        const results: Array<{ evalPath: string; result: ClaudeCodeResult }> = [];
+        let results: Array<{ evalPath: string; result: ClaudeCodeResult }> = [];
         const startTime = performance.now();
 
         if (threads === 1) {
@@ -2081,7 +2097,7 @@ async function main() {
         // Run multiple evals with Claude Code
         console.log(`🤖 Running ${evalNames.length} Claude Code evals (${threadCount} concurrent)...\n`);
 
-        const results: Array<{ evalPath: string; result: ClaudeCodeResult }> = [];
+        let results: Array<{ evalPath: string; result: ClaudeCodeResult }> = [];
 
         if (threadCount === 1) {
           // Sequential execution
