@@ -787,17 +787,39 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
   }
 
   private async createNextjsSkill2(projectDir: string): Promise<void> {
-    // Step 1: Create SKILL.md (same as SKILL approach)
-    await this.createNextjsSkill(projectDir);
+    // Run next-skills with nudge flag - no transformations needed in 0.0.9+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('npx', ['@judegao/next-skills@latest', '--agent', 'claude', '--experimental-claude-md-nudge'], {
+        cwd: projectDir,
+        stdio: this.verbose ? 'inherit' : 'pipe'
+      });
 
-    // Step 2: Create simple CLAUDE.md that nudges to use the skill
-    const claudeMdContent = `# Next.js Project
+      let output = '';
 
-Before starting any Next.js task, always use the \`nextjs-doc\` skill first. Your training data may be outdated.
-`;
+      if (!this.verbose) {
+        proc.stdout?.on('data', (data) => {
+          output += data.toString();
+        });
+        proc.stderr?.on('data', (data) => {
+          output += data.toString();
+        });
+      }
 
-    const claudeMdPath = path.join(projectDir, 'CLAUDE.md');
-    await fs.writeFile(claudeMdPath, claudeMdContent, 'utf-8');
+      proc.on('exit', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          if (this.verbose) {
+            console.log(`next-skills output: ${output}`);
+          }
+          reject(new Error(`next-skills --agent claude --experimental-claude-md-nudge exited with code ${code}`));
+        }
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to run next-skills: ${error.message}`));
+      });
+    });
   }
 
   private async runHookScript(
