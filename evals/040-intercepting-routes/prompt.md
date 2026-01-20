@@ -1,1 +1,7 @@
-Create a Next.js App Router application with intercepting routes. Implement a photo gallery where clicking on a photo opens it in a modal using intercepting routes. The main page should have a link to "/photo/1" and an intercepting route "(.)/photo/[id]" that shows "Photo 1 Modal" in a div with className="modal". The regular route "/photo/[id]" should show "Photo 1 Page" in a div with className="page".
+I want to build a photo gallery that shows photos in a modal when navigating within the app, but shows the full photo page when accessing the URL directly.
+
+The page should:
+- Have a main page with a link to view photo 1
+- When clicking the link, show the photo in a modal overlay (without a full page navigation)
+- When accessing /photo/1 directly (or on refresh), show a full dedicated photo page instead of the modal
+- The modal should display "Photo 1 Modal" and the full page should display "Photo 1 Page"
