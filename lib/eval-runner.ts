@@ -169,7 +169,8 @@ export async function copyFolder(
       excludeTestFiles &&
       (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") ||
        entry.name.endsWith(".spec.tsx") || entry.name.endsWith(".spec.ts") ||
-       entry.name.endsWith(".spec.md") || entry.name.endsWith(".e2e.ts"))
+       entry.name.endsWith(".spec.md") || entry.name.endsWith(".e2e.ts") ||
+       entry.name === "playwright.config.ts")
     ) {
       continue;
     }
