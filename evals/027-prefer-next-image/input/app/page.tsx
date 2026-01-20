@@ -6,7 +6,6 @@ export default function Page() {
     <div>
       <h1>Welcome to Our Store</h1>
       
-      {/* Good example: using Next.js Image component */}
       <Image
         src="/hero-image.jpg"
         alt="Store hero image"
