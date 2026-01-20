@@ -1,1 +1,1 @@
-Write a client component which calls a server action to set cookies on click. Be concise and only output the client component file, assume the others exist.
+Create a page with a button that sets a cookie when clicked. When the user clicks the button, it should call a server action that sets a cookie named "theme" with the value "dark". The button should be labeled "Set Cookie".
