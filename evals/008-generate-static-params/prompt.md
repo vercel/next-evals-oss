@@ -1,1 +1,6 @@
-Write the generateStaticParams function for a blog with the dynamic route segment [id]. This file prerenders a page for blog post with ID 1. Do not include the page React component, only the generateStaticParams function. Do not add TypeScript types.
+I want to create a blog with statically generated pages for each blog post.
+
+The blog should:
+- Have a dynamic route at /blog/[id] that displays "Blog Post {id}" in a heading
+- Pre-render the page for blog post with ID "1" at build time
+- Use Next.js App Router's static generation approach
