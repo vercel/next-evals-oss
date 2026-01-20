@@ -1,1 +1,1 @@
-Create a server component that demonstrates proper navigation patterns in Next.js App Router. The component should use server-appropriate navigation methods such as the redirect() function, Link components, or server actions - NOT client-side routing hooks like useRouter(). Only output the code for the server component, not the destination page.
+Create a navigation page that lets users go to different sections of the site. The page should have links to "/about" and "/contact" pages. Keep it simple - just display the navigation links.
