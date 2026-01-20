@@ -1547,7 +1547,7 @@ async function main() {
         const requestedThreads = values.threads ? parseInt(values.threads) : 1;
         const threads = Math.max(1, requestedThreads);
 
-        const maxRetries = values.retries ? parseInt(values.retries) : 4;
+        const maxRetries = values.retries ? parseInt(values.retries) : 0;
         console.log(`🔬 Running ${evalsToRun.length} eval(s) comparing: Claude Code vs +CLAUDE.md vs +SKILL.md vs +SKILL2`);
         console.log(`   (4 runs per eval, up to ${maxRetries + 1} attempts each, ${threads} concurrent)\n`);
 

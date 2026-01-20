@@ -135,7 +135,7 @@ export interface ClaudeCodeEvalOptions {
   nextjsSkill?: boolean; // Use SKILL.md approach instead of CLAUDE.md
   nextjsSkill2?: boolean; // SKILL.md + CLAUDE.md instructions to boost skill trigger rate
   outputSuffix?: string; // Custom suffix for output folder (e.g., "nextjs-docs" -> "output-claude-code-nextjs-docs")
-  maxRetries?: number; // Maximum retry attempts when eval fails (default: 4)
+  maxRetries?: number; // Maximum retry attempts when eval fails (default: 0)
 }
 
 export class ClaudeCodeRunner {
@@ -1102,7 +1102,7 @@ export async function runClaudeCodeEval(
 
   const runner = new ClaudeCodeRunner(options);
 
-  const maxRetries = options.maxRetries ?? 4; // Total (1 initial + maxRetries) attempts
+  const maxRetries = options.maxRetries ?? 0; // Total (1 initial + maxRetries) attempts
 
   try {
     const result = await runner.runClaudeCodeEval(worktreeInputDir, outputDir, prompt, evalPath, options.timeout);
