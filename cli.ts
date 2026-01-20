@@ -728,6 +728,21 @@ async function displaySingleResult(
 
     console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test");
 
+    // Display judge score if available
+    const judgeResult = result?.evaluationResults?.judgeResult;
+    if (judgeResult) {
+      console.log(`\n🧑‍⚖️ Judge Score: ${(judgeResult.score * 100).toFixed(0)}%`);
+      if (judgeResult.criteria_met.length > 0) {
+        console.log(`   ✅ Criteria met: ${judgeResult.criteria_met.join(", ")}`);
+      }
+      if (judgeResult.criteria_failed.length > 0) {
+        console.log(`   ❌ Criteria failed: ${judgeResult.criteria_failed.join(", ")}`);
+      }
+      if (judgeResult.explanation) {
+        console.log(`   📝 ${judgeResult.explanation}`);
+      }
+    }
+
     // Show experiment URL if available
     if (result?.experimentUrl) {
       console.log(`\n🔗 Experiment: ${result.experimentUrl}`);
