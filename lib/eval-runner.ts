@@ -357,25 +357,18 @@ export async function readSpecFile(inputDir: string): Promise<string | null> {
   return null;
 }
 
-const JUDGE_SYSTEM_PROMPT = `You are an expert code reviewer evaluating if a Next.js implementation correctly follows the specification.
+const JUDGE_SYSTEM_PROMPT = `You are an expert code reviewer. Your ONLY output must be valid JSON - no markdown, no explanations, no text before or after.
 
-You will be given:
-1. A specification (test file) that describes what the implementation should do
-2. The actual implementation (source code files)
+Evaluate if the implementation meets the specification criteria.
 
-Analyze the implementation against each criterion in the spec and provide:
-1. A score from 0.0 to 1.0 (where 1.0 means all criteria are met perfectly)
-2. A brief explanation of your scoring
+Output ONLY this JSON structure (nothing else):
+{"score": 0.85, "criteria_met": ["criterion1"], "criteria_failed": ["criterion2"], "explanation": "Brief reason"}
 
-Respond in this exact JSON format:
-{
-  "score": 0.85,
-  "criteria_met": ["criterion1", "criterion2"],
-  "criteria_failed": ["criterion3"],
-  "explanation": "Brief explanation of the score"
-}
-
-Be precise and objective. Only give full credit when the implementation clearly meets the criterion.`;
+Rules:
+- score: 0.0 to 1.0 based on criteria met
+- criteria_met: array of requirement names that are satisfied
+- criteria_failed: array of requirement names that are not satisfied
+- explanation: one sentence summary`;
 
 /**
  * Use an LLM to judge how well the implementation matches the spec.
