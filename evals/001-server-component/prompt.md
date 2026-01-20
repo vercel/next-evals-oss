@@ -1,1 +1,6 @@
-Update app/page.tsx in the Next.js App Router which fetches data from api.vercel.app/products, which returns a JSON list of products, and renders ONLY the first product name in an h1 tag.
+I want to build a page that displays the first product from an API.
+
+The page should:
+- Fetch product data from https://api.vercel.app/products
+- Display only the first product's name in a heading
+- Work as a server-rendered page (no client-side JavaScript needed for the data fetching)
