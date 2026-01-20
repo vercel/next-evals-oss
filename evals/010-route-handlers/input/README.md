@@ -4,4 +4,4 @@ This is a Next.js application created from `create-next-app`. It has the followi
 
 - TypeScript
 - ESLint
-- Jest
+- Playwright
