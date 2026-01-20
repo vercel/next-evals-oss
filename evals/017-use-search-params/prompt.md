@@ -1,1 +1,1 @@
-Show a single file example of useSearchParams being correctly used with Suspense. Only output the component code using useSearchParams and nothing else. Use the Next.js App Router.
+Create a page that displays search parameters from the URL. When visiting /?query=hello, the page should show "Search: hello" in an element with data-testid="search-display". The search params display should work properly without causing hydration errors or build failures.
