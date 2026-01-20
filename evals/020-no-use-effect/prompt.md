@@ -1,8 +1,3 @@
-Create a React client component that checks the navigator API to detect if the browser is Safari or Firefox. If it is Safari or Firefox, render "Unsupported Browser" with an explanation. For other browsers, render a welcome message.
+I need a browser detection page for my web app. The page should check if the user is visiting with Safari or Firefox, and if so, show them an "Unsupported Browser" message with an explanation. For users on other browsers (like Chrome or Edge), show a welcome message instead.
 
-Requirements:
-- Use 'use client' directive
-- Do NOT use useEffect for browser detection
-- Check navigator.userAgent with proper typeof guards for SSR safety
-- Safari detection should exclude Chrome (both contain "Safari" in userAgent)
-- Handle cases where navigator is undefined
+The detection needs to work correctly even during server-side rendering when the browser APIs aren't available yet.
