@@ -1,1 +1,1 @@
-Update `app/page.tsx` to be a client component which uses the `useRouter` hook to programatically route to /about when clicking a button with the text "Navigate".
+I want a page with a "Navigate" button. When I click the button, it should take me to the /about page programmatically (not using a link).
