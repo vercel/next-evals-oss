@@ -1,6 +1,1 @@
-Create a server component <Page> which reads the URL search parameter "name" from the incoming request and forwards it to a client component <Client>. Requirements:
-- Use Next.js App Router v15
-- Component must be async and await searchParams (Promise in v15)
-- Include proper TypeScript types for searchParams Promise
-- Import and render <Client> component with name prop
-- Extract name parameter from searchParams and pass to Client
+Create a page that reads a "name" from the URL query string and displays it. When visiting /?name=Alice, the page should show "Client component with name: Alice". Use the existing Client component to display the name.
