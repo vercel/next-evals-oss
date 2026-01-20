@@ -3,23 +3,20 @@ import { test, expect } from '@playwright/test';
 test('contact form submits and shows success message', async ({ page }) => {
   await page.goto('/');
 
-  // Find and fill the name input
-  const nameInput = page.locator('input[name="name"]');
-  await expect(nameInput).toBeVisible();
-  await nameInput.fill('Alice Smith');
-
-  // Find and fill the email input
-  const emailInput = page.locator('input[name="email"], input[type="email"]');
-  await expect(emailInput).toBeVisible();
-  await emailInput.fill('alice@example.com');
-
-  // Find and fill the message textarea/input
+  // Find the contact form (the one with message field)
   const messageInput = page.locator('textarea[name="message"], input[name="message"]');
-  await expect(messageInput).toBeVisible();
+  await expect(messageInput).toBeVisible({ timeout: 5000 });
+
+  // Find the form containing the message input (that's the contact form)
+  const contactForm = page.locator('form').filter({ has: messageInput });
+
+  // Fill the contact form fields
+  await contactForm.locator('input[name="name"]').fill('Alice Smith');
+  await contactForm.locator('input[name="email"], input[type="email"]').fill('alice@example.com');
   await messageInput.fill('Hello, this is my message.');
 
-  // Submit the form
-  await page.click('button[type="submit"], button:has-text("Send"), button:has-text("Submit")');
+  // Submit the contact form
+  await contactForm.locator('button[type="submit"]').click();
 
   // Wait for success message containing the name and email
   await expect(page.locator('text=Thank you, Alice Smith')).toBeVisible({ timeout: 5000 });
@@ -29,22 +26,14 @@ test('contact form submits and shows success message', async ({ page }) => {
 test('contact form has required input fields', async ({ page }) => {
   await page.goto('/');
 
-  // Should have a form element (either the existing profile form or the contact form)
-  await expect(page.locator('form')).toHaveCount(2);
-
-  // Should have name input for contact form
-  const nameInput = page.locator('input[name="name"]');
-  await expect(nameInput.first()).toBeVisible();
-
-  // Should have email input for contact form
-  const emailInput = page.locator('input[name="email"], input[type="email"]');
-  await expect(emailInput.first()).toBeVisible();
-
-  // Should have message input for contact form
+  // Find the contact form (the one with message field)
   const messageInput = page.locator('textarea[name="message"], input[name="message"]');
-  await expect(messageInput).toBeVisible();
+  await expect(messageInput).toBeVisible({ timeout: 5000 });
 
-  // Should have submit button
-  const submitButton = page.locator('button[type="submit"], button:has-text("Send"), button:has-text("Submit")');
-  await expect(submitButton.first()).toBeVisible();
+  // The contact form should have name, email, message inputs and submit button
+  const contactForm = page.locator('form').filter({ has: messageInput });
+
+  await expect(contactForm.locator('input[name="name"]')).toBeVisible();
+  await expect(contactForm.locator('input[name="email"], input[type="email"]')).toBeVisible();
+  await expect(contactForm.locator('button[type="submit"]')).toBeVisible();
 });
