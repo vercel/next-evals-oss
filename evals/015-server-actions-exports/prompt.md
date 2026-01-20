@@ -1,1 +1,1 @@
-Create a simple server action in a file called action.ts with the Next.js App Router.
+I want to add a simple form to this Next.js app that increments a counter when submitted. The form should use a server action to handle the submission. Please create the server action in a separate file called action.ts.
