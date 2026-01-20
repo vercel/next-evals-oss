@@ -1,5 +1,7 @@
-Implement efficient data caching with selective invalidation for a product listing. Update app/page.tsx to:
-- Create a child component that fetches product data using getAllProducts() from lib/db
-- Cache the data using the 'use cache' directive with a "products" cache tag
-- Include a form with an inline server action that invalidates the "products" cache when submitted
-- Demonstrate proper cache invalidation patterns for dynamic data updates
+I want to build a product listing page with caching and cache invalidation.
+
+The page should:
+- Display a list of products fetched from the database (use getAllProducts() from lib/db)
+- Cache the product data so it doesn't re-fetch on every request
+- Have a "Refresh Products" button that invalidates the cache and shows fresh data
+- The cache should use a "products" tag so it can be selectively invalidated
