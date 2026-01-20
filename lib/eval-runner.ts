@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { exec, ExecSyncOptionsWithStringEncoding } from "child_process";
+import { exec, spawn, ExecSyncOptionsWithStringEncoding, ChildProcess } from "child_process";
 import { promisify } from "util";
 import {
   currentSpan,
@@ -167,7 +167,7 @@ export async function copyFolder(
     // Skip test files if requested
     if (
       excludeTestFiles &&
-      (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts"))
+      (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") || entry.name.endsWith(".e2e.ts"))
     ) {
       continue;
     }
@@ -208,7 +208,7 @@ async function copyTestFiles(source: string, destination: string) {
         await copyTestFiles(srcPath, destPath);
       } else if (
         entry.isFile() &&
-        (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts"))
+        (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") || entry.name.endsWith(".e2e.ts") || entry.name === "playwright.config.ts")
       ) {
         // Ensure destination directory exists
         await fs.mkdir(path.dirname(destPath), { recursive: true });
@@ -268,6 +268,8 @@ async function readProjectFiles(dir: string): Promise<string> {
     "pnpm-lock.yaml",
     "*.test.tsx",
     "*.test.ts",
+    "*.e2e.ts",
+    "playwright.config.ts",
   ]);
 
   // Check if .gitignore exists and use it
@@ -479,6 +481,129 @@ async function writeFullFile(
   }
 }
 
+// Check if e2e test files exist in the project
+async function hasE2ETests(projectDir: string): Promise<boolean> {
+  async function findE2EFiles(dir: string): Promise<boolean> {
+    try {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.name === "node_modules" || entry.name === ".next") continue;
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (await findE2EFiles(fullPath)) return true;
+        } else if (entry.isFile() && entry.name.endsWith(".e2e.ts")) {
+          return true;
+        }
+      }
+    } catch {
+      // Ignore errors
+    }
+    return false;
+  }
+  return findE2EFiles(projectDir);
+}
+
+// Start a Next.js server and return the process
+async function startNextServer(
+  projectDir: string,
+  port: number,
+  verbose: boolean = false
+): Promise<ChildProcess> {
+  return new Promise((resolve, reject) => {
+    const serverProcess = spawn(
+      "../../node_modules/.bin/next",
+      ["start", "-p", String(port)],
+      {
+        cwd: projectDir,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, PORT: String(port) },
+      }
+    );
+
+    let serverOutput = "";
+    let resolved = false;
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error(`Server startup timeout after 30s. Output: ${serverOutput}`));
+      }
+    }, 30000);
+
+    serverProcess.stdout?.on("data", (data) => {
+      serverOutput += data.toString();
+      if (verbose) {
+        process.stdout.write(data);
+      }
+      // Check if server is ready
+      if (!resolved && (serverOutput.includes("Ready in") || serverOutput.includes(`localhost:${port}`))) {
+        clearTimeout(timeout);
+        resolved = true;
+        // Give server a moment to fully initialize
+        setTimeout(() => resolve(serverProcess), 500);
+      }
+    });
+
+    serverProcess.stderr?.on("data", (data) => {
+      serverOutput += data.toString();
+      if (verbose) {
+        process.stderr.write(data);
+      }
+    });
+
+    serverProcess.on("error", (err) => {
+      clearTimeout(timeout);
+      if (!resolved) {
+        resolved = true;
+        reject(err);
+      }
+    });
+
+    serverProcess.on("exit", (code) => {
+      clearTimeout(timeout);
+      if (!resolved) {
+        resolved = true;
+        reject(new Error(`Server exited with code ${code}. Output: ${serverOutput}`));
+      }
+    });
+  });
+}
+
+// Run Playwright tests
+async function runPlaywrightTests(
+  projectDir: string,
+  port: number,
+  verbose: boolean = false
+): Promise<{ success: boolean; output: string; duration: number }> {
+  const startTime = performance.now();
+  let output = "";
+  let success = false;
+
+  try {
+    output = await execAsync(
+      `cd "${projectDir}" && BASE_URL=http://localhost:${port} ../../node_modules/.bin/playwright test --reporter=list`,
+      { encoding: "utf8" },
+      60000 // 1 minute timeout for e2e tests
+    );
+    success = true;
+  } catch (error) {
+    if (error && typeof error === "object" && "stdout" in error) {
+      output = (error as any).stdout || "";
+      if ((error as any).stderr) {
+        output += "\n" + (error as any).stderr;
+      }
+    } else {
+      output = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return {
+    success,
+    output,
+    duration: performance.now() - startTime,
+  };
+}
+
 const runEvaluation = wrapTraced(async function runEvaluation(
   projectDir: string,
   verbose: boolean = false,
@@ -580,36 +705,92 @@ const runEvaluation = wrapTraced(async function runEvaluation(
     }
   }
 
-  try {
-    // Run tests
-    if (verbose) {
-      console.log("Running tests...");
-    }
-    const testStart = performance.now();
-    testOutput = await execAsync(
-      "cd " + projectDir + " && ../../node_modules/.bin/vitest run",
-      {
-        encoding: "utf8",
-      },
-      30000,
-    ); // 30 second timeout for tests
-    testDuration = performance.now() - testStart;
-    testSuccess = true;
-    if (verbose) {
-      console.log(`✓ Tests completed (${formatDuration(testDuration)})`);
-    }
-  } catch (error) {
-    // Capture both stdout and stderr from failed test command
-    if (error && typeof error === "object" && "stdout" in error) {
-      testOutput = (error as any).stdout || "";
-      if ((error as any).stderr) {
-        testOutput += "\n" + (error as any).stderr;
+  // Check if we have e2e tests
+  const hasE2E = await hasE2ETests(projectDir);
+
+  if (hasE2E) {
+    // Run Playwright e2e tests
+    let serverProcess: ChildProcess | null = null;
+    const port = 3000 + Math.floor(Math.random() * 1000); // Random port to avoid conflicts
+
+    try {
+      if (verbose) {
+        console.log("Starting Next.js server for e2e tests...");
       }
-    } else {
+
+      // Start the Next.js server
+      serverProcess = await startNextServer(projectDir, port, verbose);
+
+      if (verbose) {
+        console.log(`✓ Server started on port ${port}`);
+        console.log("Running Playwright e2e tests...");
+      }
+
+      // Run Playwright tests
+      const testStart = performance.now();
+      const playwrightResult = await runPlaywrightTests(projectDir, port, verbose);
+      testDuration = playwrightResult.duration;
+      testOutput = playwrightResult.output;
+      testSuccess = playwrightResult.success;
+
+      if (verbose) {
+        if (testSuccess) {
+          console.log(`✓ E2E tests completed (${formatDuration(testDuration)})`);
+        } else {
+          console.log("✗ E2E tests failed");
+        }
+      }
+    } catch (error) {
       testOutput = error instanceof Error ? error.message : String(error);
+      if (verbose) {
+        console.log(`✗ E2E test setup failed: ${testOutput}`);
+      }
+    } finally {
+      // Kill the server
+      if (serverProcess) {
+        serverProcess.kill("SIGTERM");
+        // Give it a moment to clean up
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (!serverProcess.killed) {
+          serverProcess.kill("SIGKILL");
+        }
+        if (verbose) {
+          console.log("✓ Server stopped");
+        }
+      }
     }
-    if (verbose) {
-      console.log("✗ Tests failed");
+  } else {
+    // Run vitest tests
+    try {
+      if (verbose) {
+        console.log("Running tests...");
+      }
+      const testStart = performance.now();
+      testOutput = await execAsync(
+        "cd " + projectDir + " && ../../node_modules/.bin/vitest run",
+        {
+          encoding: "utf8",
+        },
+        30000,
+      ); // 30 second timeout for tests
+      testDuration = performance.now() - testStart;
+      testSuccess = true;
+      if (verbose) {
+        console.log(`✓ Tests completed (${formatDuration(testDuration)})`);
+      }
+    } catch (error) {
+      // Capture both stdout and stderr from failed test command
+      if (error && typeof error === "object" && "stdout" in error) {
+        testOutput = (error as any).stdout || "";
+        if ((error as any).stderr) {
+          testOutput += "\n" + (error as any).stderr;
+        }
+      } else {
+        testOutput = error instanceof Error ? error.message : String(error);
+      }
+      if (verbose) {
+        console.log("✗ Tests failed");
+      }
     }
   }
 

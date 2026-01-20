@@ -531,30 +531,88 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       }
     }
 
-    // Run tests
-    try {
-      if (this.verbose) {
-        console.log("Running tests...");
-      }
-      testOutput = await this.execCommand(
-        `cd "${projectDir}" && ${nodeModulesPath}/vitest run`,
-        30000
-      );
-      testSuccess = true;
-      if (this.verbose) {
-        console.log("✅ Tests completed");
-      }
-    } catch (error) {
-      if (error && typeof error === "object" && "stdout" in error) {
-        testOutput = (error as any).stdout || "";
-        if ((error as any).stderr) {
-          testOutput += "\n" + (error as any).stderr;
+    // Check if we have e2e tests (playwright)
+    const hasE2ETests = await this.hasE2ETests(projectDir);
+
+    if (hasE2ETests) {
+      // Run Playwright e2e tests
+      let serverProcess: ChildProcess | null = null;
+      const port = 3000 + Math.floor(Math.random() * 1000); // Random port to avoid conflicts
+
+      try {
+        if (this.verbose) {
+          console.log("Starting Next.js server for e2e tests...");
         }
-      } else {
-        testOutput = error instanceof Error ? error.message : String(error);
+
+        // Start the Next.js server
+        serverProcess = await this.startNextServerForTests(projectDir, port, nodeModulesPath);
+
+        if (this.verbose) {
+          console.log(`✅ Server started on port ${port}`);
+          console.log("Running Playwright e2e tests...");
+        }
+
+        // Run Playwright tests
+        testOutput = await this.execCommand(
+          `cd "${projectDir}" && BASE_URL=http://localhost:${port} ${nodeModulesPath}/playwright test --reporter=list`,
+          60000
+        );
+        testSuccess = true;
+        if (this.verbose) {
+          console.log("✅ E2E tests completed");
+        }
+      } catch (error) {
+        if (error && typeof error === "object" && "stdout" in error) {
+          testOutput = (error as any).stdout || "";
+          if ((error as any).stderr) {
+            testOutput += "\n" + (error as any).stderr;
+          }
+        } else {
+          testOutput = error instanceof Error ? error.message : String(error);
+        }
+        if (this.verbose) {
+          console.log("❌ E2E tests failed");
+        }
+      } finally {
+        // Kill the server
+        if (serverProcess) {
+          serverProcess.kill("SIGTERM");
+          // Give it a moment to clean up
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          if (!serverProcess.killed) {
+            serverProcess.kill("SIGKILL");
+          }
+          if (this.verbose) {
+            console.log("✅ Server stopped");
+          }
+        }
       }
-      if (this.verbose) {
-        console.log("❌ Tests failed");
+    } else {
+      // Run vitest tests
+      try {
+        if (this.verbose) {
+          console.log("Running tests...");
+        }
+        testOutput = await this.execCommand(
+          `cd "${projectDir}" && ${nodeModulesPath}/vitest run`,
+          30000
+        );
+        testSuccess = true;
+        if (this.verbose) {
+          console.log("✅ Tests completed");
+        }
+      } catch (error) {
+        if (error && typeof error === "object" && "stdout" in error) {
+          testOutput = (error as any).stdout || "";
+          if ((error as any).stderr) {
+            testOutput += "\n" + (error as any).stderr;
+          }
+        } else {
+          testOutput = error instanceof Error ? error.message : String(error);
+        }
+        if (this.verbose) {
+          console.log("❌ Tests failed");
+        }
       }
     }
 
@@ -566,6 +624,95 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       testSuccess,
       testOutput,
     };
+  }
+
+  // Check if e2e test files exist in the project
+  private async hasE2ETests(projectDir: string): Promise<boolean> {
+    const findE2EFiles = async (dir: string): Promise<boolean> => {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.name === "node_modules" || entry.name === ".next") continue;
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            if (await findE2EFiles(fullPath)) return true;
+          } else if (entry.isFile() && entry.name.endsWith(".e2e.ts")) {
+            return true;
+          }
+        }
+      } catch {
+        // Ignore errors
+      }
+      return false;
+    };
+    return findE2EFiles(projectDir);
+  }
+
+  // Start a Next.js server for e2e tests and return the process
+  private async startNextServerForTests(
+    projectDir: string,
+    port: number,
+    nodeModulesPath: string
+  ): Promise<ChildProcess> {
+    return new Promise((resolve, reject) => {
+      const serverProcess = spawn(
+        `${nodeModulesPath}/next`,
+        ["start", "-p", String(port)],
+        {
+          cwd: projectDir,
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { ...process.env, PORT: String(port) },
+          shell: true,
+        }
+      );
+
+      let serverOutput = "";
+      let resolved = false;
+
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error(`Server startup timeout after 30s. Output: ${serverOutput}`));
+        }
+      }, 30000);
+
+      serverProcess.stdout?.on("data", (data) => {
+        serverOutput += data.toString();
+        if (this.verbose) {
+          process.stdout.write(data);
+        }
+        // Check if server is ready
+        if (!resolved && (serverOutput.includes("Ready in") || serverOutput.includes(`localhost:${port}`))) {
+          clearTimeout(timeout);
+          resolved = true;
+          // Give server a moment to fully initialize
+          setTimeout(() => resolve(serverProcess), 500);
+        }
+      });
+
+      serverProcess.stderr?.on("data", (data) => {
+        serverOutput += data.toString();
+        if (this.verbose) {
+          process.stderr.write(data);
+        }
+      });
+
+      serverProcess.on("error", (err) => {
+        clearTimeout(timeout);
+        if (!resolved) {
+          resolved = true;
+          reject(err);
+        }
+      });
+
+      serverProcess.on("exit", (code) => {
+        clearTimeout(timeout);
+        if (!resolved) {
+          resolved = true;
+          reject(new Error(`Server exited with code ${code}. Output: ${serverOutput}`));
+        }
+      });
+    });
   }
 
   private async execCommand(command: string, timeout: number): Promise<string> {
@@ -905,7 +1052,9 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
                         entry.name.endsWith(".test.jsx") ||
                         entry.name.endsWith(".test.js") ||
                         entry.name.endsWith(".spec.jsx") ||
-                        entry.name.endsWith(".spec.js");
+                        entry.name.endsWith(".spec.js") ||
+                        entry.name.endsWith(".e2e.ts") ||
+                        entry.name === "playwright.config.ts";
       const isTestDir = entry.name === "__tests__" ||
                        entry.name === "test" ||
                        entry.name === "tests";
