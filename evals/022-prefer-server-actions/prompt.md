@@ -1,1 +1,1 @@
-Implement the ContactForm component that allows users to submit a contact message with their name, email, and message. The form should send the data to save the contact message. Follow the existing patterns in this codebase.
+Build a contact form where users can submit their name, email, and message. After submission, display a success message showing "Thank you, [name]! We received your message and will contact you at [email]."
