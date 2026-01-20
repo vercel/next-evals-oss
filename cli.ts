@@ -1632,8 +1632,8 @@ async function main() {
         console.log("\n📊 Comparison Results:");
         console.log("═".repeat(140));
 
-        const header = `| ${"Eval".padEnd(30)} | ${"Claude Code".padEnd(16)} | ${"+CLAUDE.md".padEnd(16)} | ${"+SKILL.md".padEnd(16)} | ${"+SKILL2".padEnd(16)} |`;
-        const separator = `|${"-".repeat(32)}|${"-".repeat(18)}|${"-".repeat(18)}|${"-".repeat(18)}|${"-".repeat(18)}|`;
+        const header = `| ${"Eval".padEnd(30)} | ${"Claude Code".padEnd(20)} | ${"+CLAUDE.md".padEnd(20)} | ${"+SKILL.md".padEnd(20)} | ${"+SKILL2".padEnd(20)} |`;
+        const separator = `|${"-".repeat(32)}|${"-".repeat(22)}|${"-".repeat(22)}|${"-".repeat(22)}|${"-".repeat(22)}|`;
 
         console.log(header);
         console.log(separator);
@@ -1671,19 +1671,25 @@ async function main() {
             ? (skill2Verified.skillInvoked ? (skill2Verified.docsRead ? '📚' : '📥') : '⚠️')
             : '';
 
-          const ccEmoji = `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}${ccRetry ? ' ' + ccRetry : ''}`;
-          const ccNextjsEmoji = `${claudeCodeNextjsDocs.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.testSuccess ? "✅" : "❌"}${ccNextjsRetry ? ' ' + ccNextjsRetry : ''}`;
-          const ccSkillEmoji = `${claudeCodeNextjsSkill.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill.testSuccess ? "✅" : "❌"}${ccSkillRetry ? ' ' + ccSkillRetry : ''}${skillIndicator ? ' ' + skillIndicator : ''}`;
-          const ccSkill2Emoji = `${claudeCodeNextjsSkill2.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill2.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill2.testSuccess ? "✅" : "❌"}${ccSkill2Retry ? ' ' + ccSkill2Retry : ''}${skill2Indicator ? ' ' + skill2Indicator : ''}`;
+          // Format judge scores as percentages
+          const ccJudge = claudeCode.judgeResult ? ` ${Math.round(claudeCode.judgeResult.score * 100)}%` : '';
+          const ccNextjsJudge = claudeCodeNextjsDocs.judgeResult ? ` ${Math.round(claudeCodeNextjsDocs.judgeResult.score * 100)}%` : '';
+          const ccSkillJudge = claudeCodeNextjsSkill.judgeResult ? ` ${Math.round(claudeCodeNextjsSkill.judgeResult.score * 100)}%` : '';
+          const ccSkill2Judge = claudeCodeNextjsSkill2.judgeResult ? ` ${Math.round(claudeCodeNextjsSkill2.judgeResult.score * 100)}%` : '';
 
-          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(16)} | ${ccNextjsEmoji.padEnd(16)} | ${ccSkillEmoji.padEnd(16)} | ${ccSkill2Emoji.padEnd(16)} |`);
+          const ccEmoji = `${claudeCode.buildSuccess ? "✅" : "❌"}${claudeCode.lintSuccess ? "✅" : "❌"}${claudeCode.testSuccess ? "✅" : "❌"}${ccJudge}${ccRetry ? ' ' + ccRetry : ''}`;
+          const ccNextjsEmoji = `${claudeCodeNextjsDocs.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsDocs.testSuccess ? "✅" : "❌"}${ccNextjsJudge}${ccNextjsRetry ? ' ' + ccNextjsRetry : ''}`;
+          const ccSkillEmoji = `${claudeCodeNextjsSkill.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill.testSuccess ? "✅" : "❌"}${ccSkillJudge}${ccSkillRetry ? ' ' + ccSkillRetry : ''}${skillIndicator ? ' ' + skillIndicator : ''}`;
+          const ccSkill2Emoji = `${claudeCodeNextjsSkill2.buildSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill2.lintSuccess ? "✅" : "❌"}${claudeCodeNextjsSkill2.testSuccess ? "✅" : "❌"}${ccSkill2Judge}${ccSkill2Retry ? ' ' + ccSkill2Retry : ''}${skill2Indicator ? ' ' + skill2Indicator : ''}`;
+
+          console.log(`| ${evalPath.padEnd(30)} | ${ccEmoji.padEnd(20)} | ${ccNextjsEmoji.padEnd(20)} | ${ccSkillEmoji.padEnd(20)} | ${ccSkill2Emoji.padEnd(20)} |`);
         }
 
         console.log(separator);
-        console.log(`| ${"TOTAL".padEnd(30)} | ${`${ccPassed}/${comparisonResults.length}`.padEnd(16)} | ${`${ccNextjsPassed}/${comparisonResults.length}`.padEnd(16)} | ${`${ccSkillPassed}/${comparisonResults.length}`.padEnd(16)} | ${`${ccSkill2Passed}/${comparisonResults.length}`.padEnd(16)} |`);
+        console.log(`| ${"TOTAL".padEnd(30)} | ${`${ccPassed}/${comparisonResults.length}`.padEnd(20)} | ${`${ccNextjsPassed}/${comparisonResults.length}`.padEnd(20)} | ${`${ccSkillPassed}/${comparisonResults.length}`.padEnd(20)} | ${`${ccSkill2Passed}/${comparisonResults.length}`.padEnd(20)} |`);
         console.log("═".repeat(140));
 
-        console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test, 🔄✅ = Retry Passed, 🔄❌ = Retry Failed");
+        console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test, XX% = Judge Score, 🔄✅ = Retry Passed, 🔄❌ = Retry Failed");
         console.log("   Skill: 📚 = Docs pulled & read, 📥 = Pulled only, ⚠️ = Skill not used");
 
         const wallClockTime = ((performance.now() - startTime) / 1000).toFixed(1);

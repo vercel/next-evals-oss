@@ -1,5 +1,1 @@
-Create a client component counter in the Next.js App Router. The component should:
-- Use the 'use client' directive
-- Use useState to manage count starting at 0
-- Display "Count: {number}" text
-- Have a button labeled "Increment" that increases the count
+Create a click counter page. The page should display "Count: 0" initially and have an "Increment" button that increases the count by 1 each time it's clicked.
