@@ -306,7 +306,10 @@ IMPORTANT: Do not run any pnpm, npm, or yarn commands (like pnpm dev, npm run de
                         entry.name.endsWith(".test.jsx") ||
                         entry.name.endsWith(".test.js") ||
                         entry.name.endsWith(".spec.jsx") ||
-                        entry.name.endsWith(".spec.js");
+                        entry.name.endsWith(".spec.js") ||
+                        entry.name.endsWith(".e2e.ts") ||
+                        entry.name.endsWith(".spec.md") ||
+                        entry.name === "playwright.config.ts";
       const isTestDir = entry.name === "__tests__" ||
                        entry.name === "test" ||
                        entry.name === "tests";
