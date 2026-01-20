@@ -211,7 +211,7 @@ async function copyTestFiles(source: string, destination: string) {
         await copyTestFiles(srcPath, destPath);
       } else if (
         entry.isFile() &&
-        (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") || entry.name.endsWith(".e2e.ts") || entry.name.endsWith(".spec.md") || entry.name === "playwright.config.ts")
+        (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") || entry.name.endsWith(".e2e.ts") || entry.name === "playwright.config.ts")
       ) {
         // Ensure destination directory exists
         await fs.mkdir(path.dirname(destPath), { recursive: true });

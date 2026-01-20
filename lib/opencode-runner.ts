@@ -208,7 +208,6 @@ async function copyTestFilesBack(inputDir: string, outputDir: string): Promise<v
                       entry.name.endsWith(".spec.jsx") ||
                       entry.name.endsWith(".spec.js") ||
                       entry.name.endsWith(".e2e.ts") ||
-                      entry.name.endsWith(".spec.md") ||
                       entry.name === "playwright.config.ts";
     const isTestDir = entry.name === "__tests__" ||
                      entry.name === "test" ||
