@@ -164,10 +164,12 @@ export async function copyFolder(
       continue;
     }
 
-    // Skip test files if requested
+    // Skip test and spec files if requested
     if (
       excludeTestFiles &&
-      (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") || entry.name.endsWith(".e2e.ts"))
+      (entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts") ||
+       entry.name.endsWith(".spec.tsx") || entry.name.endsWith(".spec.ts") ||
+       entry.name.endsWith(".spec.md") || entry.name.endsWith(".e2e.ts"))
     ) {
       continue;
     }
@@ -253,12 +255,14 @@ class SimpleIgnore {
   }
 }
 
-async function readProjectFiles(dir: string): Promise<string> {
+export async function readProjectFiles(dir: string): Promise<string> {
   const ig = new SimpleIgnore();
 
   ig.add([
     ".git",
     ".next",
+    ".next-docs",
+    ".claude",
     "node_modules",
     ".gitignore",
     ".DS_Store",
@@ -268,6 +272,9 @@ async function readProjectFiles(dir: string): Promise<string> {
     "pnpm-lock.yaml",
     "*.test.tsx",
     "*.test.ts",
+    "*.spec.tsx",
+    "*.spec.ts",
+    "*.spec.md",
     "*.e2e.ts",
     "playwright.config.ts",
   ]);
@@ -322,6 +329,161 @@ ${content}
   await processDirectory(dir);
   return allFiles.join("\n");
 }
+
+/**
+ * Read the spec file (test file) for an eval.
+ * This provides the criteria for judging the implementation.
+ */
+export async function readSpecFile(inputDir: string): Promise<string | null> {
+  // Look for spec files in common locations (prefer .spec.md)
+  const specPatterns = [
+    "app/page.spec.md",
+    "app/page.test.tsx",
+    "app/page.test.ts",
+    "app/page.spec.tsx",
+    "app/page.spec.ts",
+  ];
+
+  for (const pattern of specPatterns) {
+    const specPath = path.join(inputDir, pattern);
+    try {
+      const content = await fs.readFile(specPath, "utf8");
+      return content;
+    } catch {
+      // File doesn't exist, try next pattern
+    }
+  }
+
+  return null;
+}
+
+const JUDGE_SYSTEM_PROMPT = `You are an expert code reviewer evaluating if a Next.js implementation correctly follows the specification.
+
+You will be given:
+1. A specification (test file) that describes what the implementation should do
+2. The actual implementation (source code files)
+
+Analyze the implementation against each criterion in the spec and provide:
+1. A score from 0.0 to 1.0 (where 1.0 means all criteria are met perfectly)
+2. A brief explanation of your scoring
+
+Respond in this exact JSON format:
+{
+  "score": 0.85,
+  "criteria_met": ["criterion1", "criterion2"],
+  "criteria_failed": ["criterion3"],
+  "explanation": "Brief explanation of the score"
+}
+
+Be precise and objective. Only give full credit when the implementation clearly meets the criterion.`;
+
+/**
+ * Use an LLM to judge how well the implementation matches the spec.
+ * Returns a score from 0.0 to 1.0.
+ */
+export const runJudge = wrapTraced(async function runJudge(
+  projectFiles: string,
+  specContent: string,
+  verbose: boolean = false
+): Promise<{
+  score: number;
+  criteria_met: string[];
+  criteria_failed: string[];
+  explanation: string;
+}> {
+  const judgePrompt = `## Specification (Test File)
+The following test file describes what the implementation should do:
+
+\`\`\`typescript
+${specContent}
+\`\`\`
+
+## Implementation
+Here are the source files to evaluate:
+
+${projectFiles}
+
+Evaluate how well this implementation meets the specification criteria.`;
+
+  if (verbose) {
+    console.log("🧑‍⚖️ Running LLM judge...");
+  }
+
+  const startTime = Date.now();
+  const response = await generateText({
+    model: "anthropic/claude-sonnet-4-20250514", // Use Claude Sonnet for judging - fast and capable
+    temperature: 0.1,
+    messages: [
+      {
+        role: "system",
+        content: JUDGE_SYSTEM_PROMPT,
+      },
+      {
+        role: "user",
+        content: judgePrompt,
+      },
+    ],
+  });
+
+  // Log to Braintrust span
+  const span = currentSpan();
+  if (span) {
+    span.log({
+      input: { spec: specContent.substring(0, 500) + "..." },
+      output: response.text,
+      metrics: {
+        prompt_tokens: response.usage?.inputTokens || 0,
+        completion_tokens: response.usage?.outputTokens || 0,
+        llm_duration: Date.now() - startTime,
+      },
+      metadata: {
+        model: "claude-sonnet-4-20250514",
+        type: "judge",
+      },
+    });
+  }
+
+  // Parse the JSON response
+  try {
+    // Extract JSON from the response (handle markdown code blocks)
+    let jsonText = response.text;
+    const jsonMatch = response.text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[1].trim();
+    }
+
+    const result = JSON.parse(jsonText);
+
+    if (verbose) {
+      console.log(`✅ Judge score: ${result.score}`);
+      console.log(`   Criteria met: ${result.criteria_met.join(", ")}`);
+      if (result.criteria_failed.length > 0) {
+        console.log(`   Criteria failed: ${result.criteria_failed.join(", ")}`);
+      }
+    }
+
+    return {
+      score: Math.min(1.0, Math.max(0.0, result.score)),
+      criteria_met: result.criteria_met || [],
+      criteria_failed: result.criteria_failed || [],
+      explanation: result.explanation || "",
+    };
+  } catch (error) {
+    if (verbose) {
+      console.log("⚠️ Failed to parse judge response, defaulting to score 0.5");
+      console.log("   Response:", response.text.substring(0, 200));
+    }
+    return {
+      score: 0.5,
+      criteria_met: [],
+      criteria_failed: [],
+      explanation: "Failed to parse judge response",
+    };
+  }
+}, {
+  type: "score",
+  name: "judge",
+});
 
 function createPrompt(prompt: string, fileContents: string): string {
   return `
@@ -876,10 +1038,11 @@ export const runSingleEval = wrapTraced(
     // Run the build and tests
     const results = await runEvaluation(outputDir);
 
-    // Score the results
-    await scoreEval({
+    // Score the results (including LLM judge)
+    const scoreResult = await scoreEval({
       modelResponse: diffContent,
       evaluationResults: results,
+      inputDir,
       outputDir,
       debug: false, // Braintrust runs don't use debug mode
     });
@@ -887,6 +1050,7 @@ export const runSingleEval = wrapTraced(
     return {
       modelResponse: diffContent,
       evaluationResults: results,
+      judgeResult: scoreResult.judgeResult,
     };
   },
   {
@@ -898,19 +1062,39 @@ const scoreEval = wrapTraced(
   async function scoreEval({
     modelResponse,
     evaluationResults: results,
+    inputDir,
     outputDir,
     debug = false,
+    verbose = false,
   }: {
     modelResponse: string;
     evaluationResults: Awaited<ReturnType<typeof runEvaluation>>;
+    inputDir: string;
     outputDir: string;
     debug?: boolean;
+    verbose?: boolean;
   }) {
     // Score based on individual component success
     const buildScore = results.buildSuccess ? 1.0 : 0.0;
     const lintScore = results.lintSuccess ? 1.0 : 0.0;
     const testScore = results.testSuccess ? 1.0 : 0.0;
-    const overallScore = buildScore * lintScore * testScore; // All must pass for overall success
+
+    // Run LLM judge if spec file exists
+    let judgeResult: Awaited<ReturnType<typeof runJudge>> | null = null;
+    const specContent = await readSpecFile(inputDir);
+
+    if (specContent) {
+      // Read the generated project files for judging
+      const projectFiles = await readProjectFiles(outputDir);
+      judgeResult = await runJudge(projectFiles, specContent, verbose);
+    }
+
+    const judgeScore = judgeResult?.score ?? 1.0; // Default to 1.0 if no spec
+
+    // Overall score now includes judge (weighted average)
+    // Build/Lint/Test must pass, but judge score gives more nuance
+    const passingScore = buildScore * lintScore * testScore;
+    const overallScore = passingScore * judgeScore;
 
     // Clean up by deleting the output folder (unless in debug mode)
     if (
@@ -940,6 +1124,7 @@ const scoreEval = wrapTraced(
         build_score: buildScore,
         lint_score: lintScore,
         test_score: testScore,
+        judge_score: judgeScore,
       },
       metadata: {
         reasoning: `
@@ -948,13 +1133,18 @@ Build: ${results.buildSuccess ? "Success" : "Failed"} (${
         }ms)
 Lint: ${results.lintSuccess ? "Success" : "Failed"} (${results.lintDuration}ms)
 Tests: ${results.testSuccess ? "Success" : "Failed"} (${results.testDuration}ms)
+Judge: ${judgeScore.toFixed(2)} ${judgeResult ? `(${judgeResult.explanation})` : "(no spec)"}
 
 Build Output: ${results.buildOutput}
 Lint Output: ${results.lintOutput}
 Test Output: ${results.testOutput}
 `,
+        judge_criteria_met: judgeResult?.criteria_met || [],
+        judge_criteria_failed: judgeResult?.criteria_failed || [],
       },
     });
+
+    return { judgeResult };
   },
   {
     type: "score",

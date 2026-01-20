@@ -650,6 +650,21 @@ async function displaySingleResult(
       console.log(row);
       console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test, 🔄✅ = Retry Passed, 🔄❌ = Retry Failed");
 
+      // Display judge score if available
+      const judgeResult = result?.evaluationResults?.judgeResult;
+      if (judgeResult) {
+        console.log(`\n🧑‍⚖️ Judge Score: ${(judgeResult.score * 100).toFixed(0)}%`);
+        if (judgeResult.criteria_met.length > 0) {
+          console.log(`   ✅ Criteria met: ${judgeResult.criteria_met.join(", ")}`);
+        }
+        if (judgeResult.criteria_failed.length > 0) {
+          console.log(`   ❌ Criteria failed: ${judgeResult.criteria_failed.join(", ")}`);
+        }
+        if (judgeResult.explanation) {
+          console.log(`   📝 ${judgeResult.explanation}`);
+        }
+      }
+
       // Display errors if any
       if (!buildSuccess || !lintSuccess || !testSuccess) {
         console.log("\n❌ Error Details:");
@@ -1579,6 +1594,7 @@ async function main() {
           const ccSkill2Success = ccNextjsSkill2Result.success && ccNextjsSkill2Result.buildSuccess && ccNextjsSkill2Result.lintSuccess && ccNextjsSkill2Result.testSuccess;
           const duration = ((performance.now() - evalStart) / 1000).toFixed(1);
 
+
           console.log(` ▶ ${evalPath} [${duration}s] CC: ${ccSuccess ? '✅' : '❌'} | +Docs: ${ccNextjsSuccess ? '✅' : '❌'} | +Skill: ${ccSkillSuccess ? '✅' : '❌'} | +Skill2: ${ccSkill2Success ? '✅' : '❌'}`);
 
           return {
@@ -2044,6 +2060,7 @@ async function main() {
             lintOutput: result.lintOutput,
             testOutput: result.testOutput,
             retryStatus: result.retryStatus,
+            judgeResult: result.judgeResult,
           },
         };
 

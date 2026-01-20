@@ -4,7 +4,7 @@ import path from "path";
 import { spawn, ChildProcess } from "child_process";
 import { performance } from "perf_hooks";
 import { homedir } from "os";
-import { copyFolder, ensureSharedDependencies } from "./eval-runner";
+import { copyFolder, ensureSharedDependencies, readProjectFiles, readSpecFile, runJudge } from "./eval-runner";
 import { captureAndCompare } from "./visual-diff";
 
 /**
@@ -111,6 +111,12 @@ export interface ClaudeCodeResult {
     skillInvoked: boolean;
     docsRead: boolean;
     docsFilesRead: string[];
+  };
+  judgeResult?: {
+    score: number;
+    criteria_met: string[];
+    criteria_failed: string[];
+    explanation: string;
   };
 }
 
@@ -286,6 +292,14 @@ export class ClaudeCodeRunner {
         });
       }
 
+      // Run LLM judge if spec file exists
+      let judgeResult;
+      const specContent = await readSpecFile(inputDir);
+      if (specContent) {
+        const projectFiles = await readProjectFiles(outputDir);
+        judgeResult = await runJudge(projectFiles, specContent, this.verbose);
+      }
+
       return {
         success: true,
         output: claudeResult.output,
@@ -297,6 +311,7 @@ export class ClaudeCodeRunner {
         lintOutput: evalResults.lintOutput,
         testOutput: evalResults.testOutput,
         visualDiff: visualDiffResult,
+        judgeResult,
       };
     } catch (error) {
       return {
@@ -1010,11 +1025,13 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
           `Read(/${evalsRootDir}/**/*.test.ts)`,
           `Read(/${evalsRootDir}/**/*.spec.tsx)`,
           `Read(/${evalsRootDir}/**/*.spec.ts)`,
+          `Read(/${evalsRootDir}/**/*.spec.md)`,
           // Also block test file patterns anywhere as defense in depth
           "Read(**/*.test.tsx)",
           "Read(**/*.test.ts)",
           "Read(**/*.spec.tsx)",
           "Read(**/*.spec.ts)",
+          "Read(**/*.spec.md)",
           "Read(**/*.test.jsx)",
           "Read(**/*.test.js)",
           "Read(**/*.spec.jsx)",
