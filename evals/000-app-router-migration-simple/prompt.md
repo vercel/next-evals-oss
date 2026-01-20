@@ -1,10 +1,5 @@
-Migrate this Next.js project from Pages Router to App Router. The project currently uses the pages directory structure. You need to:
+I have a simple Next.js app using the Pages Router that I want to migrate to the App Router.
 
-1. Create the app directory with the proper App Router structure
-2. Migrate the index page from pages/index.tsx to app/page.tsx  
-3. Create a root layout file (app/layout.tsx) with proper HTML structure
-4. Remove the pages directory and any pages-specific files
-5. Update imports and routing patterns to use App Router conventions
-6. Ensure the migrated app builds and runs correctly
+The current app has a home page that displays "Home" as its main heading. I want the same functionality after migration, but using the modern App Router structure.
 
-Keep the same functionality and UI, but use App Router patterns and file structure.
+Please migrate the project to use the App Router while keeping the same functionality.
