@@ -174,9 +174,13 @@ export class ClaudeCodeRunner {
     let postEvalHookRan = false;
 
     try {
-      // Ensure output directory exists and copy input files
+      // Ensure output directory exists and copy input files (excluding test files)
       await fs.mkdir(outputDir, { recursive: true });
-      await copyFolder(inputDir, outputDir);
+      await copyFolder(inputDir, outputDir, true); // Exclude test files so Claude doesn't see them
+
+      // Create .claude/settings.json with permissions.deny to block reading from input dir
+      // This prevents Claude from "cheating" by reading test files from the original location
+      await this.createPermissionsDenySettings(inputDir, outputDir);
 
       // If we're in a worktree, install dependencies in outputDir
       if (outputDir.includes('.worktrees/')) {
@@ -256,6 +260,10 @@ export class ClaudeCodeRunner {
           duration: performance.now() - startTime,
         };
       }
+
+      // Copy test files back from input directory now that Claude has finished
+      // This allows tests to run against Claude's code without Claude having seen them
+      await this.copyTestFilesBack(inputDir, outputDir);
 
       // Run evaluation (build, lint, test) on the modified code
       const evalResults = await this.runEvaluation(outputDir);
@@ -820,6 +828,114 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
         reject(new Error(`Failed to run next-skills: ${error.message}`));
       });
     });
+  }
+
+  /**
+   * Create .claude/settings.json with permissions.deny rules to prevent Claude
+   * from reading test files or accessing the original input directory.
+   * This prevents the model from "cheating" by reverse-engineering test assertions.
+   */
+  private async createPermissionsDenySettings(inputDir: string, outputDir: string): Promise<void> {
+    // Resolve the real path to handle symlinks (e.g., /tmp -> /private/tmp on macOS)
+    const realInputDir = await fs.realpath(inputDir);
+
+    // Get the evals directory (parent of the eval folder, which is parent of input)
+    // inputDir structure: /path/to/evals/XXX-eval-name/input
+    // We want to block: /path/to/evals/*/input/**
+    const evalDir = path.dirname(realInputDir); // e.g., /path/to/evals/022-prefer-server-actions
+    const evalsRootDir = path.dirname(evalDir); // e.g., /path/to/evals
+
+    const settingsDir = path.join(outputDir, '.claude');
+    await fs.mkdir(settingsDir, { recursive: true });
+
+    // For absolute paths, Claude Code uses // prefix, but since our paths start with /,
+    // we need to use / prefix (which becomes // when combined with the leading /)
+    const settings = {
+      permissions: {
+        deny: [
+          // Block access to the original input directory (where test files live)
+          `Read(/${realInputDir})`,
+          `Read(/${realInputDir}/**)`,
+          // Block ALL input directories under evals (prevents Explore agent from reading other evals' test files)
+          `Read(/${evalsRootDir}/*/input/**)`,
+          // Block test file patterns with absolute paths under the evals directory
+          `Read(/${evalsRootDir}/**/*.test.tsx)`,
+          `Read(/${evalsRootDir}/**/*.test.ts)`,
+          `Read(/${evalsRootDir}/**/*.spec.tsx)`,
+          `Read(/${evalsRootDir}/**/*.spec.ts)`,
+          // Also block test file patterns anywhere as defense in depth
+          "Read(**/*.test.tsx)",
+          "Read(**/*.test.ts)",
+          "Read(**/*.spec.tsx)",
+          "Read(**/*.spec.ts)",
+          "Read(**/*.test.jsx)",
+          "Read(**/*.test.js)",
+          "Read(**/*.spec.jsx)",
+          "Read(**/*.spec.js)"
+        ]
+      }
+    };
+
+    await fs.writeFile(
+      path.join(settingsDir, 'settings.json'),
+      JSON.stringify(settings, null, 2)
+    );
+
+    if (this.verbose) {
+      console.log(`🔒 Created permissions.deny settings to block test file access`);
+    }
+  }
+
+  /**
+   * Copy test files from input to output directory after Claude has finished.
+   * This allows tests to run against Claude's code without Claude having seen them.
+   */
+  private async copyTestFilesBack(inputDir: string, outputDir: string): Promise<void> {
+    const entries = await fs.readdir(inputDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.name === "node_modules") {
+        continue;
+      }
+
+      const isTestFile = entry.name.endsWith(".test.tsx") ||
+                        entry.name.endsWith(".test.ts") ||
+                        entry.name.endsWith(".spec.tsx") ||
+                        entry.name.endsWith(".spec.ts") ||
+                        entry.name.endsWith(".test.jsx") ||
+                        entry.name.endsWith(".test.js") ||
+                        entry.name.endsWith(".spec.jsx") ||
+                        entry.name.endsWith(".spec.js");
+      const isTestDir = entry.name === "__tests__" ||
+                       entry.name === "test" ||
+                       entry.name === "tests";
+      const isEslintConfig = entry.name === ".eslintrc.json" ||
+                            entry.name === ".eslintrc.js" ||
+                            entry.name === ".eslintrc.cjs" ||
+                            entry.name === ".eslintrc.yml" ||
+                            entry.name === ".eslintrc.yaml" ||
+                            entry.name === "eslint.config.js" ||
+                            entry.name === "eslint.config.mjs" ||
+                            entry.name === "eslint.config.cjs";
+
+      const srcPath = path.join(inputDir, entry.name);
+      const destPath = path.join(outputDir, entry.name);
+
+      try {
+        if (isTestFile || isEslintConfig) {
+          // Copy the test file or eslint config
+          await fs.copyFile(srcPath, destPath);
+        } else if (entry.isDirectory() && isTestDir) {
+          // Copy the test directory
+          await copyFolder(srcPath, destPath, false); // Don't exclude anything when copying test dirs
+        } else if (entry.isDirectory()) {
+          // Recursively copy test files from subdirectories
+          await this.copyTestFilesBack(srcPath, destPath);
+        }
+      } catch (error) {
+        // Ignore errors (e.g., directory doesn't exist in output)
+      }
+    }
   }
 
   private async runHookScript(
