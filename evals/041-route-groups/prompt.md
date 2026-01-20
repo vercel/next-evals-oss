@@ -1,1 +1,7 @@
-Create a Next.js App Router application using route groups to organize routes without affecting the URL structure. Create two route groups: (marketing) with a page at "about/page.tsx" that shows "About Us" in an h1, and (shop) with a page at "products/page.tsx" that shows "Our Products" in an h1. Both should be accessible at /about and /products respectively.
+I want to organize my Next.js app routes into logical groups without affecting the URL structure.
+
+I need:
+- An "About Us" page accessible at /about
+- A "Our Products" page accessible at /products
+
+The about page should be part of a marketing section, and the products page should be part of a shop section, but these organizational groupings should not appear in the URLs.
