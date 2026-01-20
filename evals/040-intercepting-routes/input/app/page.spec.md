@@ -5,10 +5,9 @@ This implementation should use Next.js intercepting routes to show a modal when 
 ## Requirements
 
 1. Main page has a Link component (from next/link) pointing to /photo/1
-2. Uses intercepting route convention with (.) prefix folder to intercept the /photo/[id] route
-3. The intercepting route folder structure is app/(.)photo/[id]/page.tsx
-4. The regular route folder structure is app/photo/[id]/page.tsx
-5. The intercepting route page displays "Photo 1 Modal" (or "Photo {id} Modal") in an element with className="modal"
-6. The regular route page displays "Photo 1 Page" (or "Photo {id} Page") in an element with className="page"
-7. Both dynamic routes properly access the id parameter from params
-8. The layout.tsx properly renders both the main content and the intercepted modal slot (if using parallel routes pattern)
+2. Uses intercepting route convention to intercept the /photo/[id] route (can use (.) prefix or parallel routes pattern with @modal slot)
+3. Has a regular route at app/photo/[id]/page.tsx for direct URL access
+4. Clicking the link shows "Modal" text indicating the intercepted modal view
+5. Direct navigation to /photo/1 shows "Page" text indicating the full page view
+6. Both dynamic routes properly access the id parameter from params
+7. The different content between modal and page views demonstrates that interception is working
