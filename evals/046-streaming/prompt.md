@@ -1,1 +1,7 @@
-Create a Next.js App Router page with streaming using React Suspense. The page should have a fast-loading header showing "Dashboard" in an h1, and a slow-loading component wrapped in Suspense with fallback="Loading data...". The slow component should be async, simulate a 3-second delay, and show "Data loaded!" in a div.
+I want to build a dashboard page that loads quickly with streaming content.
+
+The page should:
+- Show a "Dashboard" header immediately when the page loads
+- Display "Loading data..." while fetching slow data
+- After about 3 seconds, replace the loading message with "Data loaded!"
+- The header should remain visible the entire time, never disappear or reload
