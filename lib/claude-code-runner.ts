@@ -1,10 +1,33 @@
-import { runClaudeCodeInSandbox, type SandboxRunnerOptions, type SandboxRunnerResult } from "./sandbox-runner";
+import fs from "fs/promises";
+import path from "path";
+import { Sandbox } from "@vercel/sandbox";
+import ignore from "ignore";
+
+const DEFAULT_TIMEOUT = 600000; // 10 minutes
+
+const IGNORED_PATTERNS = [
+  ".git",
+  ".next",
+  "node_modules",
+  ".DS_Store",
+  "*.log",
+  "build",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+];
+
+const TEST_FILE_PATTERNS = ["*.test.tsx", "*.test.ts"];
+
+export interface ClaudeCodeEvalOptions {
+  timeout?: number;
+  verbose?: boolean;
+}
 
 export interface ClaudeCodeResult {
   success: boolean;
-  output?: string;
+  output: string;
   error?: string;
-  duration?: number;
+  duration: number;
   buildSuccess?: boolean;
   lintSuccess?: boolean;
   testSuccess?: boolean;
@@ -16,96 +39,255 @@ export interface ClaudeCodeResult {
   timestamp?: string;
 }
 
-export interface ClaudeCodeEvalOptions {
-  timeout?: number;
-  verbose?: boolean;
-  debug?: boolean;
-  devServer?: {
-    enabled: boolean;
-    command?: string;
-    port?: number;
-  };
-  hooks?: {
-    preEval?: string;
-    postEval?: string;
-  };
-  outputFormat?: string;
-  outputFile?: string;
+/**
+ * Collect files from a directory, optionally filtering test files.
+ */
+async function collectFiles(
+  dir: string,
+  options: { excludeTests?: boolean; onlyTests?: boolean } = {}
+): Promise<{ path: string; content: Buffer }[]> {
+  const files: { path: string; content: Buffer }[] = [];
+  const ig = ignore();
+
+  ig.add(IGNORED_PATTERNS);
+
+  if (options.excludeTests) {
+    ig.add(TEST_FILE_PATTERNS);
+  }
+
+  async function processDir(currentDir: string, relativePath: string = ""): Promise<void> {
+    const entries = await fs.readdir(currentDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryRelativePath = relativePath
+        ? `${relativePath}/${entry.name}`
+        : entry.name;
+      const fullPath = path.join(currentDir, entry.name);
+
+      if (ig.ignores(entryRelativePath)) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        await processDir(fullPath, entryRelativePath);
+      } else {
+        const isTestFile =
+          entry.name.endsWith(".test.tsx") || entry.name.endsWith(".test.ts");
+
+        if (options.onlyTests && !isTestFile) {
+          continue;
+        }
+
+        if (options.excludeTests && isTestFile) {
+          continue;
+        }
+
+        try {
+          const content = await fs.readFile(fullPath);
+          files.push({ path: entryRelativePath, content });
+        } catch {
+          // Skip unreadable files
+        }
+      }
+    }
+  }
+
+  await processDir(dir);
+  return files;
 }
 
 /**
  * Run Claude Code eval in an isolated Vercel Sandbox.
  *
- * This provides complete filesystem isolation - test files physically don't exist
- * in the sandbox until after the agent runs, preventing any possibility of cheating.
- *
- * ## Unsupported Features in Sandbox Mode
- *
- * The following features from the original local runner are NOT supported in sandbox mode:
- *
- * - **devServer**: Local dev server management is not supported. The sandbox runs
- *   build/lint/test but does not start a persistent dev server.
- *
- * - **hooks (preEval/postEval)**: Pre and post eval shell scripts are not supported.
- *   The sandbox environment is isolated and doesn't have access to local hook scripts.
- *
- * - **visualDiff**: Screenshot capture and visual regression testing is not supported.
- *   This would require running Playwright inside the sandbox which adds complexity.
- *
- * - **debug**: The debug option to persist output folders is not applicable since
- *   the sandbox is ephemeral and destroyed after each run.
- *
- * - **API keys**: The sandbox uses AI_GATEWAY_API_KEY environment variable exclusively
- *   for Vercel AI Gateway authentication. No custom API key option is provided.
- *
- * - **MCP config**: Loading .mcp.json for MCP servers is not supported in sandbox mode.
- *
- * - **useWorktree**: Git worktree isolation is replaced by sandbox isolation which
- *   provides stronger guarantees (physical file isolation vs filesystem isolation).
- *
- * @param evalPath - The eval directory name (e.g., "001-server-component")
- * @param options - Configuration options
- * @param _useWorktree - Deprecated, ignored (sandbox provides better isolation)
+ * Test files are withheld from the sandbox until after the agent completes,
+ * ensuring the agent cannot access them during code generation.
  */
 export async function runClaudeCodeEval(
   evalPath: string,
-  options: ClaudeCodeEvalOptions = {},
-  _useWorktree: boolean = false
+  options: ClaudeCodeEvalOptions = {}
 ): Promise<ClaudeCodeResult> {
-  const sandboxOptions: SandboxRunnerOptions = {
-    timeout: options.timeout,
-    verbose: options.verbose,
-  };
+  const evalsDir = path.join(process.cwd(), "evals");
+  const fullEvalPath = path.join(evalsDir, evalPath);
+  const inputDir = path.join(fullEvalPath, "input");
+  const promptFile = path.join(fullEvalPath, "prompt.md");
+  const templateDir = path.join(process.cwd(), "template");
+  const verbose = options.verbose ?? false;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
-  // Log warnings for unsupported options
-  if (options.devServer?.enabled) {
-    console.warn("⚠️  devServer option is not supported in sandbox mode");
-  }
-  if (options.hooks?.preEval || options.hooks?.postEval) {
-    console.warn("⚠️  hooks (preEval/postEval) are not supported in sandbox mode");
-  }
-  if (options.visualDiff) {
-    console.warn("⚠️  visualDiff option is not supported in sandbox mode");
-  }
-  if (options.debug) {
-    console.warn("⚠️  debug option is not supported in sandbox mode (sandbox is ephemeral)");
-  }
+  const log = (msg: string) => verbose && console.log(msg);
 
-  const result: SandboxRunnerResult = await runClaudeCodeInSandbox(evalPath, sandboxOptions);
+  log(`\n🚀 Running Claude Code in sandbox for: ${evalPath}`);
 
-  return {
-    success: result.success,
-    output: result.output,
-    error: result.error,
-    duration: result.duration,
-    buildSuccess: result.buildSuccess,
-    lintSuccess: result.lintSuccess,
-    testSuccess: result.testSuccess,
-    buildOutput: result.buildOutput,
-    lintOutput: result.lintOutput,
-    testOutput: result.testOutput,
-    sandboxId: result.sandboxId,
-    evalPath,
-    timestamp: new Date().toISOString(),
-  };
+  const prompt = await fs.readFile(promptFile, "utf8");
+  log(`📝 Task: ${prompt.trim().slice(0, 100)}...`);
+
+  const workspaceFiles = await collectFiles(inputDir, { excludeTests: true });
+  const testFiles = await collectFiles(inputDir, { onlyTests: true });
+  log(`📂 Found ${workspaceFiles.length} workspace files, ${testFiles.length} test files`);
+
+  const sandbox = await Sandbox.create({ runtime: "node24", timeout });
+  log(`🔲 Sandbox created: ${sandbox.sandboxId}`);
+
+  const startTime = Date.now();
+  let claudeOutput = "";
+
+  try {
+    // Upload workspace files (excluding tests)
+    await sandbox.writeFiles(workspaceFiles);
+
+    // Upload template files
+    const [templatePkg, eslintConfig] = await Promise.all([
+      fs.readFile(path.join(templateDir, "package.json")),
+      fs.readFile(path.join(templateDir, "eslint.config.mjs")),
+    ]);
+    await sandbox.writeFiles([
+      { path: "package.json", content: templatePkg },
+      { path: "eslint.config.mjs", content: eslintConfig },
+    ]);
+
+    // Install dependencies
+    log(`📦 Installing dependencies...`);
+    const installResult = await sandbox.runCommand("pnpm", ["install"]);
+    if (installResult.exitCode !== 0) {
+      throw new Error(`pnpm install failed: ${await installResult.stderr()}`);
+    }
+
+    // Install Claude Code CLI
+    log(`🤖 Installing Claude Code CLI...`);
+    const cliInstall = await sandbox.runCommand("npm", ["install", "-g", "@anthropic-ai/claude-code"]);
+    if (cliInstall.exitCode !== 0) {
+      throw new Error(`Claude Code install failed: ${await cliInstall.stderr()}`);
+    }
+
+    // Verify test file isolation
+    const testCheck = await sandbox.runCommand("find", [
+      ".", "-path", "./node_modules", "-prune", "-o",
+      "-name", "*.test.tsx", "-print", "-o",
+      "-name", "*.test.ts", "-print",
+    ]);
+    const foundTests = (await testCheck.stdout()).trim();
+    if (foundTests) {
+      throw new Error(`Test files found in sandbox before agent run: ${foundTests}`);
+    }
+    log(`🔒 Test file isolation verified`);
+
+    // Run Claude Code
+    log(`🤖 Running Claude Code...`);
+    const aiGatewayKey = process.env.AI_GATEWAY_API_KEY;
+    if (!aiGatewayKey) {
+      throw new Error("AI_GATEWAY_API_KEY environment variable is required");
+    }
+
+    const enhancedPrompt = `${prompt.trim()}
+
+IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependencies have already been installed. Do not run build, test, or dev server commands. Just write the code files.`;
+
+    const claudeResult = await sandbox.runCommand({
+      cmd: "claude",
+      args: ["--print", "--dangerously-skip-permissions", enhancedPrompt],
+      env: {
+        ANTHROPIC_BASE_URL: "https://ai-gateway.vercel.sh",
+        ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
+        ANTHROPIC_API_KEY: "", // Must be empty so Claude Code uses AUTH_TOKEN
+      },
+    });
+
+    claudeOutput = await claudeResult.output("both");
+    log(`✅ Claude Code finished (exit: ${claudeResult.exitCode})`);
+
+    if (claudeResult.exitCode !== 0) {
+      return {
+        success: false,
+        output: claudeOutput,
+        error: `Claude Code exited with code ${claudeResult.exitCode}`,
+        duration: Date.now() - startTime,
+        sandboxId: sandbox.sandboxId,
+        evalPath,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    // Upload test files for validation
+    log(`📤 Uploading test files...`);
+    await sandbox.writeFiles(testFiles);
+
+    // Run validation
+    log(`🔨 Running validation...`);
+    const [buildResult, lintResult, testResult] = await Promise.all([
+      runBuild(sandbox),
+      runLint(sandbox),
+      runTests(sandbox),
+    ]);
+
+    log(`   Build: ${buildResult.success ? "✅" : "❌"}`);
+    log(`   Lint: ${lintResult.success ? "✅" : "❌"}`);
+    log(`   Tests: ${testResult.success ? "✅" : "❌"}`);
+
+    return {
+      success: buildResult.success && lintResult.success && testResult.success,
+      output: claudeOutput,
+      duration: Date.now() - startTime,
+      buildSuccess: buildResult.success,
+      lintSuccess: lintResult.success,
+      testSuccess: testResult.success,
+      buildOutput: buildResult.output,
+      lintOutput: lintResult.output,
+      testOutput: testResult.output,
+      sandboxId: sandbox.sandboxId,
+      evalPath,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      output: claudeOutput,
+      error: error instanceof Error ? error.message : String(error),
+      duration: Date.now() - startTime,
+      sandboxId: sandbox.sandboxId,
+      evalPath,
+      timestamp: new Date().toISOString(),
+    };
+  } finally {
+    log(`🧹 Stopping sandbox...`);
+    await sandbox.stop();
+  }
+}
+
+async function runBuild(sandbox: Sandbox): Promise<{ success: boolean; output: string }> {
+  try {
+    const result = await sandbox.runCommand("npx", ["next", "build"]);
+    return {
+      success: result.exitCode === 0,
+      output: await result.output("both"),
+    };
+  } catch (e) {
+    return { success: false, output: String(e) };
+  }
+}
+
+async function runLint(sandbox: Sandbox): Promise<{ success: boolean; output: string }> {
+  try {
+    const result = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", "./node_modules/.bin/eslint app/"],
+    });
+    return {
+      success: result.exitCode === 0,
+      output: await result.output("both"),
+    };
+  } catch (e) {
+    return { success: false, output: String(e) };
+  }
+}
+
+async function runTests(sandbox: Sandbox): Promise<{ success: boolean; output: string }> {
+  try {
+    const result = await sandbox.runCommand("npx", ["vitest", "run"]);
+    return {
+      success: result.exitCode === 0,
+      output: await result.output("both"),
+    };
+  } catch (e) {
+    return { success: false, output: String(e) };
+  }
 }

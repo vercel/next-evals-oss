@@ -1458,43 +1458,11 @@ async function main() {
         process.exit(1);
       }
 
-      // Helper to check if an eval is an agent eval
-      const isAgentEval = (evalPath: string) => /^agent-\d+/.test(evalPath);
-
-      // Determine if we need dev server
-      // Auto-enable for agent evals, or if explicitly requested
-      const agentEvalsOnly = values["agent-evals"] || false;
-      const singleEval = values.eval || positionals[0];
-      const isRunningAgentEval = agentEvalsOnly || (singleEval && isAgentEval(singleEval));
-
-      // Dev server auto-starts for agent evals (agent-* pattern)
-      const withDevServer = isRunningAgentEval;
-
-      // --with-hooks specifies hook name (e.g., "nextjs-mcp" -> nextjs-mcp-pre.sh, nextjs-mcp-post.sh)
-      const hooksName = values["with-hooks"];
-      const hooks = hooksName
-        ? {
-            preEval: `scripts/eval-hooks/${hooksName}-pre.sh`,
-            postEval: `scripts/eval-hooks/${hooksName}-post.sh`,
-          }
-        : undefined;
-
       const claudeOptions = {
         verbose: values.verbose || false,
-        debug: values.debug || false,
         timeout: values["claude-timeout"]
           ? parseInt(values["claude-timeout"])
           : 600000, // 10 minutes default
-        devServer: withDevServer
-          ? {
-              enabled: true,
-              command: values["dev-server-cmd"] || "npm run dev",
-              port: values["dev-server-port"]
-                ? parseInt(values["dev-server-port"])
-                : 4000,
-            }
-          : undefined,
-        hooks,
       };
 
       if (values.all) {
@@ -1524,7 +1492,7 @@ async function main() {
           for (const evalPath of allEvals) {
             try {
               console.log(` ▶ ${evalPath}`);
-              const result = await runClaudeCodeEval(evalPath, claudeOptions, false);
+              const result = await runClaudeCodeEval(evalPath, claudeOptions);
               results.push({ evalPath, result });
 
               const success =
@@ -1552,7 +1520,7 @@ async function main() {
               batch.map(async (evalPath) => {
                 try {
                   console.log(` ▶ ${evalPath}`);
-                  const result = await runClaudeCodeEval(evalPath, claudeOptions, true); // Use worktrees
+                  const result = await runClaudeCodeEval(evalPath, claudeOptions); // Use worktrees
 
                   const success =
                     result.success &&
@@ -1686,7 +1654,7 @@ async function main() {
           for (const evalPath of evalNames) {
             try {
               console.log(` ▶ ${evalPath}`);
-              const result = await runClaudeCodeEval(evalPath, claudeOptions, false);
+              const result = await runClaudeCodeEval(evalPath, claudeOptions);
               results.push({ evalPath, result });
 
               const success =
@@ -1715,7 +1683,7 @@ async function main() {
               batch.map(async (evalPath) => {
                 try {
                   console.log(` ▶ ${evalPath}`);
-                  const result = await runClaudeCodeEval(evalPath, claudeOptions, true); // Use worktrees
+                  const result = await runClaudeCodeEval(evalPath, claudeOptions); // Use worktrees
 
                   const success =
                     result.success &&
