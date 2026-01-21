@@ -1471,86 +1471,37 @@ async function main() {
         const allEvals = await getAllEvals(agentEvalsOnly);
         const evalType = agentEvalsOnly ? "agent evals" : "evals";
 
-        // Use git worktrees for concurrent execution
-        const requestedThreads = values.threads ? parseInt(values.threads) : 1;
-        const threads = requestedThreads;
+        console.log(`🤖 Running ${allEvals.length} ${evalType} with Claude Code in parallel...\n`);
 
-        if (threads > 1) {
-          console.log(`🔀 Using git worktrees for concurrent execution (${threads} at a time)\n`);
-        }
-
-        console.log(
-          `🤖 Running ${allEvals.length} ${evalType} with Claude Code...\n`
-        );
-
-        const results: { evalPath: string; result: ClaudeCodeResult }[] = [];
         const startTime = performance.now();
 
-        // Run evals with concurrency limit
-        if (threads === 1) {
-          // Sequential execution
-          for (const evalPath of allEvals) {
+        // Run all evals in parallel - each runs in isolated sandbox
+        const results = await Promise.all(
+          allEvals.map(async (evalPath) => {
+            console.log(` ▶ ${evalPath}`);
             try {
-              console.log(` ▶ ${evalPath}`);
               const result = await runClaudeCodeEval(evalPath, claudeOptions);
-              results.push({ evalPath, result });
-
               const success =
                 result.success &&
                 result.buildSuccess &&
                 result.lintSuccess &&
                 result.testSuccess;
-
-              console.log(`   ${success ? '✅ done' : '❌ failed'}`);
+              console.log(`   ${evalPath}: ${success ? '✅' : '❌'}`);
+              return { evalPath, result };
             } catch (error) {
-              const errorResult: ClaudeCodeResult = {
-                success: false,
-                output: "",
-                error: error instanceof Error ? error.message : String(error),
-                duration: 0,
+              console.log(`   ${evalPath}: ❌`);
+              return {
+                evalPath,
+                result: {
+                  success: false,
+                  output: "",
+                  error: error instanceof Error ? error.message : String(error),
+                  duration: 0,
+                } as ClaudeCodeResult,
               };
-              results.push({ evalPath, result: errorResult });
-              console.log(`   ❌ failed`);
             }
-          }
-        } else {
-          // Concurrent execution with limit using worktrees
-          const runBatch = async (batch: string[]) => {
-            return Promise.all(
-              batch.map(async (evalPath) => {
-                try {
-                  console.log(` ▶ ${evalPath}`);
-                  const result = await runClaudeCodeEval(evalPath, claudeOptions); // Use worktrees
-
-                  const success =
-                    result.success &&
-                    result.buildSuccess &&
-                    result.lintSuccess &&
-                    result.testSuccess;
-
-                  console.log(`   ${success ? '✅ done' : '❌ failed'}`);
-                  return { evalPath, result };
-                } catch (error) {
-                  const errorResult: ClaudeCodeResult = {
-                    success: false,
-                    output: "",
-                    error: error instanceof Error ? error.message : String(error),
-                    duration: 0,
-                  };
-                  console.log(`   ❌ failed`);
-                  return { evalPath, result: errorResult };
-                }
-              })
-            );
-          };
-
-          // Process in batches
-          for (let i = 0; i < allEvals.length; i += threads) {
-            const batch = allEvals.slice(i, i + threads);
-            const batchResults = await runBatch(batch);
-            results.push(...batchResults);
-          }
-        }
+          })
+        );
 
         // Display results in table format
         console.log("\n📊 Results:\n" + "═".repeat(80));
@@ -1601,15 +1552,9 @@ async function main() {
         );
         const totalWorkTimeSec = (totalWorkTime / 1000).toFixed(1);
 
-        if (threads > 1) {
-          console.log(
-            `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s wall-clock, ${totalWorkTimeSec}s combined work)`
-          );
-        } else {
-          console.log(
-            `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s total)`
-          );
-        }
+        console.log(
+          `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s wall-clock, ${totalWorkTimeSec}s combined work)`
+        );
 
         process.exit(passed === results.length ? 0 : 1);
       } else if (values.evals) {
@@ -1617,7 +1562,6 @@ async function main() {
         const evalNames = values.evals.split(",").map((e: string) => e.trim());
 
         // Validate that all specified evals exist
-        // Check both regular and agent evals
         const regularEvals = await getAllEvals(false);
         const agentEvals = await getAllEvals(true);
         const allEvals = [...regularEvals, ...agentEvals];
@@ -1637,84 +1581,37 @@ async function main() {
           process.exit(1);
         }
 
-        // Determine concurrency using git worktrees
-        const requestedThreads = values.threads ? parseInt(values.threads) : 1;
-        const threads = requestedThreads;
+        console.log(`🤖 Running ${evalNames.length} Claude Code evals in parallel...\n`);
 
-        if (threads > 1) {
-          console.log(`🔀 Using git worktrees for concurrent execution (${threads} at a time)\n`);
-        }
-        console.log(`🤖 Running ${evalNames.length} Claude Code evals...\n`);
-
-        const results: Array<{ evalPath: string; result: ClaudeCodeResult }> = [];
         const startTime = performance.now();
 
-        if (threads === 1) {
-          // Sequential execution
-          for (const evalPath of evalNames) {
+        // Run all specified evals in parallel
+        const results = await Promise.all(
+          evalNames.map(async (evalPath: string) => {
+            console.log(` ▶ ${evalPath}`);
             try {
-              console.log(` ▶ ${evalPath}`);
               const result = await runClaudeCodeEval(evalPath, claudeOptions);
-              results.push({ evalPath, result });
-
               const success =
                 result.success &&
                 result.buildSuccess &&
                 result.lintSuccess &&
                 result.testSuccess;
-
-              console.log(`   ${success ? '✅ done' : '❌ failed'}`);
+              console.log(`   ${evalPath}: ${success ? '✅' : '❌'}`);
+              return { evalPath, result };
             } catch (error) {
-              const errorResult: ClaudeCodeResult = {
-                success: false,
-                buildSuccess: false,
-                lintSuccess: false,
-                testSuccess: false,
-                error: error instanceof Error ? error.message : String(error),
+              console.log(`   ${evalPath}: ❌`);
+              return {
+                evalPath,
+                result: {
+                  success: false,
+                  output: "",
+                  error: error instanceof Error ? error.message : String(error),
+                  duration: 0,
+                } as ClaudeCodeResult,
               };
-              results.push({ evalPath, result: errorResult });
-              console.log(`   ❌ failed`);
             }
-          }
-        } else {
-          // Concurrent execution with limit using worktrees
-          const runBatch = async (batch: string[]) => {
-            return Promise.all(
-              batch.map(async (evalPath) => {
-                try {
-                  console.log(` ▶ ${evalPath}`);
-                  const result = await runClaudeCodeEval(evalPath, claudeOptions); // Use worktrees
-
-                  const success =
-                    result.success &&
-                    result.buildSuccess &&
-                    result.lintSuccess &&
-                    result.testSuccess;
-
-                  console.log(`   ${success ? '✅ done' : '❌ failed'}`);
-                  return { evalPath, result };
-                } catch (error) {
-                  const errorResult: ClaudeCodeResult = {
-                    success: false,
-                    buildSuccess: false,
-                    lintSuccess: false,
-                    testSuccess: false,
-                    error: error instanceof Error ? error.message : String(error),
-                  };
-                  console.log(`   ❌ failed`);
-                  return { evalPath, result: errorResult };
-                }
-              })
-            );
-          };
-
-          // Process in batches
-          for (let i = 0; i < evalNames.length; i += threads) {
-            const batch = evalNames.slice(i, i + threads);
-            const batchResults = await runBatch(batch);
-            results.push(...batchResults);
-          }
-        }
+          })
+        );
 
         // Display results in table format
         console.log("\n📊 Results:\n" + "═".repeat(80));
@@ -1765,15 +1662,9 @@ async function main() {
         );
         const totalWorkTimeSec = (totalWorkTime / 1000).toFixed(1);
 
-        if (threads > 1) {
-          console.log(
-            `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s wall-clock, ${totalWorkTimeSec}s combined work)`
-          );
-        } else {
-          console.log(
-            `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s total)`
-          );
-        }
+        console.log(
+          `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s wall-clock, ${totalWorkTimeSec}s combined work)`
+        );
 
         process.exit(passed === results.length ? 0 : 1);
       } else {
