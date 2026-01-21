@@ -296,8 +296,6 @@ function parseCliArgs(args: string[]) {
       values["dev-server-port"] = args[++i];
     } else if (arg === "--with-hooks") {
       values["with-hooks"] = args[++i];
-    } else if (arg === "--with-visual-diff") {
-      values["with-visual-diff"] = true;
     } else if (!arg.startsWith("-")) {
       positionals.push(arg);
     }
@@ -335,7 +333,6 @@ Options:
       --dev-server-cmd    Command to start dev server (default: "npm run dev")
       --dev-server-port   Port for dev server (default: 4000, auto-increments for concurrent evals)
       --with-hooks <name> Use eval hooks from scripts/eval-hooks/<name>-pre.sh and <name>-post.sh
-      --with-visual-diff  Enable visual regression testing with screenshot comparison
 
 Examples:
   # Run all evals with LLMs
@@ -1505,7 +1502,6 @@ async function main() {
             }
           : undefined,
         hooks,
-        visualDiff: values["with-visual-diff"] || false,
       };
 
       if (values.all) {

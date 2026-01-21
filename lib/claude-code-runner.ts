@@ -4,7 +4,6 @@ import path from "path";
 import { spawn, ChildProcess } from "child_process";
 import { performance } from "perf_hooks";
 import { copyFolder, ensureSharedDependencies } from "./eval-runner";
-import { captureAndCompare } from "./visual-diff";
 
 // Global port allocator for concurrent eval runs
 let nextAvailablePort = 4000;
@@ -21,12 +20,6 @@ export interface ClaudeCodeResult {
   buildOutput?: string;
   lintOutput?: string;
   testOutput?: string;
-  visualDiff?: {
-    success: boolean;
-    screenshotPath?: string;
-    pixelDifference?: number;
-    error?: string;
-  };
   evalPath?: string;
   timestamp?: string;
 }
@@ -45,7 +38,6 @@ export interface ClaudeCodeEvalOptions {
     preEval?: string;
     postEval?: string;
   };
-  visualDiff?: boolean;
   outputFormat?: string;
   outputFile?: string;
 }
@@ -58,7 +50,6 @@ export class ClaudeCodeRunner {
   private apiKey?: string;
   private devServer?: { enabled: boolean; command?: string; port?: number };
   private hooks?: { preEval?: string; postEval?: string };
-  private visualDiff: boolean;
 
   constructor(options: ClaudeCodeEvalOptions = {}) {
     this.verbose = options.verbose || false;
@@ -66,7 +57,6 @@ export class ClaudeCodeRunner {
     this.apiKey = options.apiKey || process.env.ANTHROPIC_API_KEY;
     this.devServer = options.devServer;
     this.hooks = options.hooks;
-    this.visualDiff = options.visualDiff || false;
   }
 
   async runClaudeCodeEval(
@@ -165,18 +155,6 @@ export class ClaudeCodeRunner {
         postEvalHookRan = true;
       }
 
-      // Run visual diff if enabled and dev server is running
-      let visualDiffResult;
-      if (this.visualDiff && this.devServer?.enabled) {
-        const port = this.devServer.port || 3000;
-        visualDiffResult = await captureAndCompare({
-          url: `http://localhost:${port}`,
-          outputDir,
-          evalPath: evalName,
-          enabled: true,
-        });
-      }
-
       return {
         success: true,
         output: claudeResult.output,
@@ -187,7 +165,6 @@ export class ClaudeCodeRunner {
         buildOutput: evalResults.buildOutput,
         lintOutput: evalResults.lintOutput,
         testOutput: evalResults.testOutput,
-        visualDiff: visualDiffResult,
       };
     } catch (error) {
       return {
