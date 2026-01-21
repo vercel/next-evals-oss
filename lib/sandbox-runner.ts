@@ -146,9 +146,7 @@ export async function runClaudeCodeInSandbox(
 
     // Step 3: Install project dependencies
     log(`\n📦 Installing project dependencies...`);
-    const installResult = await sandbox.runCommand("pnpm", ["install"], {
-      timeout: 180000,
-    });
+    const installResult = await sandbox.runCommand("pnpm", ["install"]);
     if (installResult.exitCode !== 0) {
       throw new Error(`pnpm install failed: ${await installResult.stderr()}`);
     }
@@ -158,8 +156,7 @@ export async function runClaudeCodeInSandbox(
     log(`\n🤖 Installing Claude Code CLI...`);
     const cliInstall = await sandbox.runCommand(
       "npm",
-      ["install", "-g", "@anthropic-ai/claude-code"],
-      { timeout: 120000 }
+      ["install", "-g", "@anthropic-ai/claude-code"]
     );
     if (cliInstall.exitCode !== 0) {
       throw new Error(`Claude Code install failed: ${await cliInstall.stderr()}`);
@@ -203,7 +200,6 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       cmd: "claude",
       args: ["--print", "--dangerously-skip-permissions", enhancedPrompt],
       env: claudeEnv,
-      timeout: 300000, // 5 min for Claude
     });
 
     claudeOutput = await claudeResult.output("both");
@@ -243,9 +239,7 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     // Build
     try {
       log(`   → Building...`);
-      const buildResult = await sandbox.runCommand("npx", ["next", "build"], {
-        timeout: 60000,
-      });
+      const buildResult = await sandbox.runCommand("npx", ["next", "build"]);
       buildOutput = await buildResult.output("both");
       buildSuccess = buildResult.exitCode === 0;
       log(`   → Build: ${buildSuccess ? "✅" : "❌"}`);
@@ -259,7 +253,6 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       const lintResult = await sandbox.runCommand({
         cmd: "bash",
         args: ["-c", "./node_modules/.bin/eslint app/"],
-        timeout: 30000,
       });
       lintOutput = await lintResult.output("both");
       lintSuccess = lintResult.exitCode === 0;
@@ -271,9 +264,7 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     // Test
     try {
       log(`   → Testing...`);
-      const testResult = await sandbox.runCommand("npx", ["vitest", "run"], {
-        timeout: 30000,
-      });
+      const testResult = await sandbox.runCommand("npx", ["vitest", "run"]);
       testOutput = await testResult.output("both");
       testSuccess = testResult.exitCode === 0;
       log(`   → Tests: ${testSuccess ? "✅" : "❌"}`);
