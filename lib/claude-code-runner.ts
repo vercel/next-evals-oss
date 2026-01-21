@@ -37,6 +37,7 @@ export interface ClaudeCodeResult {
   sandboxId?: string;
   evalPath?: string;
   timestamp?: string;
+  generatedFiles?: Record<string, string>; // filepath -> content
 }
 
 /**
@@ -223,6 +224,10 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
     log(`   Lint: ${lintResult.success ? "✅" : "❌"}`);
     log(`   Tests: ${testResult.success ? "✅" : "❌"}`);
 
+    // Capture generated files from sandbox
+    log(`📥 Capturing generated files...`);
+    const generatedFiles = await captureGeneratedFiles(sandbox);
+
     return {
       success: buildResult.success && lintResult.success && testResult.success,
       output: claudeOutput,
@@ -236,6 +241,7 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       sandboxId: sandbox.sandboxId,
       evalPath,
       timestamp: new Date().toISOString(),
+      generatedFiles,
     };
   } catch (error) {
     return {
@@ -290,4 +296,41 @@ async function runTests(sandbox: Sandbox): Promise<{ success: boolean; output: s
   } catch (e) {
     return { success: false, output: String(e) };
   }
+}
+
+/**
+ * Capture generated files from sandbox for analysis.
+ * Reads all .ts, .tsx, .js, .jsx files from app/ directory.
+ */
+async function captureGeneratedFiles(sandbox: Sandbox): Promise<Record<string, string>> {
+  const files: Record<string, string> = {};
+
+  try {
+    // Find all source files in app/ directory
+    const findResult = await sandbox.runCommand("find", [
+      "app", "-type", "f",
+      "(", "-name", "*.ts", "-o", "-name", "*.tsx", "-o", "-name", "*.js", "-o", "-name", "*.jsx", ")",
+    ]);
+
+    const filePaths = (await findResult.stdout())
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+
+    // Read each file
+    for (const filePath of filePaths) {
+      try {
+        const catResult = await sandbox.runCommand("cat", [filePath]);
+        if (catResult.exitCode === 0) {
+          files[filePath] = await catResult.stdout();
+        }
+      } catch {
+        // Skip unreadable files
+      }
+    }
+  } catch {
+    // If capture fails, return empty object
+  }
+
+  return files;
 }
