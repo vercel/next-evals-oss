@@ -1716,6 +1716,12 @@ async function main() {
         const durationSec = (result.duration / 1000).toFixed(1);
         console.log(`\n⏱️  Duration: ${durationSec}s`);
 
+        // Save detailed results to JSON file
+        const results = [{ evalPath, result }];
+        const resultsFile = `eval-results-${Date.now()}.json`;
+        await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
+        console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
+
         const success =
           result.success &&
           result.buildSuccess &&
