@@ -3,10 +3,11 @@ import path from "path";
 import { Sandbox } from "@vercel/sandbox";
 import ignore from "ignore";
 
+const DEFAULT_TIMEOUT = 600000; // 10 minutes
+
 export interface SandboxRunnerOptions {
   timeout?: number;
   verbose?: boolean;
-  captureScreenshot?: boolean;
 }
 
 export interface SandboxRunnerResult {
@@ -21,11 +22,23 @@ export interface SandboxRunnerResult {
   lintOutput?: string;
   testOutput?: string;
   sandboxId?: string;
-  screenshot?: Buffer;
 }
 
+const IGNORED_PATTERNS = [
+  ".git",
+  ".next",
+  "node_modules",
+  ".DS_Store",
+  "*.log",
+  "build",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+];
+
+const TEST_FILE_PATTERNS = ["*.test.tsx", "*.test.ts"];
+
 /**
- * Collect files from a directory, optionally excluding test files
+ * Collect files from a directory, optionally filtering test files.
  */
 async function collectFiles(
   dir: string,
@@ -34,22 +47,13 @@ async function collectFiles(
   const files: { path: string; content: Buffer }[] = [];
   const ig = ignore();
 
-  ig.add([
-    ".git",
-    ".next",
-    "node_modules",
-    ".DS_Store",
-    "*.log",
-    "build",
-    "pnpm-lock.yaml",
-    "package-lock.json",
-  ]);
+  ig.add(IGNORED_PATTERNS);
 
   if (options.excludeTests) {
-    ig.add(["*.test.tsx", "*.test.ts"]);
+    ig.add(TEST_FILE_PATTERNS);
   }
 
-  const processDir = async (currentDir: string, relativePath: string = "") => {
+  async function processDir(currentDir: string, relativePath: string = ""): Promise<void> {
     const entries = await fs.readdir(currentDir, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -84,17 +88,17 @@ async function collectFiles(
         }
       }
     }
-  };
+  }
 
   await processDir(dir);
   return files;
 }
 
 /**
- * Run Claude Code agent inside Vercel Sandbox
+ * Run Claude Code agent inside a Vercel Sandbox.
  *
- * This ensures Claude Code cannot access test files because they
- * physically don't exist in the sandbox until after the agent runs.
+ * Test files are withheld from the sandbox until after the agent completes,
+ * ensuring the agent cannot access them during code generation.
  */
 export async function runClaudeCodeInSandbox(
   evalPath: string,
@@ -104,106 +108,90 @@ export async function runClaudeCodeInSandbox(
   const fullEvalPath = path.join(evalsDir, evalPath);
   const inputDir = path.join(fullEvalPath, "input");
   const promptFile = path.join(fullEvalPath, "prompt.md");
+  const templateDir = path.join(process.cwd(), "template");
   const verbose = options.verbose ?? false;
+  const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
   const log = (msg: string) => verbose && console.log(msg);
 
   log(`\n🚀 Running Claude Code in sandbox for: ${evalPath}`);
 
-  // Read prompt
   const prompt = await fs.readFile(promptFile, "utf8");
   log(`📝 Task: ${prompt.trim().slice(0, 100)}...`);
 
-  // Collect files excluding tests
-  const files = await collectFiles(inputDir, { excludeTests: true });
-  log(`📂 Found ${files.length} files (excluding tests)`);
-
-  // Get test files count for info
+  const workspaceFiles = await collectFiles(inputDir, { excludeTests: true });
   const testFiles = await collectFiles(inputDir, { onlyTests: true });
-  log(`🔒 ${testFiles.length} test files will be added AFTER agent runs`);
+  log(`📂 Found ${workspaceFiles.length} workspace files, ${testFiles.length} test files`);
 
-  // Create sandbox
-  log(`\n🔲 Creating sandbox...`);
-  const sandbox = await Sandbox.create({
-    runtime: "node24",
-    timeout: options.timeout || 600000, // 10 min
-  });
-  log(`   ✅ Sandbox: ${sandbox.sandboxId}`);
+  const sandbox = await Sandbox.create({ runtime: "node24", timeout });
+  log(`🔲 Sandbox created: ${sandbox.sandboxId}`);
 
   const startTime = Date.now();
   let claudeOutput = "";
 
   try {
-    // Step 1: Upload workspace files (NO test files!)
-    log(`\n📤 Uploading workspace files...`);
-    await sandbox.writeFiles(files);
+    // Upload workspace files (excluding tests)
+    await sandbox.writeFiles(workspaceFiles);
 
-    // Step 2: Copy template package.json
-    const templatePkg = await fs.readFile(
-      path.join(process.cwd(), "template", "package.json")
-    );
-    await sandbox.writeFiles([{ path: "package.json", content: templatePkg }]);
+    // Upload template files
+    const [templatePkg, eslintConfig] = await Promise.all([
+      fs.readFile(path.join(templateDir, "package.json")),
+      fs.readFile(path.join(templateDir, "eslint.config.mjs")),
+    ]);
+    await sandbox.writeFiles([
+      { path: "package.json", content: templatePkg },
+      { path: "eslint.config.mjs", content: eslintConfig },
+    ]);
 
-    // Step 3: Install project dependencies
-    log(`\n📦 Installing project dependencies...`);
+    // Install dependencies
+    log(`📦 Installing dependencies...`);
     const installResult = await sandbox.runCommand("pnpm", ["install"]);
     if (installResult.exitCode !== 0) {
       throw new Error(`pnpm install failed: ${await installResult.stderr()}`);
     }
-    log(`   ✅ Dependencies installed`);
 
-    // Step 4: Install Claude Code CLI
-    log(`\n🤖 Installing Claude Code CLI...`);
-    const cliInstall = await sandbox.runCommand(
-      "npm",
-      ["install", "-g", "@anthropic-ai/claude-code"]
-    );
+    // Install Claude Code CLI
+    log(`🤖 Installing Claude Code CLI...`);
+    const cliInstall = await sandbox.runCommand("npm", ["install", "-g", "@anthropic-ai/claude-code"]);
     if (cliInstall.exitCode !== 0) {
       throw new Error(`Claude Code install failed: ${await cliInstall.stderr()}`);
     }
-    log(`   ✅ Claude Code CLI installed`);
 
-    // Verify no project test files in sandbox (ignore node_modules)
-    log(`\n🔍 Verifying no test files in sandbox...`);
+    // Verify test file isolation
     const testCheck = await sandbox.runCommand("find", [
       ".", "-path", "./node_modules", "-prune", "-o",
       "-name", "*.test.tsx", "-print", "-o",
-      "-name", "*.test.ts", "-print"
+      "-name", "*.test.ts", "-print",
     ]);
     const foundTests = (await testCheck.stdout()).trim();
     if (foundTests) {
       throw new Error(`Test files found in sandbox before agent run: ${foundTests}`);
     }
-    log(`   ✅ No test files - isolation confirmed`);
+    log(`🔒 Test file isolation verified`);
 
-    // Step 5: Run Claude Code with the prompt (via Vercel AI Gateway)
-    log(`\n🤖 Running Claude Code (via AI Gateway)...`);
-    const enhancedPrompt = `${prompt.trim()}
-
-IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependencies have already been installed. Do not run build, test, or dev server commands. Just write the code files.`;
-
-    // Use Vercel AI Gateway
+    // Run Claude Code
+    log(`🤖 Running Claude Code...`);
     const aiGatewayKey = process.env.AI_GATEWAY_API_KEY;
     if (!aiGatewayKey) {
       throw new Error("AI_GATEWAY_API_KEY environment variable is required");
     }
 
-    const claudeEnv: Record<string, string> = {
-      ANTHROPIC_BASE_URL: "https://ai-gateway.vercel.sh",
-      ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
-      ANTHROPIC_API_KEY: "", // Must be empty so Claude Code uses AUTH_TOKEN
-    };
+    const enhancedPrompt = `${prompt.trim()}
 
-    log(`   Using Vercel AI Gateway`);
+IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependencies have already been installed. Do not run build, test, or dev server commands. Just write the code files.`;
 
     const claudeResult = await sandbox.runCommand({
       cmd: "claude",
       args: ["--print", "--dangerously-skip-permissions", enhancedPrompt],
-      env: claudeEnv,
+      env: {
+        ANTHROPIC_BASE_URL: "https://ai-gateway.vercel.sh",
+        ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
+        ANTHROPIC_API_KEY: "", // Must be empty so Claude Code uses AUTH_TOKEN
+      },
     });
 
     claudeOutput = await claudeResult.output("both");
-    log(`   ✅ Claude Code finished (exit: ${claudeResult.exitCode})`);
+    log(`✅ Claude Code finished (exit: ${claudeResult.exitCode})`);
 
     if (claudeResult.exitCode !== 0) {
       return {
@@ -215,129 +203,33 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       };
     }
 
-    // Step 6: NOW upload test files for validation
-    log(`\n📤 Uploading test files for validation...`);
+    // Upload test files for validation
+    log(`📤 Uploading test files...`);
     await sandbox.writeFiles(testFiles);
 
-    // Upload template eslint config
-    const eslintConfig = await fs.readFile(
-      path.join(process.cwd(), "template", "eslint.config.mjs")
-    );
-    await sandbox.writeFiles([{ path: "eslint.config.mjs", content: eslintConfig }]);
-    log(`   ✅ ${testFiles.length} test files uploaded`);
+    // Run validation
+    log(`🔨 Running validation...`);
+    const [buildResult, lintResult, testResult] = await Promise.all([
+      runBuild(sandbox),
+      runLint(sandbox),
+      runTests(sandbox),
+    ]);
 
-    // Step 7: Run validation (build, lint, test)
-    log(`\n🔨 Running validation...`);
-
-    let buildSuccess = false;
-    let buildOutput = "";
-    let lintSuccess = false;
-    let lintOutput = "";
-    let testSuccess = false;
-    let testOutput = "";
-
-    // Build
-    try {
-      log(`   → Building...`);
-      const buildResult = await sandbox.runCommand("npx", ["next", "build"]);
-      buildOutput = await buildResult.output("both");
-      buildSuccess = buildResult.exitCode === 0;
-      log(`   → Build: ${buildSuccess ? "✅" : "❌"}`);
-    } catch (e) {
-      buildOutput = String(e);
-    }
-
-    // Lint (eslint directly)
-    try {
-      log(`   → Linting...`);
-      const lintResult = await sandbox.runCommand({
-        cmd: "bash",
-        args: ["-c", "./node_modules/.bin/eslint app/"],
-      });
-      lintOutput = await lintResult.output("both");
-      lintSuccess = lintResult.exitCode === 0;
-      log(`   → Lint: ${lintSuccess ? "✅" : "❌"}`);
-    } catch (e) {
-      lintOutput = String(e);
-    }
-
-    // Test
-    try {
-      log(`   → Testing...`);
-      const testResult = await sandbox.runCommand("npx", ["vitest", "run"]);
-      testOutput = await testResult.output("both");
-      testSuccess = testResult.exitCode === 0;
-      log(`   → Tests: ${testSuccess ? "✅" : "❌"}`);
-    } catch (e) {
-      testOutput = String(e);
-    }
-
-    // Step 8: Capture screenshot if enabled
-    let screenshot: Buffer | undefined;
-    if (options.captureScreenshot && buildSuccess) {
-      try {
-        log(`\n📸 Capturing screenshot...`);
-
-        // Install Playwright
-        log(`   → Installing Playwright...`);
-        await sandbox.runCommand("npx", ["playwright", "install", "chromium"], {
-          timeout: 120000,
-        });
-
-        // Create screenshot script
-        const screenshotScript = `
-const { chromium } = require('playwright');
-(async () => {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
-  await page.waitForTimeout(1000);
-  await page.screenshot({ path: '/tmp/screenshot.png', fullPage: true });
-  await browser.close();
-})();
-`;
-        await sandbox.writeFiles([{ path: "screenshot.js", content: Buffer.from(screenshotScript) }]);
-
-        // Start dev server in background
-        log(`   → Starting dev server...`);
-        sandbox.runCommand("npx", ["next", "dev", "-p", "3000"], { timeout: 60000 });
-
-        // Wait for server to start
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Run screenshot script
-        log(`   → Taking screenshot...`);
-        const screenshotResult = await sandbox.runCommand("node", ["screenshot.js"], {
-          timeout: 30000,
-        });
-
-        if (screenshotResult.exitCode === 0) {
-          // Read the screenshot file
-          const screenshotFiles = await sandbox.readFiles(["/tmp/screenshot.png"]);
-          if (screenshotFiles.length > 0) {
-            screenshot = screenshotFiles[0].content;
-            log(`   → Screenshot: ✅`);
-          }
-        } else {
-          log(`   → Screenshot: ❌ (${await screenshotResult.stderr()})`);
-        }
-      } catch (e) {
-        log(`   → Screenshot: ❌ (${e})`);
-      }
-    }
+    log(`   Build: ${buildResult.success ? "✅" : "❌"}`);
+    log(`   Lint: ${lintResult.success ? "✅" : "❌"}`);
+    log(`   Tests: ${testResult.success ? "✅" : "❌"}`);
 
     return {
-      success: buildSuccess && lintSuccess && testSuccess,
+      success: buildResult.success && lintResult.success && testResult.success,
       output: claudeOutput,
       duration: Date.now() - startTime,
-      buildSuccess,
-      lintSuccess,
-      testSuccess,
-      buildOutput,
-      lintOutput,
-      testOutput,
+      buildSuccess: buildResult.success,
+      lintSuccess: lintResult.success,
+      testSuccess: testResult.success,
+      buildOutput: buildResult.output,
+      lintOutput: lintResult.output,
+      testOutput: testResult.output,
       sandboxId: sandbox.sandboxId,
-      screenshot,
     };
   } catch (error) {
     return {
@@ -348,7 +240,46 @@ const { chromium } = require('playwright');
       sandboxId: sandbox.sandboxId,
     };
   } finally {
-    log(`\n🧹 Stopping sandbox...`);
+    log(`🧹 Stopping sandbox...`);
     await sandbox.stop();
+  }
+}
+
+async function runBuild(sandbox: Sandbox): Promise<{ success: boolean; output: string }> {
+  try {
+    const result = await sandbox.runCommand("npx", ["next", "build"]);
+    return {
+      success: result.exitCode === 0,
+      output: await result.output("both"),
+    };
+  } catch (e) {
+    return { success: false, output: String(e) };
+  }
+}
+
+async function runLint(sandbox: Sandbox): Promise<{ success: boolean; output: string }> {
+  try {
+    const result = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", "./node_modules/.bin/eslint app/"],
+    });
+    return {
+      success: result.exitCode === 0,
+      output: await result.output("both"),
+    };
+  } catch (e) {
+    return { success: false, output: String(e) };
+  }
+}
+
+async function runTests(sandbox: Sandbox): Promise<{ success: boolean; output: string }> {
+  try {
+    const result = await sandbox.runCommand("npx", ["vitest", "run"]);
+    return {
+      success: result.exitCode === 0,
+      output: await result.output("both"),
+    };
+  } catch (e) {
+    return { success: false, output: String(e) };
   }
 }

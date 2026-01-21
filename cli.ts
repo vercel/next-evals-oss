@@ -288,8 +288,6 @@ function parseCliArgs(args: string[]) {
       values.threads = args[++i];
     } else if (arg === "--claude-timeout") {
       values["claude-timeout"] = args[++i];
-    } else if (arg === "--api-key") {
-      values["api-key"] = args[++i];
     } else if (arg === "--dev-server-cmd") {
       values["dev-server-cmd"] = args[++i];
     } else if (arg === "--dev-server-port") {
@@ -327,9 +325,8 @@ Options:
       --debug             Persist output folders for debugging (don't clean up)
   -t, --threads <num>     Number of worker threads (default: 1, max: CPU cores)
       --all-models        Run single eval with all models (default: only first model)
-      --claude-code       Use Claude Code agent instead of LLM models
+      --claude-code       Use Claude Code agent instead of LLM models (requires AI_GATEWAY_API_KEY env var)
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
-      --api-key <key>     Anthropic API key for Claude Code (or use ANTHROPIC_API_KEY env var)
       --dev-server-cmd    Command to start dev server (default: "npm run dev")
       --dev-server-port   Port for dev server (default: 4000, auto-increments for concurrent evals)
       --with-hooks <name> Use eval hooks from scripts/eval-hooks/<name>-pre.sh and <name>-post.sh
@@ -347,8 +344,8 @@ Examples:
   # Run multiple specific evals
   cli.ts --evals 001-server-component,002-client-component,003-cookies
 
-  # Run Claude Code eval with custom timeout and API key
-  cli.ts --eval 001-server-component --claude-code --claude-timeout 600000 --api-key your-key
+  # Run Claude Code eval with custom timeout
+  cli.ts --eval 001-server-component --claude-code --claude-timeout 600000
 
   # Create a new eval
   cli.ts --create --name "my-new-eval" --prompt "Create a button component"
@@ -1453,13 +1450,10 @@ async function main() {
 
     // Claude Code mode
     if (values["claude-code"]) {
-      const apiKey = values["api-key"] || process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) {
+      const aiGatewayKey = process.env.AI_GATEWAY_API_KEY;
+      if (!aiGatewayKey) {
         console.error(
-          "❌ Error: Anthropic API key is required for Claude Code mode."
-        );
-        console.error(
-          "Set ANTHROPIC_API_KEY environment variable or use --api-key option."
+          "❌ Error: AI_GATEWAY_API_KEY environment variable is required for Claude Code mode."
         );
         process.exit(1);
       }
@@ -1491,7 +1485,6 @@ async function main() {
         timeout: values["claude-timeout"]
           ? parseInt(values["claude-timeout"])
           : 600000, // 10 minutes default
-        apiKey,
         devServer: withDevServer
           ? {
               enabled: true,

@@ -20,7 +20,6 @@ export interface ClaudeCodeEvalOptions {
   timeout?: number;
   verbose?: boolean;
   debug?: boolean;
-  apiKey?: string;
   devServer?: {
     enabled: boolean;
     command?: string;
@@ -56,8 +55,8 @@ export interface ClaudeCodeEvalOptions {
  * - **debug**: The debug option to persist output folders is not applicable since
  *   the sandbox is ephemeral and destroyed after each run.
  *
- * - **apiKey**: Custom API keys are not supported. The sandbox uses AI_GATEWAY_API_KEY
- *   environment variable exclusively for Vercel AI Gateway authentication.
+ * - **API keys**: The sandbox uses AI_GATEWAY_API_KEY environment variable exclusively
+ *   for Vercel AI Gateway authentication. No custom API key option is provided.
  *
  * - **MCP config**: Loading .mcp.json for MCP servers is not supported in sandbox mode.
  *
@@ -90,9 +89,6 @@ export async function runClaudeCodeEval(
   }
   if (options.debug) {
     console.warn("⚠️  debug option is not supported in sandbox mode (sandbox is ephemeral)");
-  }
-  if (options.apiKey) {
-    console.warn("⚠️  apiKey option is ignored in sandbox mode (uses AI_GATEWAY_API_KEY)");
   }
 
   const result: SandboxRunnerResult = await runClaudeCodeInSandbox(evalPath, sandboxOptions);
