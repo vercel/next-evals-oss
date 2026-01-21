@@ -299,8 +299,7 @@ async function runTests(sandbox: Sandbox): Promise<{ success: boolean; output: s
 }
 
 /**
- * Capture generated files from sandbox for analysis.
- * Reads all .ts, .tsx, .js, .jsx files from app/ directory.
+ * Capture generated files and Claude transcript from sandbox for analysis.
  */
 async function captureGeneratedFiles(sandbox: Sandbox): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
@@ -326,6 +325,48 @@ async function captureGeneratedFiles(sandbox: Sandbox): Promise<Record<string, s
         }
       } catch {
         // Skip unreadable files
+      }
+    }
+
+    // Capture Claude transcript - search multiple locations
+    const transcriptFind = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", "find /root /home /vercel -name '*.jsonl' -type f 2>/dev/null || true"],
+    });
+    const transcriptPaths = (await transcriptFind.stdout())
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+
+    for (const transcriptPath of transcriptPaths) {
+      try {
+        const catResult = await sandbox.runCommand("cat", [transcriptPath]);
+        if (catResult.exitCode === 0) {
+          files[transcriptPath] = await catResult.stdout();
+        }
+      } catch {
+        // Skip unreadable files
+      }
+    }
+
+    // Also capture any .tsx/.ts files in root (Claude sometimes puts them there)
+    const rootFiles = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", "find /vercel/sandbox -maxdepth 1 -name '*.tsx' -o -name '*.ts' 2>/dev/null || true"],
+    });
+    const rootFilePaths = (await rootFiles.stdout())
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+
+    for (const filePath of rootFilePaths) {
+      try {
+        const catResult = await sandbox.runCommand("cat", [filePath]);
+        if (catResult.exitCode === 0) {
+          files[filePath] = await catResult.stdout();
+        }
+      } catch {
+        // Skip
       }
     }
   } catch {
