@@ -101,6 +101,9 @@ bun claude-code-cli.ts --eval 001-server-component --verbose
 
 # Debug mode - keep output folders
 bun claude-code-cli.ts --eval 001-server-component --debug
+
+# Add extra prompt instructions from a file
+bun claude-code-cli.ts --eval 001-server-component --extra-prompt extra-prompt.md
 ```
 
 #### Claude Code with Dev Server and Hooks
