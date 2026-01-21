@@ -1556,6 +1556,11 @@ async function main() {
           `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s wall-clock, ${totalWorkTimeSec}s combined work)`
         );
 
+        // Save detailed results to JSON file
+        const resultsFile = `eval-results-${Date.now()}.json`;
+        await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
+        console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
+
         process.exit(passed === results.length ? 0 : 1);
       } else if (values.evals) {
         // Run multiple specific evals with Claude Code
@@ -1665,6 +1670,11 @@ async function main() {
         console.log(
           `\n📈 Summary: ${passed}/${results.length} evals passed (${wallClockTime}s wall-clock, ${totalWorkTimeSec}s combined work)`
         );
+
+        // Save detailed results to JSON file
+        const resultsFile = `eval-results-${Date.now()}.json`;
+        await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
+        console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
 
         process.exit(passed === results.length ? 0 : 1);
       } else {
