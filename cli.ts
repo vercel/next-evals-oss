@@ -288,6 +288,8 @@ function parseCliArgs(args: string[]) {
       values.threads = args[++i];
     } else if (arg === "--claude-timeout") {
       values["claude-timeout"] = args[++i];
+    } else if (arg === "--pre-hook") {
+      values["pre-hook"] = args[++i];
     } else if (arg === "--dev-server-cmd") {
       values["dev-server-cmd"] = args[++i];
     } else if (arg === "--dev-server-port") {
@@ -326,6 +328,7 @@ Options:
       --all-models        Run single eval with all models (default: only first model)
       --claude-code       Use Claude Code agent (requires AI_GATEWAY_API_KEY, only runs agent-* evals)
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
+      --pre-hook <cmd>    Command to run in sandbox before Claude Code (e.g., "npx @judegao/next-skills --agent claude")
       --dev-server-cmd    Command to start dev server (default: "npm run dev")
       --dev-server-port   Port for dev server (default: 4000, auto-increments for concurrent evals)
       --with-hooks <name> Use eval hooks from scripts/eval-hooks/<name>-pre.sh and <name>-post.sh
@@ -1453,10 +1456,10 @@ async function main() {
       }
 
       const claudeOptions = {
-        verbose: values.verbose || false,
         timeout: values["claude-timeout"]
           ? parseInt(values["claude-timeout"])
           : 600000, // 10 minutes default
+        preHook: values["pre-hook"],
       };
 
       if (values.all) {
@@ -1560,7 +1563,9 @@ async function main() {
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
         console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
 
-        process.exit(passed === results.length ? 0 : 1);
+        // Set exit code and return (don't use process.exit which skips stdout flush)
+        process.exitCode = passed === results.length ? 0 : 1;
+        return;
       } else if (values.evals) {
         // Run multiple specific evals with Claude Code
         const evalNames = values.evals.split(",").map((e: string) => e.trim());
@@ -1683,7 +1688,9 @@ async function main() {
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
         console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
 
-        process.exit(passed === results.length ? 0 : 1);
+        // Set exit code and return (don't use process.exit which skips stdout flush)
+        process.exitCode = passed === results.length ? 0 : 1;
+        return;
       } else {
         // Single eval with Claude Code
         const evalPath = values.eval || positionals[0];
@@ -1746,7 +1753,9 @@ async function main() {
           result.buildSuccess &&
           result.lintSuccess &&
           result.testSuccess;
-        process.exit(success ? 0 : 1);
+        // Set exit code and return (don't use process.exit which skips stdout flush)
+        process.exitCode = success ? 0 : 1;
+        return;
       }
     }
 
@@ -1875,7 +1884,9 @@ async function main() {
         ).length;
         console.log(`Passed: ${passed}/${results.length}`);
 
-        process.exit(passed === results.length ? 0 : 1);
+        // Set exit code and return (don't use process.exit which skips stdout flush)
+        process.exitCode = passed === results.length ? 0 : 1;
+        return;
       } else {
         // Run multiple evals with LLM
         if (threadCount > 1) {

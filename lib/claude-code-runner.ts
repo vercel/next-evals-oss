@@ -20,7 +20,7 @@ const TEST_FILE_PATTERNS = ["*.test.tsx", "*.test.ts"];
 
 export interface ClaudeCodeEvalOptions {
   timeout?: number;
-  verbose?: boolean;
+  preHook?: string; // Command to run before Claude Code (e.g., "npx @judegao/next-skills --agent claude")
 }
 
 export interface ClaudeCodeResult {
@@ -38,6 +38,7 @@ export interface ClaudeCodeResult {
   evalPath?: string;
   timestamp?: string;
   generatedFiles?: Record<string, string>; // filepath -> content
+  claudeMdContent?: string; // Content of CLAUDE.md after pre-hook
 }
 
 /**
@@ -112,25 +113,18 @@ export async function runClaudeCodeEval(
   const inputDir = path.join(fullEvalPath, "input");
   const promptFile = path.join(fullEvalPath, "prompt.md");
   const templateDir = path.join(process.cwd(), "template");
-  const verbose = options.verbose ?? false;
   const timeout = options.timeout ?? DEFAULT_TIMEOUT;
 
-  const log = (msg: string) => verbose && console.log(msg);
-
-  log(`\n🚀 Running Claude Code in sandbox for: ${evalPath}`);
-
   const prompt = await fs.readFile(promptFile, "utf8");
-  log(`📝 Task: ${prompt.trim().slice(0, 100)}...`);
 
   const workspaceFiles = await collectFiles(inputDir, { excludeTests: true });
   const testFiles = await collectFiles(inputDir, { onlyTests: true });
-  log(`📂 Found ${workspaceFiles.length} workspace files, ${testFiles.length} test files`);
 
   const sandbox = await Sandbox.create({ runtime: "node24", timeout });
-  log(`🔲 Sandbox created: ${sandbox.sandboxId}`);
 
   const startTime = Date.now();
   let claudeOutput = "";
+  let claudeMdContent: string | undefined;
 
   try {
     // Upload workspace files (excluding tests)
@@ -147,14 +141,12 @@ export async function runClaudeCodeEval(
     ]);
 
     // Install dependencies
-    log(`📦 Installing dependencies...`);
     const installResult = await sandbox.runCommand("pnpm", ["install"]);
     if (installResult.exitCode !== 0) {
       throw new Error(`pnpm install failed: ${await installResult.stderr()}`);
     }
 
     // Install Claude Code CLI
-    log(`🤖 Installing Claude Code CLI...`);
     const cliInstall = await sandbox.runCommand("npm", ["install", "-g", "@anthropic-ai/claude-code"]);
     if (cliInstall.exitCode !== 0) {
       throw new Error(`Claude Code install failed: ${await cliInstall.stderr()}`);
@@ -170,31 +162,55 @@ export async function runClaudeCodeEval(
     if (foundTests) {
       throw new Error(`Test files found in sandbox before agent run: ${foundTests}`);
     }
-    log(`🔒 Test file isolation verified`);
+
+    // Run pre-hook if specified
+    if (options.preHook) {
+      const hookResult = await sandbox.runCommand({
+        cmd: "bash",
+        args: ["-c", options.preHook],
+      });
+      const hookOutput = await hookResult.output("both");
+      console.log(`[pre-hook] Output: ${hookOutput}`);
+      if (hookResult.exitCode !== 0) {
+        throw new Error(`Pre-hook failed (exit ${hookResult.exitCode}): ${hookOutput}`);
+      }
+
+      // List what was created
+      const lsResult = await sandbox.runCommand({
+        cmd: "bash",
+        args: ["-c", "find .claude -type f 2>/dev/null || echo 'No .claude directory'"],
+      });
+      console.log(`[pre-hook] Created files: ${await lsResult.stdout()}`);
+    }
+
+    // Capture CLAUDE.md content before running Claude Code
+    const claudeMdResult = await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-c", "cat CLAUDE.md 2>/dev/null || echo '[CLAUDE.md not found]'"],
+    });
+    claudeMdContent = await claudeMdResult.stdout();
+    console.log(`[pre-hook] CLAUDE.md content (first 500 chars): ${claudeMdContent.substring(0, 500)}`);
 
     // Run Claude Code
-    log(`🤖 Running Claude Code...`);
-    const aiGatewayKey = process.env.AI_GATEWAY_API_KEY;
-    if (!aiGatewayKey) {
-      throw new Error("AI_GATEWAY_API_KEY environment variable is required");
-    }
 
     const enhancedPrompt = `${prompt.trim()}
 
 IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependencies have already been installed. Do not run build, test, or dev server commands. Just write the code files.`;
 
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (!anthropicKey) {
+      throw new Error("ANTHROPIC_API_KEY environment variable is required");
+    }
+
     const claudeResult = await sandbox.runCommand({
       cmd: "claude",
-      args: ["--print", "--dangerously-skip-permissions", enhancedPrompt],
+      args: ["--print", "--model", "opus", "--dangerously-skip-permissions", enhancedPrompt],
       env: {
-        ANTHROPIC_BASE_URL: "https://ai-gateway.vercel.sh",
-        ANTHROPIC_AUTH_TOKEN: aiGatewayKey,
-        ANTHROPIC_API_KEY: "", // Must be empty so Claude Code uses AUTH_TOKEN
+        ANTHROPIC_API_KEY: anthropicKey,
       },
     });
 
     claudeOutput = await claudeResult.output("both");
-    log(`✅ Claude Code finished (exit: ${claudeResult.exitCode})`);
 
     if (claudeResult.exitCode !== 0) {
       return {
@@ -205,27 +221,21 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
         sandboxId: sandbox.sandboxId,
         evalPath,
         timestamp: new Date().toISOString(),
+        claudeMdContent,
       };
     }
 
     // Upload test files for validation
-    log(`📤 Uploading test files...`);
     await sandbox.writeFiles(testFiles);
 
     // Run validation
-    log(`🔨 Running validation...`);
     const [buildResult, lintResult, testResult] = await Promise.all([
       runBuild(sandbox),
       runLint(sandbox),
       runTests(sandbox),
     ]);
 
-    log(`   Build: ${buildResult.success ? "✅" : "❌"}`);
-    log(`   Lint: ${lintResult.success ? "✅" : "❌"}`);
-    log(`   Tests: ${testResult.success ? "✅" : "❌"}`);
-
     // Capture generated files from sandbox
-    log(`📥 Capturing generated files...`);
     const generatedFiles = await captureGeneratedFiles(sandbox);
 
     return {
@@ -242,6 +252,7 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       evalPath,
       timestamp: new Date().toISOString(),
       generatedFiles,
+      claudeMdContent,
     };
   } catch (error) {
     return {
@@ -252,9 +263,9 @@ IMPORTANT: Do not run npm, pnpm, yarn, or any package manager commands. Dependen
       sandboxId: sandbox.sandboxId,
       evalPath,
       timestamp: new Date().toISOString(),
+      claudeMdContent,
     };
   } finally {
-    log(`🧹 Stopping sandbox...`);
     await sandbox.stop();
   }
 }
