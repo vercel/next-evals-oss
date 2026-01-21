@@ -1,3 +1,0 @@
-module.exports=[35072,a=>{a.n(a.i(19820))},942,a=>{a.n(a.i(11922))},19406,a=>{a.n(a.i(40961))},86697,a=>{a.n(a.i(98095))},89237,a=>{"use strict";var b=a.i(41026);function c(){return(0,b.jsxs)("div",{children:[(0,b.jsx)("h2",{children:"User Dashboard"}),(0,b.jsx)("p",{children:"User dashboard content goes here"})]})}async function d(){try{return(await fetch("https://api.example.com/stats")).json()}catch{return{users:100}}}async function e(){let a=await d();return(0,b.jsxs)("div",{children:[(0,b.jsx)("h1",{children:"Dashboard"}),(0,b.jsxs)("p",{children:["Total users: ",a.users]}),(0,b.jsx)(c,{})]})}a.s(["default",()=>e],89237)}];
-
-//# sourceMappingURL=evals_023-avoid-getserversideprops_input_1bc0a0fd._.js.map
