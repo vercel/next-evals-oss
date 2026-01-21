@@ -314,10 +314,9 @@ Usage:
 Options:
   -h, --help              Show this help message
   -c, --create            Create a new eval
-  -a, --all               Run all evals (default: regular evals only)
-      --agent-evals       When used with --all, run agent evals instead of regular evals
+  -a, --all               Run all evals (LLM mode: regular evals, Claude Code mode: agent evals)
   -e, --eval <path>       Run a specific eval by path
-      --evals <paths>     Run multiple evals (comma-separated, e.g., "001,002,003")
+      --evals <paths>     Run multiple evals (comma-separated)
   -n, --name <name>       Name for new eval (required with --create)
   -p, --prompt <prompt>   Prompt for new eval (required with --create)
   -d, --dry               Run eval locally without uploading to Braintrust
@@ -325,32 +324,36 @@ Options:
       --debug             Persist output folders for debugging (don't clean up)
   -t, --threads <num>     Number of worker threads (default: 1, max: CPU cores)
       --all-models        Run single eval with all models (default: only first model)
-      --claude-code       Use Claude Code agent instead of LLM models (requires AI_GATEWAY_API_KEY env var)
+      --claude-code       Use Claude Code agent (requires AI_GATEWAY_API_KEY, only runs agent-* evals)
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
       --dev-server-cmd    Command to start dev server (default: "npm run dev")
       --dev-server-port   Port for dev server (default: 4000, auto-increments for concurrent evals)
       --with-hooks <name> Use eval hooks from scripts/eval-hooks/<name>-pre.sh and <name>-post.sh
 
-Examples:
-  # Run all evals with LLMs
-  cli.ts --all
+Eval Types:
+  Regular evals (001-*, 002-*, etc.):  Single-shot LLM tests with clear specifications
+  Agent evals (agent-*):               Multi-turn agent tests requiring exploration/iteration
 
-  # Run all evals with Claude Code
+Examples:
+  # Run all regular evals with LLMs
+  cli.ts --all --dry
+
+  # Run all agent evals with Claude Code
   cli.ts --all --claude-code
 
-  # Run a specific eval with Claude Code
-  cli.ts --eval 001-server-component --claude-code
+  # Run a specific agent eval with Claude Code
+  cli.ts --eval agent-000-app-router-migration-simple --claude-code
 
-  # Run multiple specific evals
-  cli.ts --evals 001-server-component,002-client-component,003-cookies
+  # Run multiple agent evals with Claude Code
+  cli.ts --evals agent-021-avoid-fetch-in-effect,agent-022-prefer-server-actions --claude-code
 
   # Run Claude Code eval with custom timeout
-  cli.ts --eval 001-server-component --claude-code --claude-timeout 600000
+  cli.ts --eval agent-000-app-router-migration-simple --claude-code --claude-timeout 900000
 
   # Create a new eval
   cli.ts --create --name "my-new-eval" --prompt "Create a button component"
 
-  # Run eval by positional argument
+  # Run regular eval by positional argument
   cli.ts 001-server-component
 
   # Run eval locally without Braintrust upload
@@ -361,15 +364,6 @@ Examples:
 
   # Use multiple worker threads for faster parallel execution
   cli.ts --all --dry --threads 4
-
-  # Run all agent evals with nextjs-mcp hooks
-  cli.ts --all --agent-evals --claude-code --with-hooks nextjs-mcp
-
-  # Run specific agent eval with nextjs-mcp hooks (dev server auto-starts)
-  cli.ts --eval agent-001-add-dark-mode --claude-code --with-hooks nextjs-mcp
-
-  # Run agent eval without hooks (dev server still auto-starts for agent-* evals)
-  cli.ts --eval agent-001-add-dark-mode --claude-code
 `);
 }
 
@@ -1466,12 +1460,15 @@ async function main() {
       };
 
       if (values.all) {
-        // Run all evals with Claude Code
-        const agentEvalsOnly = values["agent-evals"] || false;
-        const allEvals = await getAllEvals(agentEvalsOnly);
-        const evalType = agentEvalsOnly ? "agent evals" : "evals";
+        // Run all agent evals with Claude Code (--claude-code always runs agent evals)
+        const allEvals = await getAllEvals(true); // Always agent evals for --claude-code
 
-        console.log(`🤖 Running ${allEvals.length} ${evalType} with Claude Code in parallel...\n`);
+        if (allEvals.length === 0) {
+          console.error("❌ Error: No agent evals found. Agent evals must be prefixed with 'agent-'.");
+          process.exit(1);
+        }
+
+        console.log(`🤖 Running ${allEvals.length} agent evals with Claude Code in parallel...\n`);
 
         const startTime = performance.now();
 
@@ -1568,22 +1565,28 @@ async function main() {
         // Run multiple specific evals with Claude Code
         const evalNames = values.evals.split(",").map((e: string) => e.trim());
 
+        // Claude Code mode requires agent evals (prefixed with 'agent-')
+        const nonAgentEvals = evalNames.filter((e: string) => !e.startsWith("agent-"));
+        if (nonAgentEvals.length > 0) {
+          console.error(`❌ Error: Claude Code mode only supports agent evals (prefixed with 'agent-').`);
+          console.error(`   The following evals are not agent evals: ${nonAgentEvals.join(", ")}`);
+          const agentEvals = await getAllEvals(true);
+          console.log("\nAvailable agent evals:");
+          agentEvals.forEach((evalName) => console.log(`  ${evalName}`));
+          process.exit(1);
+        }
+
         // Validate that all specified evals exist
-        const regularEvals = await getAllEvals(false);
         const agentEvals = await getAllEvals(true);
-        const allEvals = [...regularEvals, ...agentEvals];
 
         const invalidEvals = evalNames.filter(
-          (e: string) => !allEvals.includes(e)
+          (e: string) => !agentEvals.includes(e)
         );
         if (invalidEvals.length > 0) {
           console.error(
             `Error: The following evals do not exist: ${invalidEvals.join(", ")}`
           );
-          console.log("\nAvailable evals:");
-          console.log("\nRegular evals:");
-          regularEvals.forEach((evalName) => console.log(`  ${evalName}`));
-          console.log("\nAgent evals:");
+          console.log("\nAvailable agent evals:");
           agentEvals.forEach((evalName) => console.log(`  ${evalName}`));
           process.exit(1);
         }
@@ -1686,9 +1689,19 @@ async function main() {
         const evalPath = values.eval || positionals[0];
         if (!evalPath) {
           console.error("❌ Error: No eval specified for Claude Code mode.");
-          const allEvals = await getAllEvals();
-          console.log("\nAvailable evals:");
-          allEvals.forEach((evalName) => console.log(`  ${evalName}`));
+          const agentEvals = await getAllEvals(true);
+          console.log("\nAvailable agent evals:");
+          agentEvals.forEach((evalName) => console.log(`  ${evalName}`));
+          process.exit(1);
+        }
+
+        // Claude Code mode requires agent evals (prefixed with 'agent-')
+        if (!evalPath.startsWith("agent-")) {
+          console.error(`❌ Error: Claude Code mode only supports agent evals (prefixed with 'agent-').`);
+          console.error(`   '${evalPath}' is not an agent eval.`);
+          const agentEvals = await getAllEvals(true);
+          console.log("\nAvailable agent evals:");
+          agentEvals.forEach((evalName) => console.log(`  ${evalName}`));
           process.exit(1);
         }
 
