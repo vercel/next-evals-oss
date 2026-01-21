@@ -1557,7 +1557,9 @@ async function main() {
         );
 
         // Save detailed results to JSON file
-        const resultsFile = `eval-results-${Date.now()}.json`;
+        const resultsDir = "eval-results";
+        await fs.mkdir(resultsDir, { recursive: true });
+        const resultsFile = `${resultsDir}/eval-results-${Date.now()}.json`;
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
         console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
 
@@ -1672,7 +1674,9 @@ async function main() {
         );
 
         // Save detailed results to JSON file
-        const resultsFile = `eval-results-${Date.now()}.json`;
+        const resultsDir = "eval-results";
+        await fs.mkdir(resultsDir, { recursive: true });
+        const resultsFile = `${resultsDir}/eval-results-${Date.now()}.json`;
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
         console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
 
@@ -1718,7 +1722,9 @@ async function main() {
 
         // Save detailed results to JSON file
         const results = [{ evalPath, result }];
-        const resultsFile = `eval-results-${Date.now()}.json`;
+        const resultsDir = "eval-results";
+        await fs.mkdir(resultsDir, { recursive: true });
+        const resultsFile = `${resultsDir}/eval-results-${Date.now()}.json`;
         await fs.writeFile(resultsFile, JSON.stringify(results, null, 2));
         console.log(`\n📁 Detailed results saved to: ${resultsFile}`);
 
