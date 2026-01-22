@@ -25,7 +25,7 @@ test('Proxy function uses correct name (not middleware)', () => {
 
     // In Next.js 16+, the function should be named 'proxy', not 'middleware'
     // Should export proxy function
-    expect(content).toMatch(/export\s+(default\s+)?function\s+proxy|export\s+function\s+proxy|export\s+default\s+async\s+function\s+proxy/);
+    expect(content).toMatch(/export\s+(async\s+)?(default\s+)?function\s+proxy|export\s+default\s+async\s+function\s+proxy/);
 
     // Should NOT have a function named 'middleware'
     expect(content).not.toMatch(/export\s+(default\s+)?function\s+middleware/);
