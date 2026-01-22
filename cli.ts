@@ -1703,30 +1703,20 @@ async function main() {
 
         const result = await runClaudeCodeEval(evalPath, claudeOptions);
 
-        // Format result for display
-        const formattedResult = {
-          evaluationResults: {
-            buildSuccess: result.buildSuccess,
-            lintSuccess: result.lintSuccess,
-            testSuccess: result.testSuccess,
-            buildOutput: result.buildOutput,
-            lintOutput: result.lintOutput,
-            testOutput: result.testOutput,
-          },
-        };
-
-        // Display results in table format
-        // Claude Code results use the same structure as dry run (evaluationResults.buildSuccess, etc.)
-        await displaySingleResult(
+        // Display results using the same format as batch mode
+        const tableResults = [{
           evalPath,
-          formattedResult,
-          true, // Always use dry run display for Claude Code
-          "Claude Code"
-        );
-
-        // Display duration
-        const durationSec = (result.duration / 1000).toFixed(1);
-        console.log(`\n⏱️  Duration: ${durationSec}s`);
+          result: {
+            buildSuccess: result.buildSuccess ?? false,
+            lintSuccess: result.lintSuccess ?? false,
+            testSuccess: result.testSuccess ?? false,
+            duration: result.duration,
+          }
+        }];
+        console.log("\n📊 Results:\n" + "═".repeat(80));
+        console.log(formatClaudeCodeResultsTable(tableResults));
+        console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test");
+        console.log("═".repeat(80));
 
         // Save detailed result to JSON file
         const resultsDir = "eval-results";
