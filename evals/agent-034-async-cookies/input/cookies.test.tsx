@@ -72,9 +72,7 @@ test('Does NOT use synchronous cookies() pattern', () => {
     // We check that every cookies() call is preceded by await
     const syncCookiesPattern = /(?<!await\s)cookies\s*\(\s*\)(?!\s*\.then)/;
 
-    // If there's a cookies() call, it should be awaited
-    if (content.includes('cookies(')) {
-      expect(content).toMatch(/await\s+cookies\s*\(\s*\)/);
-    }
+    // Verify the synchronous cookies() pattern is NOT used
+    expect(content).not.toMatch(syncCookiesPattern);
   }
 });
