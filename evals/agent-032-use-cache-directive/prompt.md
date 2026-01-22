@@ -1,0 +1,1 @@
+Create a blog posts page that fetches posts from an API and caches the results. The page should use Next.js 16's modern caching approach with a 1 hour revalidation time. Use the cacheTag function to tag the cache with "posts" so it can be invalidated on-demand.
