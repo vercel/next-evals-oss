@@ -649,16 +649,12 @@ async function displaySingleResult(
   } else {
     // For Braintrust runs, show eval score if available
     // For Claude Code runs (no Braintrust), check build/lint/test success
-    // Note: runEval returns ExperimentSummary[] (array) for Braintrust mode
-    const experimentResults = Array.isArray(result) ? result : [result];
-    const firstResult = experimentResults[0];
-
-    const evalScore = firstResult?.scores?.eval_score?.score;
+    const evalScore = result?.scores?.eval_score?.score;
     const passed = typeof evalScore === "number"
       ? evalScore >= 1
-      : (firstResult?.evaluationResults?.buildSuccess &&
-         firstResult?.evaluationResults?.lintSuccess &&
-         firstResult?.evaluationResults?.testSuccess) ?? false;
+      : (result?.evaluationResults?.buildSuccess &&
+         result?.evaluationResults?.lintSuccess &&
+         result?.evaluationResults?.testSuccess) ?? false;
 
     const evalColWidth = Math.max(25, evalPath.length);
     const modelColWidth = 20;
@@ -680,11 +676,9 @@ async function displaySingleResult(
 
     console.log("\n📋 Legend: ✅✅✅ = Build/Lint/Test");
 
-    // Show experiment URLs if available
-    for (const expResult of experimentResults) {
-      if (expResult?.experimentUrl) {
-        console.log(`\n🔗 Experiment: ${expResult.experimentUrl}`);
-      }
+    // Show experiment URL if available
+    if (result?.experimentUrl) {
+      console.log(`\n🔗 Experiment: ${result.experimentUrl}`);
     }
   }
 
@@ -1722,10 +1716,11 @@ async function main() {
         };
 
         // Display results in table format
+        // Claude Code results use the same structure as dry run (evaluationResults.buildSuccess, etc.)
         await displaySingleResult(
           evalPath,
           formattedResult,
-          values.dry ?? false,
+          true, // Always use dry run display for Claude Code
           "Claude Code"
         );
 
