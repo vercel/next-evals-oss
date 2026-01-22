@@ -91,6 +91,7 @@ test('Does NOT use revalidateTag for read-your-own-writes (should use updateTag)
 
   // Should use updateTag, not just revalidateTag
   expect(usesUpdateTag).toBe(true);
+  expect(usesOnlyRevalidateTag).toBe(false);
 });
 
 test('Server Action has post creation logic', () => {
