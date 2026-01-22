@@ -57,11 +57,16 @@ test('Does NOT use force-dynamic segment config as primary approach', () => {
   if (existsSync(pagePath)) {
     const content = readFileSync(pagePath, 'utf-8');
 
-    // Should use connection() instead of segment config
-    // If using segment config, should also have connection()
-    if (content.includes("dynamic = 'force-dynamic'") || content.includes('dynamic = "force-dynamic"')) {
-      // If they use segment config, they should still also use connection()
-      expect(content).toMatch(/connection\s*\(\s*\)/);
+    // Should use connection() as the primary approach instead of segment config
+    const hasForceDynamic = content.includes("dynamic = 'force-dynamic'") || content.includes('dynamic = "force-dynamic"');
+    const hasConnection = /connection\s*\(\s*\)/.test(content);
+
+    // Enforce that connection() is the primary dynamic approach
+    // If force-dynamic is used, it cannot be the only dynamic mechanism
+    // When connection() is available/used, force-dynamic should not be redundantly added
+    if (hasForceDynamic && !hasConnection) {
+      // force-dynamic is being used as the sole dynamic mechanism (wrong)
+      expect.fail('force-dynamic segment config should not be the primary approach - use connection() instead');
     }
   }
 });
