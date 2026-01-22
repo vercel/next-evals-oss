@@ -79,5 +79,6 @@ test('Does NOT use redirect for auth (should use forbidden)', () => {
     // This test checks that redirect is not the primary auth mechanism
     // Some redirects might be acceptable, but forbidden() should be used
     expect(content).toMatch(/forbidden\s*\(\s*\)/);
+    expect(usesRedirect).toBe(false);
   }
 });
