@@ -48,13 +48,16 @@ test('Component uses cacheTag function for on-demand invalidation', () => {
   }
 });
 
-test('Page fetches posts from API', () => {
+test('Page fetches posts using getPosts', () => {
   const pagePath = join(process.cwd(), 'app', 'page.tsx');
   if (existsSync(pagePath)) {
     const content = readFileSync(pagePath, 'utf-8');
 
-    // Should fetch data
-    expect(content).toMatch(/fetch\s*\(/);
+    // Should import getPosts from lib/api
+    expect(content).toMatch(/import.*getPosts.*from\s+['"].*lib\/api['"]/);
+
+    // Should call getPosts
+    expect(content).toMatch(/getPosts\s*\(/);
 
     // Should be an async function/component
     expect(content).toMatch(/async/);
