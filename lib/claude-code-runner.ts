@@ -192,17 +192,9 @@ export async function runClaudeCodeEval(
         args: ["-c", options.preHook],
       });
       const hookOutput = await hookResult.output("both");
-      console.log(`[pre-hook] Output: ${hookOutput}`);
       if (hookResult.exitCode !== 0) {
         throw new Error(`Pre-hook failed (exit ${hookResult.exitCode}): ${hookOutput}`);
       }
-
-      // List what was created
-      const lsResult = await sandbox.runCommand({
-        cmd: "bash",
-        args: ["-c", "find .claude -type f 2>/dev/null || echo 'No .claude directory'"],
-      });
-      console.log(`[pre-hook] Created files: ${await lsResult.stdout()}`);
     }
 
     // Capture CLAUDE.md content before running Claude Code
@@ -211,7 +203,6 @@ export async function runClaudeCodeEval(
       args: ["-c", "cat CLAUDE.md 2>/dev/null || echo '[CLAUDE.md not found]'"],
     });
     claudeMdContent = await claudeMdResult.stdout();
-    console.log(`[pre-hook] CLAUDE.md content (first 500 chars): ${claudeMdContent.substring(0, 500)}`);
 
     // Run Claude Code
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
