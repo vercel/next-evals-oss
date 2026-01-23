@@ -31,7 +31,8 @@ async function runClaudeCodeEvalWithRetries(
 
   console.log(`   🔄 Running ${totalAttempts} concurrent attempts for ${evalPath}`);
 
-  // Create abort controller to cancel remaining runs on success
+  // Track early exit - when a perfect result is found, we stop processing
+  // further results but in-flight runs continue to completion (sandboxes clean up naturally)
   let earlyExit = false;
   let winningResult: ClaudeCodeResult | null = null;
   let completedCount = 0;
