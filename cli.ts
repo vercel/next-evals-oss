@@ -12,6 +12,117 @@ import { createNewEval, runEval } from "./lib/eval-runner";
 import { formatClaudeCodeResultsTable } from "./lib/format-results";
 import { MODELS } from "./lib/models";
 
+/**
+ * Run a Claude Code eval with retries.
+ * If retries > 0, spawns N+1 concurrent runs and returns the best result.
+ * Short-circuits and cancels remaining runs when one achieves 100% pass.
+ */
+async function runClaudeCodeEvalWithRetries(
+  evalPath: string,
+  options: { timeout?: number; preHook?: string },
+  retries: number
+): Promise<ClaudeCodeResult> {
+  const totalAttempts = retries + 1;
+
+  if (totalAttempts === 1) {
+    // No retries, just run once
+    return runClaudeCodeEval(evalPath, options);
+  }
+
+  console.log(`   🔄 Running ${totalAttempts} concurrent attempts for ${evalPath}`);
+
+  // Create abort controller to cancel remaining runs on success
+  let earlyExit = false;
+  let winningResult: ClaudeCodeResult | null = null;
+  let completedCount = 0;
+
+  const results: (ClaudeCodeResult | null)[] = new Array(totalAttempts).fill(null);
+
+  // Create a promise that resolves when we get a 100% pass or all complete
+  await new Promise<void>((resolve) => {
+    for (let i = 0; i < totalAttempts; i++) {
+      const attemptIndex = i;
+      runClaudeCodeEval(evalPath, options)
+        .then((result) => {
+          if (earlyExit) return; // Already found a winner
+
+          results[attemptIndex] = result;
+          completedCount++;
+
+          const isPerfect = result.success &&
+            result.buildSuccess &&
+            result.lintSuccess &&
+            result.testSuccess;
+
+          if (isPerfect) {
+            console.log(`   ✅ Attempt ${attemptIndex + 1}/${totalAttempts} achieved 100% - using this result`);
+            earlyExit = true;
+            winningResult = result;
+            resolve();
+            return;
+          }
+
+          console.log(`   ⚠️  Attempt ${attemptIndex + 1}/${totalAttempts} completed (B:${result.buildSuccess ? '✓' : '✗'} L:${result.lintSuccess ? '✓' : '✗'} T:${result.testSuccess ? '✓' : '✗'})`);
+
+          if (completedCount === totalAttempts) {
+            resolve();
+          }
+        })
+        .catch((error) => {
+          if (earlyExit) return;
+
+          results[attemptIndex] = {
+            success: false,
+            output: "",
+            error: error instanceof Error ? error.message : String(error),
+            duration: 0,
+          };
+          completedCount++;
+
+          console.log(`   ❌ Attempt ${attemptIndex + 1}/${totalAttempts} failed: ${error instanceof Error ? error.message : String(error)}`);
+
+          if (completedCount === totalAttempts) {
+            resolve();
+          }
+        });
+    }
+  });
+
+  // If we found a perfect result, return it
+  if (winningResult) {
+    return winningResult;
+  }
+
+  // Otherwise, find the best result among completed ones
+  const completedResults = results.filter((r): r is ClaudeCodeResult => r !== null);
+
+  if (completedResults.length === 0) {
+    return {
+      success: false,
+      output: "",
+      error: "All retry attempts failed",
+      duration: 0,
+    };
+  }
+
+  // Score results: 3 points for test, 2 for lint, 1 for build
+  const scoreResult = (r: ClaudeCodeResult): number => {
+    let score = 0;
+    if (r.buildSuccess) score += 1;
+    if (r.lintSuccess) score += 2;
+    if (r.testSuccess) score += 3;
+    return score;
+  };
+
+  const bestResult = completedResults.reduce((best, current) => {
+    return scoreResult(current) > scoreResult(best) ? current : best;
+  }, completedResults[0]);
+
+  console.log(`   📊 Best result across ${completedResults.length} attempts: B:${bestResult.buildSuccess ? '✓' : '✗'} L:${bestResult.lintSuccess ? '✓' : '✗'} T:${bestResult.testSuccess ? '✓' : '✗'}`);
+
+  return bestResult;
+}
+
 let globalProgressTracker: ProgressTracker | null = null;
 let globalDebugMode: boolean = false;
 
@@ -290,6 +401,8 @@ function parseCliArgs(args: string[]) {
       values["claude-timeout"] = args[++i];
     } else if (arg === "--pre-hook") {
       values["pre-hook"] = args[++i];
+    } else if (arg === "--retries") {
+      values["retries"] = args[++i];
     } else if (!arg.startsWith("-")) {
       positionals.push(arg);
     }
@@ -323,6 +436,7 @@ Options:
       --claude-code       Use Claude Code agent (requires ANTHROPIC_API_KEY, only runs agent-* evals)
       --claude-timeout    Timeout for Claude Code in ms (default: 600000 = 10 minutes)
       --pre-hook <cmd>    Command to run in sandbox before Claude Code (e.g., "npx @judegao/next-skills --agent claude")
+      --retries <num>     Number of retry attempts for failed evals (default: 0). Runs N+1 concurrent attempts and reports best result. Stops early on 100% pass.
 
 Eval Types:
   Regular evals (001-*, 002-*, etc.):  Single-shot LLM tests with clear specifications
@@ -343,6 +457,9 @@ Examples:
 
   # Run Claude Code eval with custom timeout
   cli.ts --eval agent-000-app-router-migration-simple --claude-code --claude-timeout 900000
+
+  # Run Claude Code eval with retries (3 concurrent attempts, best result reported)
+  cli.ts --eval agent-000-app-router-migration-simple --claude-code --retries 2
 
   # Create a new eval
   cli.ts --create --name "my-new-eval" --prompt "Create a button component"
@@ -1449,6 +1566,7 @@ async function main() {
           : 600000, // 10 minutes default
         preHook: values["pre-hook"],
       };
+      const retries = values["retries"] ? parseInt(values["retries"]) : 0;
 
       if (values.all) {
         // Run all agent evals with Claude Code (--claude-code always runs agent evals)
@@ -1459,7 +1577,7 @@ async function main() {
           process.exit(1);
         }
 
-        console.log(`🤖 Running ${allEvals.length} agent evals with Claude Code in parallel...\n`);
+        console.log(`🤖 Running ${allEvals.length} agent evals with Claude Code in parallel...${retries > 0 ? ` (${retries} retries each)` : ''}\n`);
 
         const startTime = performance.now();
 
@@ -1468,7 +1586,7 @@ async function main() {
           allEvals.map(async (evalPath) => {
             console.log(` ▶ ${evalPath}`);
             try {
-              const result = await runClaudeCodeEval(evalPath, claudeOptions);
+              const result = await runClaudeCodeEvalWithRetries(evalPath, claudeOptions, retries);
               const success =
                 result.success &&
                 result.buildSuccess &&
@@ -1584,7 +1702,7 @@ async function main() {
           process.exit(1);
         }
 
-        console.log(`🤖 Running ${evalNames.length} Claude Code evals in parallel...\n`);
+        console.log(`🤖 Running ${evalNames.length} Claude Code evals in parallel...${retries > 0 ? ` (${retries} retries each)` : ''}\n`);
 
         const startTime = performance.now();
 
@@ -1593,7 +1711,7 @@ async function main() {
           evalNames.map(async (evalPath: string) => {
             console.log(` ▶ ${evalPath}`);
             try {
-              const result = await runClaudeCodeEval(evalPath, claudeOptions);
+              const result = await runClaudeCodeEvalWithRetries(evalPath, claudeOptions, retries);
               const success =
                 result.success &&
                 result.buildSuccess &&
@@ -1699,9 +1817,9 @@ async function main() {
           process.exit(1);
         }
 
-        console.log(`🤖 Running Claude Code eval: ${evalPath}\n`);
+        console.log(`🤖 Running Claude Code eval: ${evalPath}${retries > 0 ? ` (${retries} retries)` : ''}\n`);
 
-        const result = await runClaudeCodeEval(evalPath, claudeOptions);
+        const result = await runClaudeCodeEvalWithRetries(evalPath, claudeOptions, retries);
 
         // Display results using the same format as batch mode
         const tableResults = [{
