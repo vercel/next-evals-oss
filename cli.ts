@@ -1567,7 +1567,17 @@ async function main() {
           : 600000, // 10 minutes default
         preHook: values["pre-hook"],
       };
-      const retries = values["retries"] ? parseInt(values["retries"]) : 0;
+      
+      // Validate retries parameter
+      let retries = 0;
+      if (values["retries"]) {
+        const retriesValue = parseInt(values["retries"], 10);
+        if (isNaN(retriesValue) || retriesValue < 0) {
+          console.error(`❌ Error: --retries must be a non-negative integer, got "${values["retries"]}"`);
+          process.exit(1);
+        }
+        retries = retriesValue;
+      }
 
       if (values.all) {
         // Run all agent evals with Claude Code (--claude-code always runs agent evals)
