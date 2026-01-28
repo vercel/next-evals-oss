@@ -1,1 +1,0 @@
-Create a client component that sets the page title to "My Page" and description to "Test" using React 19's direct metadata through JSX tags. Write only the component code for <ClientMeta />.

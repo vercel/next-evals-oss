@@ -1,1 +1,0 @@
-Create a form in the Next.js App Router in the `app/page.tsx` file which saves to a server action, reads the server action response, and uses it to display a success or error message. Use the latest React APIs and do NOT use useState.

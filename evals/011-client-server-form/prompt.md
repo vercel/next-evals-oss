@@ -1,1 +1,0 @@
-Create a minimal form component with the Next.js App Router that submits data to a server action.

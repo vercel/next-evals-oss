@@ -1,1 +1,0 @@
-Create a Next.js App Router page with draft mode functionality. The page should call draftMode() from next/headers to check if draft mode is enabled. Display "Draft Mode: ON" in an h1 if enabled, otherwise "Draft Mode: OFF". Also create an API route at /api/draft that enables draft mode and redirects to the page.

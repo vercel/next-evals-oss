@@ -1,1 +1,0 @@
-In Next.js App Router, create an opengraph-image.tsx file using the ImageResponse API to display "hello" text
