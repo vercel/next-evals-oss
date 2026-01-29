@@ -1,6 +1,6 @@
 # Next.js Evals
 
-Agent evaluations for Next.js coding tasks, powered by [`@judegao/eval`](https://www.npmjs.com/package/@judegao/eval).
+Agent evaluations for Next.js coding tasks, powered by [`@vercel/agent-eval`](https://www.npmjs.com/package/@vercel/agent-eval).
 
 ## Setup
 
