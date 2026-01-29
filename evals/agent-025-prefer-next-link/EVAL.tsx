@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Prefer Next.js Link
  *
@@ -12,7 +13,7 @@ import { expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import Navigation from './Navigation';
+import Navigation from './app/Navigation';
 
 test('Navigation component has required links', () => {
   render(<Navigation />);
