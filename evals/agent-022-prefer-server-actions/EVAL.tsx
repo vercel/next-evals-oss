@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Prefer Server Actions
  *
@@ -12,7 +13,7 @@ import { expect, test } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import Page from './page';
+import Page from './app/page';
 
 test('renders contact form component', () => {
   render(<Page />);
