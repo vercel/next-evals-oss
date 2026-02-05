@@ -9,23 +9,37 @@ npm install
 cp .env.local .env   # requires VERCEL_OIDC_TOKEN and AI_GATEWAY_API_KEY
 ```
 
-## Usage
+## Scripts
+
+### `npm run run-evals`
+
+Runs agent evaluations with memoization. Only runs (model, eval) pairs that haven't been completed yet.
 
 ```bash
-# Dry run — validate all 20 fixtures load correctly
-npx agent-eval cc --dry
-
-# Run all evals
-npx agent-eval cc
-
-# Smoke test — run a single eval (agent-031-proxy-middleware)
-npx agent-eval cc-smoke
+npm run run-evals              # Run only missing pairs
+npm run run-evals -- --dry     # Preview what would run
+npm run run-evals -- --force   # Re-run everything
+npm run run-evals -- --retry   # Retry failed evals only
+npm run run-evals -- --smoke   # Run 1 eval per experiment (sanity check)
 ```
 
-Experiment configs live in `experiments/`:
+The runner automatically detects:
+- **New model added** → runs all evals for that model
+- **New eval added** → runs that eval for all models
+- **Already completed** → skips
 
-- **`cc.ts`** — runs all evals with Claude Code via Vercel AI Gateway
-- **`cc-smoke.ts`** — runs only `agent-031-proxy-middleware` for quick validation
+### `npm run export-results`
+
+Exports results from `results/` to `agent-results.json` for use on nextjs.org/evals.
+
+## Models
+
+| Experiment | Model | Agent |
+|------------|-------|-------|
+| `claude-opus-4.5` | Claude Opus 4.5 | Claude Code |
+| `claude-sonnet-4.5` | Claude Sonnet 4.5 | Claude Code |
+| `gemini-3-pro-preview` | Gemini 3 Pro Preview | OpenCode (via AI Gateway) |
+| `gpt-5.2-high` | GPT 5.2 Codex | OpenCode (via AI Gateway) |
 
 ## Eval structure
 
@@ -50,11 +64,6 @@ evals/agent-031-proxy-middleware/
 | `package.json` | Must have `"type": "module"` and a `"build"` script |
 | Everything else | Source files the agent can see and modify |
 
-The framework automatically:
-- Withholds `EVAL.ts` and `*.test.ts`/`*.test.tsx` from the agent
-- Creates a vitest config in the sandbox
-- Runs `EVAL.ts` via `npx vitest run EVAL.ts` to score the result
-
 ## Adding a new eval
 
 1. Create a directory under `evals/` (e.g., `evals/agent-040-my-eval/`)
@@ -62,7 +71,23 @@ The framework automatically:
 3. Add `EVAL.ts` with vitest assertions
 4. Add `package.json` with `"type": "module"` and `"build": "next build"`
 5. Add the Next.js source files the agent starts with
-6. Verify: `npx agent-eval cc --dry`
+6. Run `npm run run-evals` — it will automatically run the new eval for all models
+
+## Adding a new model
+
+1. Create a config in `experiments/` (e.g., `experiments/gpt-5.ts`)
+2. Run `npm run run-evals` — it will automatically run all evals for the new model
+
+## Publishing to nextjs.org/evals
+
+After running evals:
+
+1. Export results: `npm run export-results`
+2. Copy to front repo:
+   ```bash
+   cp agent-results.json <path-to-front>/apps/next-site/app/\(next-site\)/evals/agent-results.json
+   ```
+3. Commit and deploy the front repo
 
 ## Current evals
 
