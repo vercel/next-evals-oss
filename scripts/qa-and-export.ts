@@ -89,7 +89,6 @@ const MODEL_NAMES: Record<string, string> = {
   'qwen3-max': 'Qwen3 Max',
   'kimi-k2-turbo': 'Kimi K2 Turbo',
   'kimi-k2-0905': 'Kimi K2 0905',
-  'deepseek-v3.2': 'DeepSeek V3.2',
   'devstral-2': 'Devstral 2',
   'minimax-m2.1': 'Minimax M2.1',
   'kat-coder-pro-v1': 'Kat Coder Pro V1',
@@ -544,6 +543,8 @@ async function main(): Promise<void> {
       const CLASSIFY_CONCURRENCY = 10;
       console.log(`Classifying ${failures.length} failures...`);
 
+      let done = 0;
+      const total = failures.length;
       const results: Array<{ result: AgentResult; classification: Awaited<ReturnType<typeof classifyFailure>> }> = [];
       for (let i = 0; i < failures.length; i += CLASSIFY_CONCURRENCY) {
         const batch = failures.slice(i, i + CLASSIFY_CONCURRENCY);
@@ -555,11 +556,18 @@ async function main(): Promise<void> {
               rawTimestamp,
               result.evalPath
             );
+            done++;
+            const icon = classification
+              ? { model: '\x1b[31m✗\x1b[0m', infra: '\x1b[33m⚙\x1b[0m', timeout: '\x1b[33m⏱\x1b[0m' }[classification.failureType]
+              : '\x1b[90m?\x1b[0m';
+            process.stdout.write(`\r  ${icon} ${done}/${total}  ${experiment}/${result.evalPath}`);
+            process.stdout.write('\x1b[K'); // clear to end of line
             return { result, classification };
           })
         );
         results.push(...batchResults);
       }
+      console.log(); // newline after progress
 
       for (const { result, classification } of results) {
         if (classification) {
