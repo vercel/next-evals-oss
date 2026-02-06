@@ -194,7 +194,7 @@ async function main(): Promise<void> {
 
   if (smoke) {
     console.log('Smoke test: running 1 eval per experiment (parallel)\n');
-    const smokeEval = evals[0];
+    const smokeEval = 'agent-027-prefer-next-image';
     if (dry) {
       for (const exp of experiments) {
         console.log(`${exp}: ${smokeEval}`);

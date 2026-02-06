@@ -1,0 +1,178 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.tsx (6 tests | 1 failed) 80ms
+   ✓ renders contact form component 72ms
+   × uses server action instead of client-side submission 5ms
+     → expected '\'use client\';\n\nimport { useRef, u…' not to match /['"]use client['"];?/
+   ✓ processes form data using FormData API 0ms
+   ✓ has proper form structure with action attribute 0ms
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  20:54:30
+   Duration  845ms (transform 71ms, setup 0ms, collect 138ms, tests 80ms, environment 416ms, prepare 83ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.tsx > uses server action instead of client-side submission
+AssertionError: expected '\'use client\';\n\nimport { useRef, u…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { useRef, useState } from 'react';
+
+type FormState = {
+  success: boolean;
+  message: string;
+};
+
+async function submitContactForm(formData: FormData): Promise<FormState> {
+  'use server';
+
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+  const message = formData.get('message') as string;
+
+  const errors: string[] = [];
+
+  if (!name || name.trim() === '') {
+    errors.push('Name is required');
+  }
+
+  if (!email || email.trim() === '') {
+    errors.push('Email is required');
+  }
+
+  if (!message || message.trim() === '') {
+    errors.push('Message is required');
+  }
+
+  if (errors.length > 0) {
+    return {
+      success: false,
+      message: errors.join(', ')
+    };
+  }
+
+  console.log('Contact message received:', { name, email, message });
+
+  return {
+    success: true,
+    message: 'Thank you for your message! We will get back to you soon.'
+  };
+}
+
+export default function ContactForm() {
+  const [formState, setFormState] = useState<FormState | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  async function handleSubmit(formData: FormData) {
+    setIsPending(true);
+    try {
+      const result = await submitContactForm(formData);
+      setFormState(result);
+      if (result.success) {
+        formRef.current?.reset();
+      }
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <div>
+      <h2>Contact Us</h2>
+      <form ref={formRef} action={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label htmlFor=\"name\" style={{ display: 'block', marginBottom: '0.5rem' }}>
+            Name
+          </label>
+          <input
+            id=\"name\"
+            name=\"name\"
+            type=\"text\"
+            placeholder=\"Your name\"
+            required
+            style={{ width: '100%', padding: '0.5rem' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label htmlFor=\"email\" style={{ display: 'block', marginBottom: '0.5rem' }}>
+            Email
+          </label>
+          <input
+            id=\"email\"
+            name=\"email\"
+            type=\"email\"
+            placeholder=\"your@email.com\"
+            required
+            style={{ width: '100%', padding: '0.5rem' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label htmlFor=\"message\" style={{ display: 'block', marginBottom: '0.5rem' }}>
+            Message
+          </label>
+          <textarea
+            id=\"message\"
+            name=\"message\"
+            placeholder=\"Your message\"
+            rows={4}
+            required
+            style={{ width: '100%', padding: '0.5rem' }}
+          />
+        </div>
+
+        <button
+          type=\"submit\"
+          disabled={isPending}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: isPending ? '#ccc' : '#007',
+            color: 'white',
+            border: 'none',
+            cursor: isPending ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {isPending ? 'Sending...' : 'Send Message'}
+        </button>
+      </form>
+
+      {formState && (
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: formState.success ? '#d4edda' : '#f8d7da',
+            borderRadius: '4px'
+          }}
+        >
+          {formState.message}
+        </div>
+      )}
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.tsx:26:23
+     24|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     25|   
+     26|   expect(content).not.toMatch(/['"]use client['"];?/);
+       |                       ^
+     27|   expect(content).not.toMatch(/onSubmit|fetch\s*\(|useState|preventDef…
+     28|   expect(content).toMatch(/['"]use server['"];?/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

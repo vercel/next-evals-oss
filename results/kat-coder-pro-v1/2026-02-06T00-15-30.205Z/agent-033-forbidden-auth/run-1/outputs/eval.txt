@@ -1,0 +1,481 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 5 failed) 12ms
+   × next.config enables authInterrupts 6ms
+     → expected 'import type { NextConfig } from "next…' to match /authInterrupts\s*:\s*true/
+   × Admin page imports forbidden from next/navigation 1ms
+     → expected 'import { notFound, redirect } from \'…' to match /import.*forbidden.*from…/navigation['"]
+   × Admin page calls forbidden() for unauthorized access 1ms
+     → expected 'import { notFound, redirect } from \'…' to match /forbidden\s*\(\s*\)/
+   × forbidden.tsx error boundary file exists 2ms
+     → expected false to be true // Object.is equality
+   ✓ forbidden.tsx has proper error UI 0ms
+   × Does NOT use redirect for auth (should use forbidden) 1ms
+     → expected 'import { notFound, redirect } from \'…' to match /forbidden\s*\(\s*\)/
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 1 passed (6)
+   Start at  00:19:52
+   Duration  244ms (transform 47ms, setup 0ms, collect 33ms, tests 12ms, environment 0ms, prepare 78ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > next.config enables authInterrupts
+AssertionError: expected 'import type { NextConfig } from "next…' to match /authInterrupts\s*:\s*true/
+
+[32m- Expected:[39m 
+/authInterrupts\s*:\s*true/
+
+[31m+ Received:[39m 
+"import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+"
+
+ ❯ EVAL.ts:21:21
+     19| 
+     20|     // The forbidden() function requires authInterrupts: true
+     21|     expect(content).toMatch(/authInterrupts\s*:\s*true/);
+       |                     ^
+     22|   }
+     23| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  EVAL.ts > Admin page imports forbidden from next/navigation
+AssertionError: expected 'import { notFound, redirect } from \'…' to match /import.*forbidden.*from…/navigation['"]
+
+[32m- Expected:[39m 
+/import.*forbidden.*from\s+['"]next\/navigation['"]/
+
+[31m+ Received:[39m 
+"import { notFound, redirect } from 'next/navigation';
+import { verifyAdmin } from '../lib/auth';
+
+export const metadata = {
+  title: 'Admin Dashboard | Forbidden',
+};
+
+export default async function AdminPage() {
+  const { isAdmin, session } = await verifyAdmin();
+
+  // Return 403 Forbidden if not authenticated or not admin
+  if (!session) {
+    return (
+      <div className=\"min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8\">
+        <div className=\"sm:mx-auto sm:w-full sm:max-w-md\">
+          <h2 className=\"mt-6 text-center text-3xl font-extrabold text-gray-900\">
+            403 Forbidden
+          </h2>
+          <p className=\"mt-2 text-center text-sm text-gray-600\">
+            You must be logged in to access this page.
+          </p>
+        </div>
+
+        <div className=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\">
+          <div className=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\">
+            <div className=\"text-center\">
+              <p className=\"text-gray-500 mb-4\">
+                Please log in with an admin account to access the dashboard.
+              </p>
+              <a
+                href=\"/\"
+                className=\"inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500\"
+              >
+                Return to Home
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className=\"min-h-screen bg-red-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8\">
+        <div className=\"sm:mx-auto sm:w-full sm:max-w-md\">
+          <h2 className=\"mt-6 text-center text-3xl font-extrabold text-red-900\">
+            403 Forbidden
+          </h2>
+          <p className=\"mt-2 text-center text-sm text-red-600\">
+            Access denied. Admin privileges required.
+          </p>
+        </div>
+
+        <div className=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\">
+          <div className=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\">
+            <div className=\"text-center\">
+              <p className=\"text-gray-500 mb-4\">
+                Your current role: <span className=\"font-medium\">{session.role}</span>
+              </p>
+              <p className=\"text-gray-500 mb-6\">
+                Only users with admin privileges can access this dashboard.
+              </p>
+              <a
+                href=\"/\"
+                className=\"inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500\"
+              >
+                Return to Home
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin content
+  return (
+    <div className=\"min-h-screen bg-gray-50\">
+      <div className=\"py-10\">
+        <div className=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8\">
+          <div className=\"bg-white shadow rounded-lg\">
+            <div className=\"px-4 py-5 sm:px-6\">
+              <h1 className=\"text-2xl font-bold text-gray-900\">Admin Dashboard</h1>
+              <p className=\"mt-1 max-w-2xl text-sm text-gray-500\">
+                Welcome, {session.name}! You have admin access to this dashboard.
+              </p>
+            </div>
+            <div className=\"border-t border-gray-200 px-4 py-5 sm:p-0\">
+              <dl className=\"sm:divide-y sm:divide-gray-200\">
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">User ID</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    {session.userId}
+                  </dd>
+                </div>
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">Role</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    <span className=\"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800\">
+                      {session.role}
+                    </span>
+                  </dd>
+                </div>
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">Status</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    <span className=\"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800\">
+                      Authorized
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}"
+
+ ❯ EVAL.ts:31:21
+     29| 
+     30|     // Should import forbidden from next/navigation
+     31|     expect(content).toMatch(/import.*forbidden.*from\s+['"]next\/navig…
+       |                     ^
+     32|   }
+     33| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  EVAL.ts > Admin page calls forbidden() for unauthorized access
+AssertionError: expected 'import { notFound, redirect } from \'…' to match /forbidden\s*\(\s*\)/
+
+[32m- Expected:[39m 
+/forbidden\s*\(\s*\)/
+
+[31m+ Received:[39m 
+"import { notFound, redirect } from 'next/navigation';
+import { verifyAdmin } from '../lib/auth';
+
+export const metadata = {
+  title: 'Admin Dashboard | Forbidden',
+};
+
+export default async function AdminPage() {
+  const { isAdmin, session } = await verifyAdmin();
+
+  // Return 403 Forbidden if not authenticated or not admin
+  if (!session) {
+    return (
+      <div className=\"min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8\">
+        <div className=\"sm:mx-auto sm:w-full sm:max-w-md\">
+          <h2 className=\"mt-6 text-center text-3xl font-extrabold text-gray-900\">
+            403 Forbidden
+          </h2>
+          <p className=\"mt-2 text-center text-sm text-gray-600\">
+            You must be logged in to access this page.
+          </p>
+        </div>
+
+        <div className=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\">
+          <div className=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\">
+            <div className=\"text-center\">
+              <p className=\"text-gray-500 mb-4\">
+                Please log in with an admin account to access the dashboard.
+              </p>
+              <a
+                href=\"/\"
+                className=\"inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500\"
+              >
+                Return to Home
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className=\"min-h-screen bg-red-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8\">
+        <div className=\"sm:mx-auto sm:w-full sm:max-w-md\">
+          <h2 className=\"mt-6 text-center text-3xl font-extrabold text-red-900\">
+            403 Forbidden
+          </h2>
+          <p className=\"mt-2 text-center text-sm text-red-600\">
+            Access denied. Admin privileges required.
+          </p>
+        </div>
+
+        <div className=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\">
+          <div className=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\">
+            <div className=\"text-center\">
+              <p className=\"text-gray-500 mb-4\">
+                Your current role: <span className=\"font-medium\">{session.role}</span>
+              </p>
+              <p className=\"text-gray-500 mb-6\">
+                Only users with admin privileges can access this dashboard.
+              </p>
+              <a
+                href=\"/\"
+                className=\"inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500\"
+              >
+                Return to Home
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin content
+  return (
+    <div className=\"min-h-screen bg-gray-50\">
+      <div className=\"py-10\">
+        <div className=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8\">
+          <div className=\"bg-white shadow rounded-lg\">
+            <div className=\"px-4 py-5 sm:px-6\">
+              <h1 className=\"text-2xl font-bold text-gray-900\">Admin Dashboard</h1>
+              <p className=\"mt-1 max-w-2xl text-sm text-gray-500\">
+                Welcome, {session.name}! You have admin access to this dashboard.
+              </p>
+            </div>
+            <div className=\"border-t border-gray-200 px-4 py-5 sm:p-0\">
+              <dl className=\"sm:divide-y sm:divide-gray-200\">
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">User ID</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    {session.userId}
+                  </dd>
+                </div>
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">Role</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    <span className=\"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800\">
+                      {session.role}
+                    </span>
+                  </dd>
+                </div>
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">Status</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    <span className=\"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800\">
+                      Authorized
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}"
+
+ ❯ EVAL.ts:41:21
+     39| 
+     40|     // Should call forbidden() function
+     41|     expect(content).toMatch(/forbidden\s*\(\s*\)/);
+       |                     ^
+     42| 
+     43|     // Should check for admin role
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  EVAL.ts > forbidden.tsx error boundary file exists
+AssertionError: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:56:28
+     54| 
+     55|   // Should have a forbidden.tsx file for custom error UI
+     56|   expect(hasForbiddenFile).toBe(true);
+       |                            ^
+     57| });
+     58| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  EVAL.ts > Does NOT use redirect for auth (should use forbidden)
+AssertionError: expected 'import { notFound, redirect } from \'…' to match /forbidden\s*\(\s*\)/
+
+[32m- Expected:[39m 
+/forbidden\s*\(\s*\)/
+
+[31m+ Received:[39m 
+"import { notFound, redirect } from 'next/navigation';
+import { verifyAdmin } from '../lib/auth';
+
+export const metadata = {
+  title: 'Admin Dashboard | Forbidden',
+};
+
+export default async function AdminPage() {
+  const { isAdmin, session } = await verifyAdmin();
+
+  // Return 403 Forbidden if not authenticated or not admin
+  if (!session) {
+    return (
+      <div className=\"min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8\">
+        <div className=\"sm:mx-auto sm:w-full sm:max-w-md\">
+          <h2 className=\"mt-6 text-center text-3xl font-extrabold text-gray-900\">
+            403 Forbidden
+          </h2>
+          <p className=\"mt-2 text-center text-sm text-gray-600\">
+            You must be logged in to access this page.
+          </p>
+        </div>
+
+        <div className=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\">
+          <div className=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\">
+            <div className=\"text-center\">
+              <p className=\"text-gray-500 mb-4\">
+                Please log in with an admin account to access the dashboard.
+              </p>
+              <a
+                href=\"/\"
+                className=\"inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500\"
+              >
+                Return to Home
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className=\"min-h-screen bg-red-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8\">
+        <div className=\"sm:mx-auto sm:w-full sm:max-w-md\">
+          <h2 className=\"mt-6 text-center text-3xl font-extrabold text-red-900\">
+            403 Forbidden
+          </h2>
+          <p className=\"mt-2 text-center text-sm text-red-600\">
+            Access denied. Admin privileges required.
+          </p>
+        </div>
+
+        <div className=\"mt-8 sm:mx-auto sm:w-full sm:max-w-md\">
+          <div className=\"bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10\">
+            <div className=\"text-center\">
+              <p className=\"text-gray-500 mb-4\">
+                Your current role: <span className=\"font-medium\">{session.role}</span>
+              </p>
+              <p className=\"text-gray-500 mb-6\">
+                Only users with admin privileges can access this dashboard.
+              </p>
+              <a
+                href=\"/\"
+                className=\"inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500\"
+              >
+                Return to Home
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin content
+  return (
+    <div className=\"min-h-screen bg-gray-50\">
+      <div className=\"py-10\">
+        <div className=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8\">
+          <div className=\"bg-white shadow rounded-lg\">
+            <div className=\"px-4 py-5 sm:px-6\">
+              <h1 className=\"text-2xl font-bold text-gray-900\">Admin Dashboard</h1>
+              <p className=\"mt-1 max-w-2xl text-sm text-gray-500\">
+                Welcome, {session.name}! You have admin access to this dashboard.
+              </p>
+            </div>
+            <div className=\"border-t border-gray-200 px-4 py-5 sm:p-0\">
+              <dl className=\"sm:divide-y sm:divide-gray-200\">
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">User ID</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    {session.userId}
+                  </dd>
+                </div>
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">Role</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    <span className=\"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800\">
+                      {session.role}
+                    </span>
+                  </dd>
+                </div>
+                <div className=\"py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\">
+                  <dt className=\"text-sm font-medium text-gray-500\">Status</dt>
+                  <dd className=\"mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2\">
+                    <span className=\"inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800\">
+                      Authorized
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}"
+
+ ❯ EVAL.ts:91:21
+     89|     // This test checks that redirect is not the primary auth mechanism
+     90|     // Some redirects might be acceptable, but forbidden() should be u…
+     91|     expect(content).toMatch(/forbidden\s*\(\s*\)/);
+       |                     ^
+     92|     expect(usesRedirect).toBe(false);
+     93|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
