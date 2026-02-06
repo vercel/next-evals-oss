@@ -541,13 +541,44 @@ async function main(): Promise<void> {
 
     if (failures.length > 0) {
       const CLASSIFY_CONCURRENCY = 10;
-      console.log(`Classifying ${failures.length} failures...`);
 
-      let done = 0;
-      const total = failures.length;
+      // Separate cached from uncached classifications
+      const cached: typeof failures = [];
+      const uncached: typeof failures = [];
+      for (const f of failures) {
+        const cachedPath = join(resultsDir, f.experiment, f.rawTimestamp, f.result.evalPath, 'classification.json');
+        try {
+          const data = JSON.parse(await readFile(cachedPath, 'utf-8'));
+          if (data.failureType && data.failureReason) {
+            cached.push(f);
+          } else {
+            uncached.push(f);
+          }
+        } catch {
+          uncached.push(f);
+        }
+      }
+
+      if (cached.length > 0) {
+        console.log(`Using cached classification for ${cached.length} failures`);
+      }
+      if (uncached.length > 0) {
+        console.log(`Classifying ${uncached.length} failures...`);
+      }
+
+      // Load cached classifications directly
       const results: Array<{ result: AgentResult; classification: Awaited<ReturnType<typeof classifyFailure>> }> = [];
-      for (let i = 0; i < failures.length; i += CLASSIFY_CONCURRENCY) {
-        const batch = failures.slice(i, i + CLASSIFY_CONCURRENCY);
+      for (const { result, experiment, rawTimestamp } of cached) {
+        const cachedPath = join(resultsDir, experiment, rawTimestamp, result.evalPath, 'classification.json');
+        const data = JSON.parse(await readFile(cachedPath, 'utf-8'));
+        results.push({ result, classification: { failureType: data.failureType, failureReason: data.failureReason } });
+      }
+
+      // Classify uncached failures via AI
+      let done = 0;
+      const total = uncached.length;
+      for (let i = 0; i < uncached.length; i += CLASSIFY_CONCURRENCY) {
+        const batch = uncached.slice(i, i + CLASSIFY_CONCURRENCY);
         const batchResults = await Promise.all(
           batch.map(async ({ result, experiment, rawTimestamp }) => {
             const classification = await classifyFailure(
@@ -558,7 +589,7 @@ async function main(): Promise<void> {
             );
             done++;
             const icon = classification
-              ? { model: '\x1b[31m✗\x1b[0m', infra: '\x1b[33m⚙\x1b[0m', timeout: '\x1b[33m⏱\x1b[0m' }[classification.failureType]
+              ? { model: '\x1b[32m✓\x1b[0m', infra: '\x1b[31m⚙\x1b[0m', timeout: '\x1b[31m⏱\x1b[0m' }[classification.failureType]
               : '\x1b[90m?\x1b[0m';
             process.stdout.write(`\r  ${icon} ${done}/${total}  ${experiment}/${result.evalPath}`);
             process.stdout.write('\x1b[K'); // clear to end of line
@@ -567,7 +598,7 @@ async function main(): Promise<void> {
         );
         results.push(...batchResults);
       }
-      console.log(); // newline after progress
+      if (uncached.length > 0) console.log(); // newline after progress
 
       for (const { result, classification } of results) {
         if (classification) {

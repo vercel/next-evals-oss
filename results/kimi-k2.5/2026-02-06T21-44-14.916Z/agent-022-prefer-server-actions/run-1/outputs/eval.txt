@@ -1,0 +1,101 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.tsx (6 tests | 1 failed) 35ms
+   ✓ renders contact form component 27ms
+   × uses server action instead of client-side submission 5ms
+     → expected '\'use client\';\n\nimport { useAction…' not to match /['"]use client['"];?/
+   ✓ processes form data using FormData API 0ms
+   ✓ has proper form structure with action attribute 0ms
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  21:45:31
+   Duration  729ms (transform 50ms, setup 0ms, collect 124ms, tests 35ms, environment 387ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.tsx > uses server action instead of client-side submission
+AssertionError: expected '\'use client\';\n\nimport { useAction…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { useActionState } from 'react';
+
+export default function ContactForm() {
+  async function submitContactMessage(prevState: { message: string }, formData: FormData) {
+    'use server';
+
+    const name = formData.get('name') as string | null;
+    const email = formData.get('email') as string | null;
+    const message = formData.get('message') as string | null;
+
+    if (!name || name.trim() === '') {
+      return { message: 'Error: Name is required' };
+    }
+
+    if (!email || email.trim() === '') {
+      return { message: 'Error: Email is required' };
+    }
+
+    if (!message || message.trim() === '') {
+      return { message: 'Error: Message is required' };
+    }
+
+    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { message: 'Error: Please enter a valid email address' };
+    }
+
+    console.log('Contact message received:', { name, email, message });
+
+    return { message: 'Success: Message sent successfully!' };
+  }
+
+  const [state, formAction] = useActionState(submitContactMessage, { message: '' });
+
+  return (
+    <div>
+      <h2>Contact Us</h2>
+      <form action={formAction}>
+        <div>
+          <label htmlFor=\"name\">Name:</label>
+          <input type=\"text\" id=\"name\" name=\"name\" required />
+        </div>
+        <div>
+          <label htmlFor=\"email\">Email:</label>
+          <input type=\"email\" id=\"email\" name=\"email\" required />
+        </div>
+        <div>
+          <label htmlFor=\"message\">Message:</label>
+          <textarea id=\"message\" name=\"message\" rows={5} required />
+        </div>
+        <button type=\"submit\">Send Message</button>
+        {state.message && (
+          <p style={{ color: state.message.startsWith('Error') ? 'red' : 'green' }}>
+            {state.message}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.tsx:26:23
+     24|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     25|   
+     26|   expect(content).not.toMatch(/['"]use client['"];?/);
+       |                       ^
+     27|   expect(content).not.toMatch(/onSubmit|fetch\s*\(|useState|preventDef…
+     28|   expect(content).toMatch(/['"]use server['"];?/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
