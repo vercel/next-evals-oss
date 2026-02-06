@@ -1,0 +1,495 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 3 failed) 10ms
+   × Page has child component with use cache directive 6ms
+     → expected '\'use client\';\n\nimport { unstable_…' to match /['"]use cache['"];?/
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   × Component uses cache tag for products 1ms
+     → expected '\'use client\';\n\nimport { unstable_…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+   ✓ Page has server action for cache invalidation 0ms
+   × Page has form that calls server action 1ms
+     → expected '\'use client\';\n\nimport { unstable_…' to match /action.*=/
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Start at  00:18:36
+   Duration  221ms (transform 34ms, setup 0ms, collect 25ms, tests 10ms, environment 0ms, prepare 68ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has child component with use cache directive
+AssertionError: expected '\'use client\';\n\nimport { unstable_…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { unstable_cache as cache, revalidateTag } from 'next/cache';
+import { getAllProducts } from '@/lib/db';
+import { useState } from 'react';
+
+// Cache the getAllProducts function with a \"products\" cache tag
+const getCachedProducts = cache(
+  async () => {
+    return await getAllProducts();
+  },
+  ['getAllProducts'],
+  {
+    tags: ['products'],
+    revalidate: 60, // Cache for 60 seconds
+  }
+);
+
+// Server action for form submission with cache invalidation
+async function addProduct(formData: FormData) {
+  'use server';
+  
+  const name = formData.get('name') as string;
+  const price = formData.get('price') as string;
+  
+  // Simulate adding product to database
+  await new Promise(resolve => setTimeout(resolve, 50));
+  
+  // Invalidate the products cache to ensure fresh data on next fetch
+  revalidateTag('products');
+  
+  return { success: true, message: `Product \"${name}\" added successfully!` };
+}
+
+// Child component that fetches and displays products
+function ProductsList() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage('');
+
+    const formData = new FormData(e.currentTarget);
+    try {
+      const result = await addProduct(formData);
+      setMessage(result.message);
+      // Clear form
+      e.currentTarget.reset();
+    } catch (error) {
+      setMessage('Error adding product');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className=\"max-w-4xl mx-auto p-6\">
+      <h1 className=\"text-3xl font-bold mb-6\">Product Listing</h1>
+      
+      {/* Form with inline server action */}
+      <form onSubmit={handleSubmit} className=\"bg-gray-50 p-6 rounded-lg mb-6\">
+        <h2 className=\"text-xl font-semibold mb-4\">Add New Product</h2>
+        
+        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4 mb-4\">
+          <div>
+            <label htmlFor=\"name\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+              Product Name
+            </label>
+            <input
+              type=\"text\"
+              id=\"name\"
+              name=\"name\"
+              required
+              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"
+              placeholder=\"Enter product name\"
+            />
+          </div>
+          <div>
+            <label htmlFor=\"price\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+              Price
+            </label>
+            <input
+              type=\"number\"
+              id=\"price\"
+              name=\"price\"
+              step=\"0.01\"
+              min=\"0\"
+              required
+              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"
+              placeholder=\"Enter product price\"
+            />
+          </div>
+        </div>
+        
+        <button
+          type=\"submit\"
+          disabled={isLoading}
+          className=\"bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
+        >
+          {isLoading ? 'Adding Product...' : 'Add Product'}
+        </button>
+        
+        {message && (
+          <p className={`mt-4 ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+            {message}
+          </p>
+        )}
+      </form>
+
+      {/* Product list with cached data */}
+      <div className=\"bg-white shadow rounded-lg p-6\">
+        <h2 className=\"text-xl font-semibold mb-4\">Products</h2>
+        <ProductGrid />
+      </div>
+    </div>
+  );
+}
+
+// Component that fetches and displays the cached products
+async function ProductGrid() {
+  const products = await getCachedProducts();
+
+  return (
+    <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\">
+      {products.map((product) => (
+        <div key={product.id} className=\"border border-gray-200 rounded-lg p-4\">
+          <h3 className=\"font-semibold text-lg\">{product.name}</h3>
+          <p className=\"text-gray-600\">${product.price}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function Page() {
+  return <ProductsList />;
+}
+"
+
+ ❯ EVAL.ts:25:23
+     23| 
+     24|   // Should have 'use cache' directive somewhere in the file or child …
+     25|   expect(pageContent).toMatch(/['"]use cache['"];?/);
+       |                       ^
+     26| });
+     27| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > Component uses cache tag for products
+AssertionError: expected '\'use client\';\n\nimport { unstable_…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+
+[32m- Expected:[39m 
+/cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { unstable_cache as cache, revalidateTag } from 'next/cache';
+import { getAllProducts } from '@/lib/db';
+import { useState } from 'react';
+
+// Cache the getAllProducts function with a \"products\" cache tag
+const getCachedProducts = cache(
+  async () => {
+    return await getAllProducts();
+  },
+  ['getAllProducts'],
+  {
+    tags: ['products'],
+    revalidate: 60, // Cache for 60 seconds
+  }
+);
+
+// Server action for form submission with cache invalidation
+async function addProduct(formData: FormData) {
+  'use server';
+  
+  const name = formData.get('name') as string;
+  const price = formData.get('price') as string;
+  
+  // Simulate adding product to database
+  await new Promise(resolve => setTimeout(resolve, 50));
+  
+  // Invalidate the products cache to ensure fresh data on next fetch
+  revalidateTag('products');
+  
+  return { success: true, message: `Product \"${name}\" added successfully!` };
+}
+
+// Child component that fetches and displays products
+function ProductsList() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage('');
+
+    const formData = new FormData(e.currentTarget);
+    try {
+      const result = await addProduct(formData);
+      setMessage(result.message);
+      // Clear form
+      e.currentTarget.reset();
+    } catch (error) {
+      setMessage('Error adding product');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className=\"max-w-4xl mx-auto p-6\">
+      <h1 className=\"text-3xl font-bold mb-6\">Product Listing</h1>
+      
+      {/* Form with inline server action */}
+      <form onSubmit={handleSubmit} className=\"bg-gray-50 p-6 rounded-lg mb-6\">
+        <h2 className=\"text-xl font-semibold mb-4\">Add New Product</h2>
+        
+        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4 mb-4\">
+          <div>
+            <label htmlFor=\"name\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+              Product Name
+            </label>
+            <input
+              type=\"text\"
+              id=\"name\"
+              name=\"name\"
+              required
+              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"
+              placeholder=\"Enter product name\"
+            />
+          </div>
+          <div>
+            <label htmlFor=\"price\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+              Price
+            </label>
+            <input
+              type=\"number\"
+              id=\"price\"
+              name=\"price\"
+              step=\"0.01\"
+              min=\"0\"
+              required
+              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"
+              placeholder=\"Enter product price\"
+            />
+          </div>
+        </div>
+        
+        <button
+          type=\"submit\"
+          disabled={isLoading}
+          className=\"bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
+        >
+          {isLoading ? 'Adding Product...' : 'Add Product'}
+        </button>
+        
+        {message && (
+          <p className={`mt-4 ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+            {message}
+          </p>
+        )}
+      </form>
+
+      {/* Product list with cached data */}
+      <div className=\"bg-white shadow rounded-lg p-6\">
+        <h2 className=\"text-xl font-semibold mb-4\">Products</h2>
+        <ProductGrid />
+      </div>
+    </div>
+  );
+}
+
+// Component that fetches and displays the cached products
+async function ProductGrid() {
+  const products = await getCachedProducts();
+
+  return (
+    <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\">
+      {products.map((product) => (
+        <div key={product.id} className=\"border border-gray-200 rounded-lg p-4\">
+          <h3 className=\"font-semibold text-lg\">{product.name}</h3>
+          <p className=\"text-gray-600\">${product.price}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function Page() {
+  return <ProductsList />;
+}
+"
+
+ ❯ EVAL.ts:48:23
+     46| 
+     47|   // Should use cacheTag() function with "products" tag
+     48|   expect(pageContent).toMatch(
+       |                       ^
+     49|     /cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+     50|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > Page has form that calls server action
+AssertionError: expected '\'use client\';\n\nimport { unstable_…' to match /action.*=/
+
+[32m- Expected:[39m 
+/action.*=/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { unstable_cache as cache, revalidateTag } from 'next/cache';
+import { getAllProducts } from '@/lib/db';
+import { useState } from 'react';
+
+// Cache the getAllProducts function with a \"products\" cache tag
+const getCachedProducts = cache(
+  async () => {
+    return await getAllProducts();
+  },
+  ['getAllProducts'],
+  {
+    tags: ['products'],
+    revalidate: 60, // Cache for 60 seconds
+  }
+);
+
+// Server action for form submission with cache invalidation
+async function addProduct(formData: FormData) {
+  'use server';
+  
+  const name = formData.get('name') as string;
+  const price = formData.get('price') as string;
+  
+  // Simulate adding product to database
+  await new Promise(resolve => setTimeout(resolve, 50));
+  
+  // Invalidate the products cache to ensure fresh data on next fetch
+  revalidateTag('products');
+  
+  return { success: true, message: `Product \"${name}\" added successfully!` };
+}
+
+// Child component that fetches and displays products
+function ProductsList() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage('');
+
+    const formData = new FormData(e.currentTarget);
+    try {
+      const result = await addProduct(formData);
+      setMessage(result.message);
+      // Clear form
+      e.currentTarget.reset();
+    } catch (error) {
+      setMessage('Error adding product');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className=\"max-w-4xl mx-auto p-6\">
+      <h1 className=\"text-3xl font-bold mb-6\">Product Listing</h1>
+      
+      {/* Form with inline server action */}
+      <form onSubmit={handleSubmit} className=\"bg-gray-50 p-6 rounded-lg mb-6\">
+        <h2 className=\"text-xl font-semibold mb-4\">Add New Product</h2>
+        
+        <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4 mb-4\">
+          <div>
+            <label htmlFor=\"name\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+              Product Name
+            </label>
+            <input
+              type=\"text\"
+              id=\"name\"
+              name=\"name\"
+              required
+              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"
+              placeholder=\"Enter product name\"
+            />
+          </div>
+          <div>
+            <label htmlFor=\"price\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+              Price
+            </label>
+            <input
+              type=\"number\"
+              id=\"price\"
+              name=\"price\"
+              step=\"0.01\"
+              min=\"0\"
+              required
+              className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500\"
+              placeholder=\"Enter product price\"
+            />
+          </div>
+        </div>
+        
+        <button
+          type=\"submit\"
+          disabled={isLoading}
+          className=\"bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
+        >
+          {isLoading ? 'Adding Product...' : 'Add Product'}
+        </button>
+        
+        {message && (
+          <p className={`mt-4 ${message.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+            {message}
+          </p>
+        )}
+      </form>
+
+      {/* Product list with cached data */}
+      <div className=\"bg-white shadow rounded-lg p-6\">
+        <h2 className=\"text-xl font-semibold mb-4\">Products</h2>
+        <ProductGrid />
+      </div>
+    </div>
+  );
+}
+
+// Component that fetches and displays the cached products
+async function ProductGrid() {
+  const products = await getCachedProducts();
+
+  return (
+    <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4\">
+      {products.map((product) => (
+        <div key={product.id} className=\"border border-gray-200 rounded-lg p-4\">
+          <h3 className=\"font-semibold text-lg\">{product.name}</h3>
+          <p className=\"text-gray-600\">${product.price}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function Page() {
+  return <ProductsList />;
+}
+"
+
+ ❯ EVAL.ts:84:23
+     82| 
+     83|   // Should have form action
+     84|   expect(pageContent).toMatch(/action.*=/);
+       |                       ^
+     85| 
+     86|   // Should have submit button
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

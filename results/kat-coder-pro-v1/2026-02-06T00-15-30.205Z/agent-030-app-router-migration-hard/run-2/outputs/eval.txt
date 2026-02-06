@@ -1,0 +1,174 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (8 tests | 2 failed) 11ms
+   ✓ Root layout exists and replaces _app/_document 1ms
+   ✓ Home page migrated to Server Component with async data fetching 1ms
+   ✓ Blog index migrated with ISR equivalent 0ms
+   × Dynamic blog route migrated to generateStaticParams 6ms
+     → expected 'import { notFound } from \'next/navig…' to match /export.*generateStaticParams|generate…/
+   ✓ API routes migrated to Route Handlers 1ms
+   × Metadata API replaces next/head 1ms
+     → expected 'export async function generateMetadat…' to match /export.*metadata|metadata.*Metadata/
+   ✓ Error handling migrated to error.js and not-found.js 0ms
+   ✓ Client components use next/navigation hooks 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+   Start at  00:19:34
+   Duration  250ms (transform 54ms, setup 0ms, collect 34ms, tests 11ms, environment 0ms, prepare 83ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dynamic blog route migrated to generateStaticParams
+AssertionError: expected 'import { notFound } from \'next/navig…' to match /export.*generateStaticParams|generate…/
+
+[32m- Expected:[39m 
+/export.*generateStaticParams|generateStaticParams.*export/
+
+[31m+ Received:[39m 
+"import { notFound } from 'next/navigation';
+
+type Post = {
+  id: number;
+  title: string;
+  body: string;
+};
+
+type Comment = {
+  id: number;
+  name: string;
+  body: string;
+  email: string;
+};
+
+export async function generateMetadata({ params }: { params: { id: string } }) {
+  try {
+    const post: Post = await fetch(`https://jsonplaceholder.typicode.com/posts/${params.id}`, {
+      next: { revalidate: 300 }
+    }).then(res => res.json());
+
+    return {
+      title: `${post.title} - My Blog`,
+      description: post.body.substring(0, 160),
+      openGraph: {
+        title: post.title,
+        description: post.body.substring(0, 160)
+      }
+    };
+  } catch (error) {
+    return {
+      title: 'Post Not Found',
+      description: 'The post you are looking for does not exist'
+    };
+  }
+}
+
+export default async function BlogPost({ params }: { params: { id: string } }) {
+  try {
+    // Use Promise.all for parallel fetching (equivalent to the original)
+    const [post, comments] = await Promise.all([
+      fetch(`https://jsonplaceholder.typicode.com/posts/${params.id}`, {
+        next: { revalidate: 300 } // 5 minutes
+      }).then(res => res.json()),
+      fetch(`https://jsonplaceholder.typicode.com/posts/${params.id}/comments`, {
+        next: { revalidate: 300 }
+      }).then(res => res.json())
+    ]);
+
+    return (
+      <article>
+        <form action=\"/\">
+          <button type=\"submit\">← Back</button>
+        </form>
+        
+        <h1>{post.title}</h1>
+        <p>{post.body}</p>
+        
+        <h2>Comments ({comments.length})</h2>
+        <div className=\"comments\">
+          {comments.map((comment: Comment) => (
+            <div key={comment.id} className=\"comment\">
+              <h3>{comment.name}</h3>
+              <p>{comment.body}</p>
+              <small>By: {comment.email}</small>
+            </div>
+          ))}
+        </div>
+      </article>
+    );
+  } catch (error) {
+    notFound(); // App Router equivalent of notFound: true
+  }
+}"
+
+ ❯ EVAL.ts:82:26
+     80| 
+     81|   // Should export generateStaticParams
+     82|   expect(dynamicContent).toMatch(
+       |                          ^
+     83|     /export.*generateStaticParams|generateStaticParams.*export/
+     84|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Metadata API replaces next/head
+AssertionError: expected 'export async function generateMetadat…' to match /export.*metadata|metadata.*Metadata/
+
+[32m- Expected:[39m 
+/export.*metadata|metadata.*Metadata/
+
+[31m+ Received:[39m 
+"export async function generateMetadata() {
+  return {
+    title: 'Home - My Blog',
+    description: 'Welcome to my blog homepage'
+  };
+}
+
+export default async function HomePage() {
+  // Fetch data at the component level (no server props needed)
+  const posts = await fetch('https://jsonplaceholder.typicode.com/posts?_limit=5', {
+    next: { revalidate: 0 } // SSR equivalent
+  }).then(res => res.json());
+
+  const userAgent = 'Server Component'; // Can't access req in App Router, so we'll handle this differently
+  const timestamp = new Date().toISOString();
+
+  return (
+    <>
+      <div>
+        <h1>Welcome to My Blog</h1>
+        <p>Server-side rendered at: {timestamp}</p>
+        <p>Your user agent: {userAgent}</p>
+        
+        <h2>Recent Posts</h2>
+        <ul>
+          {posts.map((post: any) => (
+            <li key={post.id}>
+              <a href={`/blog/${post.id}`}>{post.title}</a>
+            </li>
+          ))}
+        </ul>
+        
+        <form action=\"/blog\">
+          <button type=\"submit\">
+            View All Posts
+          </button>
+        </form>
+      </div>
+    </>
+  );
+}"
+
+ ❯ EVAL.ts:132:23
+    130| 
+    131|   // Should use Metadata export instead of Head component
+    132|   expect(pageContent).toMatch(/export.*metadata|metadata.*Metadata/);
+       |                       ^
+    133| 
+    134|   // Should not import or use next/head
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
