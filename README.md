@@ -28,18 +28,17 @@ The runner automatically detects:
 - **New eval added** → runs that eval for all models
 - **Already completed** → skips
 
-### `npm run export-results`
+### `npm run qa-and-export`
 
-Exports results from `results/` to `agent-results.json` for use on nextjs.org/evals.
+Classifies failures (model vs infra vs timeout), deletes non-model failures so they can be re-run, and exports clean results to `agent-results.json`.
 
-## Models
+### `npm run cleanup`
 
-| Experiment | Model | Agent |
-|------------|-------|-------|
-| `claude-opus-4.5` | Claude Opus 4.5 | Claude Code |
-| `claude-sonnet-4.5` | Claude Sonnet 4.5 | Claude Code |
-| `gemini-3-pro-preview` | Gemini 3 Pro Preview | OpenCode (via AI Gateway) |
-| `gpt-5.2-high` | GPT 5.2 Codex | OpenCode (via AI Gateway) |
+Removes duplicate and incomplete results. For each (experiment, eval) pair, keeps only the latest complete result (must have `summary.json`) and deletes older duplicates. Also removes empty timestamp directories.
+
+```bash
+npm run cleanup -- --dry   # Preview what would be cleaned
+```
 
 ## Eval structure
 
@@ -76,13 +75,14 @@ evals/agent-031-proxy-middleware/
 ## Adding a new model
 
 1. Create a config in `experiments/` (e.g., `experiments/gpt-5.ts`)
-2. Run `npm run run-evals` — it will automatically run all evals for the new model
+2. Add the display name to `MODEL_NAMES` in `scripts/qa-and-export.ts`
+3. Run `npm run run-evals` — it will automatically run all evals for the new model
 
 ## Publishing to nextjs.org/evals
 
 After running evals:
 
-1. Export results: `npm run export-results`
+1. Export results: `npm run qa-and-export`
 2. Copy to front repo:
    ```bash
    cp agent-results.json <path-to-front>/apps/next-site/app/\(next-site\)/evals/agent-results.json
