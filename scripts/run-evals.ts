@@ -32,7 +32,9 @@ interface CompletedEval {
 
 async function discoverExperiments(): Promise<string[]> {
   const files = await readdir('experiments');
-  return files.filter((f) => f.endsWith('.ts')).map((f) => f.replace('.ts', ''));
+  return files
+    .filter((f) => f.endsWith('.ts') && !f.startsWith('_temp_'))
+    .map((f) => f.replace('.ts', ''));
 }
 
 async function discoverEvals(): Promise<string[]> {
@@ -41,42 +43,44 @@ async function discoverEvals(): Promise<string[]> {
 }
 
 async function scanCompletedEvals(): Promise<CompletedEval[]> {
-  const completed: CompletedEval[] = [];
   const resultsDir = 'results';
 
-  if (!existsSync(resultsDir)) return completed;
+  if (!existsSync(resultsDir)) return [];
+
+  // Track latest result per (experiment, eval) pair across all timestamps
+  const seen = new Map<string, CompletedEval>();
 
   for (const experiment of await readdir(resultsDir)) {
     const expDir = join(resultsDir, experiment);
-    const timestamps = await readdir(expDir).catch(() => []);
-    if (timestamps.length === 0) continue;
+    const timestamps = (await readdir(expDir).catch(() => []))
+      .filter((t) => !t.startsWith('.'))
+      .sort();
 
-    // Use latest timestamp
-    const latest = timestamps.filter((t) => !t.startsWith('.')).sort().pop();
-    if (!latest) continue;
+    // Iterate oldest to newest so latest overwrites earlier results
+    for (const ts of timestamps) {
+      const runDir = join(expDir, ts);
+      for (const evalDir of await readdir(runDir).catch(() => [])) {
+        if (evalDir.startsWith('.')) continue;
 
-    const runDir = join(expDir, latest);
-    for (const evalDir of await readdir(runDir).catch(() => [])) {
-      if (evalDir.startsWith('.')) continue;
-
-      const summaryPath = join(runDir, evalDir, 'summary.json');
-      if (existsSync(summaryPath)) {
-        try {
-          const summary = JSON.parse(await readFile(summaryPath, 'utf-8'));
-          completed.push({
-            experiment,
-            eval: evalDir,
-            success: summary.passedRuns > 0,
-            timestamp: latest,
-          });
-        } catch {
-          // Skip malformed summaries
+        const summaryPath = join(runDir, evalDir, 'summary.json');
+        if (existsSync(summaryPath)) {
+          try {
+            const summary = JSON.parse(await readFile(summaryPath, 'utf-8'));
+            seen.set(`${experiment}:${evalDir}`, {
+              experiment,
+              eval: evalDir,
+              success: summary.passedRuns > 0,
+              timestamp: ts,
+            });
+          } catch {
+            // Skip malformed summaries
+          }
         }
       }
     }
   }
 
-  return completed;
+  return Array.from(seen.values());
 }
 
 function getMissingPairs(
