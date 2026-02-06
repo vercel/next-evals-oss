@@ -263,7 +263,7 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log('\nDone! Run `npm run export-results` to generate JSON.');
+  console.log('\nDone! Run `npm run qa-and-export` to generate JSON.');
 }
 
 main().catch(console.error);

@@ -5,6 +5,7 @@ const config: ExperimentConfig = {
   scripts: ['build'],
   runs: 2,
   earlyExit: true,
+  timeout: 1200,
   sandbox: 'vercel',
 };
 
