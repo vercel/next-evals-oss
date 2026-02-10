@@ -11,16 +11,15 @@ cp .env.local .env   # requires VERCEL_OIDC_TOKEN and AI_GATEWAY_API_KEY
 
 ## Scripts
 
-### `npm run run-evals`
+### `npm run eval`
 
 Runs agent evaluations with memoization. Only runs (model, eval) pairs that haven't been completed yet.
 
 ```bash
-npm run run-evals              # Run only missing pairs
-npm run run-evals -- --dry     # Preview what would run
-npm run run-evals -- --force   # Re-run everything
-npm run run-evals -- --retry   # Retry failed evals only
-npm run run-evals -- --smoke   # Run 1 eval per experiment (sanity check)
+npm run eval              # Run only missing pairs
+npm run eval:dry          # Preview what would run
+npm run eval -- --force   # Re-run everything
+npm run eval:smoke        # Run 1 eval per experiment (sanity check)
 ```
 
 The runner automatically detects:
@@ -28,17 +27,9 @@ The runner automatically detects:
 - **New eval added** → runs that eval for all models
 - **Already completed** → skips
 
-### `npm run qa-and-export`
+### `npm run export-results`
 
-Classifies failures (model vs infra vs timeout), deletes non-model failures so they can be re-run, and exports clean results to `agent-results.json`.
-
-### `npm run cleanup`
-
-Removes duplicate and incomplete results. For each (experiment, eval) pair, keeps only the latest complete result (must have `summary.json`) and deletes older duplicates. Also removes empty timestamp directories.
-
-```bash
-npm run cleanup -- --dry   # Preview what would be cleaned
-```
+Exports clean results to `agent-results.json`. Non-model failures (infra/timeout) are automatically deleted during eval runs, so only valid model results are exported.
 
 ## Eval structure
 
@@ -70,19 +61,19 @@ evals/agent-031-proxy-middleware/
 3. Add `EVAL.ts` with vitest assertions
 4. Add `package.json` with `"type": "module"` and `"build": "next build"`
 5. Add the Next.js source files the agent starts with
-6. Run `npm run run-evals` — it will automatically run the new eval for all models
+6. Run `npm run eval` — it will automatically run the new eval for all models
 
 ## Adding a new model
 
 1. Create a config in `experiments/` (e.g., `experiments/gpt-5.ts`)
-2. Add the display name to `MODEL_NAMES` in `scripts/qa-and-export.ts`
-3. Run `npm run run-evals` — it will automatically run all evals for the new model
+2. Add the display name to `MODEL_NAMES` in `scripts/export-results.ts`
+3. Run `npm run eval` — it will automatically run all evals for the new model
 
 ## Publishing to nextjs.org/evals
 
 After running evals:
 
-1. Export results: `npm run qa-and-export`
+1. Export results: `npm run export-results`
 2. Copy to front repo:
    ```bash
    cp agent-results.json <path-to-front>/apps/next-site/app/\(next-site\)/evals/agent-results.json
