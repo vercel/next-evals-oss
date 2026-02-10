@@ -1,0 +1,132 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 2 failed) 9ms
+   × Page has child component with use cache directive 6ms
+     → expected 'import { getAllProducts, updateProduc…' to match /['"]use cache['"];?/
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   × Component uses cache tag for products 1ms
+     → expected 'import { getAllProducts, updateProduc…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+   ✓ Page has server action for cache invalidation 0ms
+   ✓ Page has form that calls server action 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  21:41:25
+   Duration  301ms (transform 50ms, setup 0ms, collect 22ms, tests 9ms, environment 0ms, prepare 145ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has child component with use cache directive
+AssertionError: expected 'import { getAllProducts, updateProduc…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { getAllProducts, updateProducts } from '../lib/db';
+import { revalidateTag } from 'next/cache';
+
+async function ProductsList() {
+  const products = await getAllProducts();
+  
+  return (
+    <div>
+      <h2>Products</h2>
+      <ul>
+        {products.map(product => (
+          <li key={product.id}>
+            {product.name} - ${product.price}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+async function invalidateCache() {
+  'use server';
+  await updateProducts();
+  revalidateTag('products');
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <ProductsList />
+      <form action={invalidateCache}>
+        <button type=\"submit\">Refresh Products</button>
+      </form>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:25:23
+     23| 
+     24|   // Should have 'use cache' directive somewhere in the file or child …
+     25|   expect(pageContent).toMatch(/['"]use cache['"];?/);
+       |                       ^
+     26| });
+     27| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Component uses cache tag for products
+AssertionError: expected 'import { getAllProducts, updateProduc…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+
+[32m- Expected:[39m 
+/cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+
+[31m+ Received:[39m 
+"import { getAllProducts, updateProducts } from '../lib/db';
+import { revalidateTag } from 'next/cache';
+
+async function ProductsList() {
+  const products = await getAllProducts();
+  
+  return (
+    <div>
+      <h2>Products</h2>
+      <ul>
+        {products.map(product => (
+          <li key={product.id}>
+            {product.name} - ${product.price}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+async function invalidateCache() {
+  'use server';
+  await updateProducts();
+  revalidateTag('products');
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <ProductsList />
+      <form action={invalidateCache}>
+        <button type=\"submit\">Refresh Products</button>
+      </form>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:48:23
+     46| 
+     47|   // Should use cacheTag() function with "products" tag
+     48|   expect(pageContent).toMatch(
+       |                       ^
+     49|     /cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+     50|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

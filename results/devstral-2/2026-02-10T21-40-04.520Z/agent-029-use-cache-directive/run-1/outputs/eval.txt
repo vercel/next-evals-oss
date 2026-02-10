@@ -1,0 +1,75 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page has child component with use cache directive 1ms
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   × Component uses cache tag for products 5ms
+     → expected 'import { getAllProducts } from \'../l…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+   ✓ Page has server action for cache invalidation 0ms
+   ✓ Page has form that calls server action 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  21:41:09
+   Duration  201ms (transform 34ms, setup 0ms, collect 21ms, tests 8ms, environment 0ms, prepare 64ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Component uses cache tag for products
+AssertionError: expected 'import { getAllProducts } from \'../l…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+
+[32m- Expected:[39m 
+/cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+
+[31m+ Received:[39m 
+"import { getAllProducts } from '../lib/db';
+import { revalidateTag } from 'next/cache';
+
+async function ProductsList() {
+  'use cache';
+  const products = await getAllProducts();
+  
+  return (
+    <div>
+      <h2>Products</h2>
+      <ul>
+        {products.map(product => (
+          <li key={product.id}>
+            {product.name} - ${product.price}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+async function invalidateCache() {
+  'use server';
+  revalidateTag('products');
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+      <ProductsList />
+      <form action={invalidateCache}>
+        <button type=\"submit\">Refresh Products</button>
+      </form>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:48:23
+     46| 
+     47|   // Should use cacheTag() function with "products" tag
+     48|   expect(pageContent).toMatch(
+       |                       ^
+     49|     /cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+     50|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
