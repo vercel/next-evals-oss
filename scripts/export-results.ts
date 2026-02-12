@@ -239,9 +239,15 @@ async function main(): Promise<void> {
       agentHarness,
     });
 
-    exportedData.results[experiment] = agentResults.sort((a, b) =>
-      a.evalPath.localeCompare(b.evalPath)
-    );
+    if (exportedData.results[modelName]) {
+      exportedData.results[modelName].push(
+        ...agentResults.sort((a, b) => a.evalPath.localeCompare(b.evalPath))
+      );
+    } else {
+      exportedData.results[modelName] = agentResults.sort((a, b) =>
+        a.evalPath.localeCompare(b.evalPath)
+      );
+    }
   }
 
   // Count stats
