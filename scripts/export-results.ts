@@ -63,7 +63,6 @@ const MODEL_NAMES: Record<string, string> = {
   'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
   'gemini-2.0-flash': 'Gemini 2.0 Flash',
   'gemini-2.0-flash-lite': 'Gemini 2.0 Flash Lite',
-  'gpt-5.2-codex': 'GPT 5.2 Codex',
   'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
   'gpt-5.3-codex': 'GPT 5.3 Codex',
   'gpt-5-codex': 'GPT 5 Codex',
@@ -239,15 +238,9 @@ async function main(): Promise<void> {
       agentHarness,
     });
 
-    if (exportedData.results[modelName]) {
-      exportedData.results[modelName].push(
-        ...agentResults.sort((a, b) => a.evalPath.localeCompare(b.evalPath))
-      );
-    } else {
-      exportedData.results[modelName] = agentResults.sort((a, b) =>
-        a.evalPath.localeCompare(b.evalPath)
-      );
-    }
+    exportedData.results[experiment] = agentResults.sort((a, b) =>
+      a.evalPath.localeCompare(b.evalPath)
+    );
   }
 
   // Count stats
