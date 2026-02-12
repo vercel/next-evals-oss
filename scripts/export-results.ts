@@ -88,12 +88,16 @@ const MODEL_NAMES: Record<string, string> = {
   'glm-4.6': 'GLM 4.6',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
   'v0-1.5-md': 'v0 1.5 MD',
+  'cursor-composer-1.5': 'Cursor Composer 1.5',
+  'gemini-3-pro-preview-gemini-cli': 'Gemini 3.0 Pro Preview',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
   'claude-code': 'Claude Code',
   'codex': 'Codex',
   'vercel-ai-gateway/opencode': 'OpenCode',
+  'cursor': 'Cursor',
+  'gemini': 'Gemini CLI',
 };
 
 function parseTimestamp(ts: string): string {
