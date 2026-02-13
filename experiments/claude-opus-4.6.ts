@@ -2,6 +2,7 @@ import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
   agent: 'claude-code',
+  model: 'claude-opus-4-6',
   scripts: ['build'],
   runs: 2,
   earlyExit: true,
