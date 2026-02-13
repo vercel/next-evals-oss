@@ -2,7 +2,7 @@ import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
   agent: 'claude-code',
-  model: 'sonnet',
+  model: 'claude-sonnet-4-5',
   scripts: ['build'],
   runs: 2,
   earlyExit: true,
