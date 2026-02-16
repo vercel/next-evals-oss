@@ -4,7 +4,7 @@ const config: ExperimentConfig = {
   agent: 'codex',
   model: 'gpt-5.3-codex-api-preview?reasoningEffort=xhigh',
   scripts: ['build'],
-  runs: 2,
+  runs: 4,
   earlyExit: true,
   timeout: 1200,
   sandbox: 'vercel',
