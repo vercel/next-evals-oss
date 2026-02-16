@@ -4,7 +4,7 @@ const config: ExperimentConfig = {
   agent: 'claude-code',
   model: 'claude-sonnet-4-5',
   scripts: ['build'],
-  runs: 4,
+  runs: 3,
   earlyExit: true,
   timeout: 1200,
   sandbox: 'vercel',

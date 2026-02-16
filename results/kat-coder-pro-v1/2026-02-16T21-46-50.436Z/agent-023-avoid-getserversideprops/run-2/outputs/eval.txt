@@ -1,0 +1,118 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 1 failed) 7ms
+   ✓ Page is an async server component with proper data fetching 1ms
+   × UserDashboard component uses App Router patterns 5ms
+     → expected '\'use client\';\n\nimport { useEffect…' not to match /['"]use client['"];?/
+   ✓ UserDashboard fetches dynamic user preferences 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  21:53:24
+   Duration  198ms (transform 32ms, setup 0ms, collect 21ms, tests 7ms, environment 0ms, prepare 62ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > UserDashboard component uses App Router patterns
+AssertionError: expected '\'use client\';\n\nimport { useEffect…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { useEffect, useState } from 'react';
+
+interface UserPreferences {
+  theme: string;
+  notifications: boolean;
+  language: string;
+  lastUpdated: string;
+}
+
+export default function UserDashboard() {
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchUserPreferences() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch user preferences with cache control to ensure fresh data
+        const response = await fetch('/api/user/preferences', {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user preferences');
+        }
+
+        const data = await response.json();
+        setPreferences(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchUserPreferences();
+  }, []);
+
+  if (loading) {
+    return (
+      <div>
+        <h2>User Dashboard</h2>
+        <p>Loading user preferences...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h2>User Dashboard</h2>
+        <p>Error loading preferences: {error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>User Dashboard</h2>
+      {preferences && (
+        <div>
+          <h3>Your Preferences</h3>
+          <ul>
+            <li><strong>Theme:</strong> {preferences.theme}</li>
+            <li><strong>Notifications:</strong> {preferences.notifications ? 'Enabled' : 'Disabled'}</li>
+            <li><strong>Language:</strong> {preferences.language}</li>
+            <li><strong>Last Updated:</strong> {new Date(preferences.lastUpdated).toLocaleString()}</li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}"
+
+ ❯ EVAL.ts:38:36
+     36|   
+     37|   // Should NOT have 'use client' directive
+     38|   expect(userDashboardContent).not.toMatch(/['"]use client['"];?/);
+       |                                    ^
+     39| });
+     40| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,75 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page has child component with use cache directive 1ms
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   ✓ Component uses cache tag for products 0ms
+   × Page has server action for cache invalidation 5ms
+     → expected 'import { cacheTag } from \'next/cache…' to match /revalidateTag|revalidate.*tag/i
+   ✓ Page has form that calls server action 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  21:49:32
+   Duration  204ms (transform 26ms, setup 0ms, collect 22ms, tests 8ms, environment 0ms, prepare 65ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has server action for cache invalidation
+AssertionError: expected 'import { cacheTag } from \'next/cache…' to match /revalidateTag|revalidate.*tag/i
+
+[32m- Expected:[39m 
+/revalidateTag|revalidate.*tag/i
+
+[31m+ Received:[39m 
+"import { cacheTag } from 'next/cache'
+import { updateTag } from 'next/cache'
+import { getAllProducts } from '../lib/db'
+
+async function ProductList() {
+  'use cache'
+  cacheTag('products')
+
+  const products = await getAllProducts()
+
+  return (
+    <ul>
+      {products.map((product) => (
+        <li key={product.id}>
+          {product.name} - ${product.price}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Products</h1>
+      <ProductList />
+      <form
+        action={async () => {
+          'use server'
+          updateTag('products')
+        }}
+      >
+        <button type=\"submit\">Refresh Products</button>
+      </form>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:66:23
+     64| 
+     65|   // Should invalidate cache using revalidateTag
+     66|   expect(pageContent).toMatch(/revalidateTag|revalidate.*tag/i);
+       |                       ^
+     67| 
+     68|   // Should invalidate the "products" tag
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

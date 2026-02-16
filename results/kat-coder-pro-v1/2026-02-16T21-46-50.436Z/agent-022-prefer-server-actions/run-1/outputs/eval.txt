@@ -1,0 +1,556 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 4 failed) 10ms
+   × renders contact form with Contact Us heading 6ms
+     → expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+   × uses server action instead of client-side submission 1ms
+     → expected '\'use client\';\n\nimport { useState …' not to match /['"]use client['"];?/
+   ✓ processes form data using FormData API 0ms
+   × has proper form structure with action attribute 1ms
+     → expected '\'use client\';\n\nimport { useState …' to match /<form[^>]*action\s*=\s*{[^}]+}/
+   ✓ includes form validation 0ms
+   × does not use API routes pattern 1ms
+     → expected '\'use client\';\n\nimport { useState …' not to match /\/api\/\w+|JSON\.stringify|respon…/api\
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 2 passed (6)
+   Start at  21:52:30
+   Duration  214ms (transform 30ms, setup 0ms, collect 25ms, tests 10ms, environment 0ms, prepare 61ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > renders contact form with Contact Us heading
+AssertionError: expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+
+[32m- Expected:[39m 
+/Contact\s+Us/
+
+[31m+ Received:[39m 
+"import ContactForm from './ContactForm';
+
+// Example of existing server action
+async function updateProfile(formData: FormData) {
+  'use server';
+
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+
+  // Simulate database update
+  console.log('Updating profile:', { name, email });
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      
+      <form action={updateProfile}>
+        <input name=\"name\" placeholder=\"Name\" required />
+        <input name=\"email\" type=\"email\" placeholder=\"Email\" required />
+        <button type=\"submit\">Update Profile</button>
+      </form>
+      
+      <ContactForm />
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:17:19
+     15| test('renders contact form with Contact Us heading', () => {
+     16|   const content = readFileSync(join(process.cwd(), 'app', 'page.tsx'),…
+     17|   expect(content).toMatch(/Contact\s+Us/);
+       |                   ^
+     18| });
+     19| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  EVAL.ts > uses server action instead of client-side submission
+AssertionError: expected '\'use client\';\n\nimport { useState …' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { useState } from 'react';
+
+interface ContactFormData {
+  name: string;
+  email: string;
+  message: string;
+}
+
+interface ContactFormProps {
+  onSubmit?: (data: ContactFormData) => void;
+}
+
+export function ContactForm({ onSubmit }: ContactFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    
+    const name = (formData.get('name') as string)?.trim();
+    const email = (formData.get('email') as string)?.trim();
+    const message = (formData.get('message') as string)?.trim();
+
+    // JavaScript validation
+    const errors: string[] = [];
+    
+    if (!name) {
+      errors.push('Name is required');
+    }
+    
+    if (!email) {
+      errors.push('Email is required');
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!message) {
+      errors.push('Message is required');
+    } else if (message.length < 10) {
+      errors.push('Message must be at least 10 characters long');
+    }
+
+    if (errors.length > 0) {
+      setMessage(errors.join('. '));
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage('');
+
+    try {
+      // Simulate server action
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (response.ok) {
+        setMessage('Thank you! Your message has been sent successfully.');
+        event.currentTarget.reset();
+      } else {
+        setMessage('Sorry, there was an error sending your message. Please try again.');
+      }
+    } catch (error) {
+      setMessage('Sorry, there was an error sending your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className=\"max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md\">
+      <h2 className=\"text-2xl font-bold mb-6 text-gray-800\">Contact Us</h2>
+      
+      {message && (
+        <div className={`mb-4 p-3 rounded ${message.includes('Thank you') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className=\"space-y-4\">
+        <div>
+          <label htmlFor=\"name\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Name
+          </label>
+          <input
+            type=\"text\"
+            id=\"name\"
+            name=\"name\"
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent\"
+            placeholder=\"Your name\"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor=\"email\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Email
+          </label>
+          <input
+            type=\"email\"
+            id=\"email\"
+            name=\"email\"
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent\"
+            placeholder=\"your.email@example.com\"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor=\"message\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Message
+          </label>
+          <textarea
+            id=\"message\"
+            name=\"message\"
+            rows={5}
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical\"
+            placeholder=\"Your message (minimum 10 characters)\"
+            required
+          ></textarea>
+        </div>
+
+        <button
+          type=\"submit\"
+          disabled={isSubmitting}
+          className=\"w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
+        >
+          {isSubmitting ? 'Sending...' : 'Send Message'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function ContactFormPage() {
+  return <ContactForm />;
+}"
+
+ ❯ EVAL.ts:23:23
+     21|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     22| 
+     23|   expect(content).not.toMatch(/['"]use client['"];?/);
+       |                       ^
+     24|   expect(content).not.toMatch(/onSubmit|fetch\s*\(|useState|preventDef…
+     25|   expect(content).toMatch(/['"]use server['"];?/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  EVAL.ts > has proper form structure with action attribute
+AssertionError: expected '\'use client\';\n\nimport { useState …' to match /<form[^>]*action\s*=\s*{[^}]+}/
+
+[32m- Expected:[39m 
+/<form[^>]*action\s*=\s*{[^}]+}/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { useState } from 'react';
+
+interface ContactFormData {
+  name: string;
+  email: string;
+  message: string;
+}
+
+interface ContactFormProps {
+  onSubmit?: (data: ContactFormData) => void;
+}
+
+export function ContactForm({ onSubmit }: ContactFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    
+    const name = (formData.get('name') as string)?.trim();
+    const email = (formData.get('email') as string)?.trim();
+    const message = (formData.get('message') as string)?.trim();
+
+    // JavaScript validation
+    const errors: string[] = [];
+    
+    if (!name) {
+      errors.push('Name is required');
+    }
+    
+    if (!email) {
+      errors.push('Email is required');
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!message) {
+      errors.push('Message is required');
+    } else if (message.length < 10) {
+      errors.push('Message must be at least 10 characters long');
+    }
+
+    if (errors.length > 0) {
+      setMessage(errors.join('. '));
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage('');
+
+    try {
+      // Simulate server action
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (response.ok) {
+        setMessage('Thank you! Your message has been sent successfully.');
+        event.currentTarget.reset();
+      } else {
+        setMessage('Sorry, there was an error sending your message. Please try again.');
+      }
+    } catch (error) {
+      setMessage('Sorry, there was an error sending your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className=\"max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md\">
+      <h2 className=\"text-2xl font-bold mb-6 text-gray-800\">Contact Us</h2>
+      
+      {message && (
+        <div className={`mb-4 p-3 rounded ${message.includes('Thank you') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className=\"space-y-4\">
+        <div>
+          <label htmlFor=\"name\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Name
+          </label>
+          <input
+            type=\"text\"
+            id=\"name\"
+            name=\"name\"
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent\"
+            placeholder=\"Your name\"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor=\"email\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Email
+          </label>
+          <input
+            type=\"email\"
+            id=\"email\"
+            name=\"email\"
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent\"
+            placeholder=\"your.email@example.com\"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor=\"message\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Message
+          </label>
+          <textarea
+            id=\"message\"
+            name=\"message\"
+            rows={5}
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical\"
+            placeholder=\"Your message (minimum 10 characters)\"
+            required
+          ></textarea>
+        </div>
+
+        <button
+          type=\"submit\"
+          disabled={isSubmitting}
+          className=\"w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
+        >
+          {isSubmitting ? 'Sending...' : 'Send Message'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function ContactFormPage() {
+  return <ContactForm />;
+}"
+
+ ❯ EVAL.ts:40:19
+     38|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     39| 
+     40|   expect(content).toMatch(/<form[^>]*action\s*=\s*{[^}]+}/);
+       |                   ^
+     41|   expect(content).toMatch(/name\s*=\s*['"]name['"]/);
+     42|   expect(content).toMatch(/name\s*=\s*['"]email['"]/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  EVAL.ts > does not use API routes pattern
+AssertionError: expected '\'use client\';\n\nimport { useState …' not to match /\/api\/\w+|JSON\.stringify|respon…/api\
+
+[32m- Expected:[39m 
+/\/api\/\w+|JSON\.stringify|response\.json\(\)/
+
+[31m+ Received:[39m 
+"'use client';
+
+import { useState } from 'react';
+
+interface ContactFormData {
+  name: string;
+  email: string;
+  message: string;
+}
+
+interface ContactFormProps {
+  onSubmit?: (data: ContactFormData) => void;
+}
+
+export function ContactForm({ onSubmit }: ContactFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    
+    const name = (formData.get('name') as string)?.trim();
+    const email = (formData.get('email') as string)?.trim();
+    const message = (formData.get('message') as string)?.trim();
+
+    // JavaScript validation
+    const errors: string[] = [];
+    
+    if (!name) {
+      errors.push('Name is required');
+    }
+    
+    if (!email) {
+      errors.push('Email is required');
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      errors.push('Please enter a valid email address');
+    }
+    
+    if (!message) {
+      errors.push('Message is required');
+    } else if (message.length < 10) {
+      errors.push('Message must be at least 10 characters long');
+    }
+
+    if (errors.length > 0) {
+      setMessage(errors.join('. '));
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage('');
+
+    try {
+      // Simulate server action
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (response.ok) {
+        setMessage('Thank you! Your message has been sent successfully.');
+        event.currentTarget.reset();
+      } else {
+        setMessage('Sorry, there was an error sending your message. Please try again.');
+      }
+    } catch (error) {
+      setMessage('Sorry, there was an error sending your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className=\"max-w-md mx-auto mt-8 p-6 bg-white rounded-lg shadow-md\">
+      <h2 className=\"text-2xl font-bold mb-6 text-gray-800\">Contact Us</h2>
+      
+      {message && (
+        <div className={`mb-4 p-3 rounded ${message.includes('Thank you') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className=\"space-y-4\">
+        <div>
+          <label htmlFor=\"name\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Name
+          </label>
+          <input
+            type=\"text\"
+            id=\"name\"
+            name=\"name\"
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent\"
+            placeholder=\"Your name\"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor=\"email\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Email
+          </label>
+          <input
+            type=\"email\"
+            id=\"email\"
+            name=\"email\"
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent\"
+            placeholder=\"your.email@example.com\"
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor=\"message\" className=\"block text-sm font-medium text-gray-700 mb-1\">
+            Message
+          </label>
+          <textarea
+            id=\"message\"
+            name=\"message\"
+            rows={5}
+            className=\"w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical\"
+            placeholder=\"Your message (minimum 10 characters)\"
+            required
+          ></textarea>
+        </div>
+
+        <button
+          type=\"submit\"
+          disabled={isSubmitting}
+          className=\"w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
+        >
+          {isSubmitting ? 'Sending...' : 'Send Message'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default function ContactFormPage() {
+  return <ContactForm />;
+}"
+
+ ❯ EVAL.ts:56:23
+     54|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     55| 
+     56|   expect(content).not.toMatch(/\/api\/\w+|JSON\.stringify|response\.js…
+       |                       ^
+     57| });
+     58| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

@@ -1,0 +1,115 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page has child component with use cache directive 1ms
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   ✓ Component uses cache tag for products 0ms
+   × Page has server action for cache invalidation 5ms
+     → expected 'import { cacheTag, updateTag } from "…' to match /revalidateTag|revalidate.*tag/i
+   ✓ Page has form that calls server action 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  21:51:06
+   Duration  197ms (transform 26ms, setup 0ms, collect 22ms, tests 8ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has server action for cache invalidation
+AssertionError: expected 'import { cacheTag, updateTag } from "…' to match /revalidateTag|revalidate.*tag/i
+
+[32m- Expected:[39m 
+/revalidateTag|revalidate.*tag/i
+
+[31m+ Received:[39m 
+"import { cacheTag, updateTag } from \"next/cache\";
+import { getAllProducts } from \"@/lib/db\";
+
+async function ProductListing() {
+  \"use cache\";
+  cacheTag(\"products\");
+
+  const products = await getAllProducts();
+
+  return (
+    <ul style={{ listStyle: \"none\", padding: 0, display: \"flex\", flexDirection: \"column\", gap: \"0.5rem\" }}>
+      {products.map((product) => (
+        <li
+          key={product.id}
+          style={{
+            display: \"flex\",
+            justifyContent: \"space-between\",
+            padding: \"0.75rem 1rem\",
+            border: \"1px solid #e5e7eb\",
+            borderRadius: \"0.5rem\",
+          }}
+        >
+          <span style={{ fontWeight: 500 }}>{product.name}</span>
+          <span style={{ color: \"#6b7280\" }}>${product.price}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default function Page() {
+  async function invalidateProductsCache() {
+    \"use server\";
+    updateTag(\"products\");
+  }
+
+  return (
+    <div style={{ maxWidth: \"42rem\", margin: \"0 auto\", padding: \"2rem\" }}>
+      <h1 style={{ fontSize: \"1.5rem\", fontWeight: 700, marginBottom: \"2rem\" }}>
+        Product Listing
+      </h1>
+
+      <section style={{ marginBottom: \"2rem\" }}>
+        <h2 style={{ fontSize: \"1.125rem\", fontWeight: 600, marginBottom: \"1rem\" }}>
+          Products
+        </h2>
+        <ProductListing />
+      </section>
+
+      <section>
+        <h2 style={{ fontSize: \"1.125rem\", fontWeight: 600, marginBottom: \"1rem\" }}>
+          Refresh Cache
+        </h2>
+        <p style={{ fontSize: \"0.875rem\", color: \"#6b7280\", marginBottom: \"1rem\" }}>
+          Submit this form to invalidate the products cache. The next render
+          will fetch fresh data from the database.
+        </p>
+        <form action={invalidateProductsCache}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: \"0.5rem 1rem\",
+              backgroundColor: \"#2563eb\",
+              color: \"white\",
+              border: \"none\",
+              borderRadius: \"0.375rem\",
+              cursor: \"pointer\",
+              fontWeight: 500,
+            }}
+          >
+            Invalidate Products Cache
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:66:23
+     64| 
+     65|   // Should invalidate cache using revalidateTag
+     66|   expect(pageContent).toMatch(/revalidateTag|revalidate.*tag/i);
+       |                       ^
+     67| 
+     68|   // Should invalidate the "products" tag
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

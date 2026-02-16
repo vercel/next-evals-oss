@@ -1,0 +1,141 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 2 failed) 11ms
+   × renders contact form with Contact Us heading 7ms
+     → expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+   ✓ uses server action instead of client-side submission 1ms
+   ✓ processes form data using FormData API 0ms
+   ✓ has proper form structure with action attribute 1ms
+   × includes form validation 1ms
+     → expected 'export default function ContactForm()…' to match /!name\s*\|\|\s*!email\s*\|\|\s*!messa…/
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  21:54:34
+   Duration  257ms (transform 38ms, setup 0ms, collect 28ms, tests 11ms, environment 0ms, prepare 78ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > renders contact form with Contact Us heading
+AssertionError: expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+
+[32m- Expected:[39m 
+/Contact\s+Us/
+
+[31m+ Received:[39m 
+"import ContactForm from './ContactForm';
+
+// Example of existing server action
+async function updateProfile(formData: FormData) {
+  'use server';
+
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+
+  // Simulate database update
+  console.log('Updating profile:', { name, email });
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      
+      <form action={updateProfile}>
+        <input name=\"name\" placeholder=\"Name\" required />
+        <input name=\"email\" type=\"email\" placeholder=\"Email\" required />
+        <button type=\"submit\">Update Profile</button>
+      </form>
+      
+      <ContactForm />
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:17:19
+     15| test('renders contact form with Contact Us heading', () => {
+     16|   const content = readFileSync(join(process.cwd(), 'app', 'page.tsx'),…
+     17|   expect(content).toMatch(/Contact\s+Us/);
+       |                   ^
+     18| });
+     19| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > includes form validation
+AssertionError: expected 'export default function ContactForm()…' to match /!name\s*\|\|\s*!email\s*\|\|\s*!messa…/
+
+[32m- Expected:[39m 
+/!name\s*\|\|\s*!email\s*\|\|\s*!message|if\s*\([^)]*(!name|!email|!message)/
+
+[31m+ Received:[39m 
+"export default function ContactForm() {
+  async function submitContactMessage(formData: FormData) {
+    'use server';
+
+    const name = formData.get('name');
+    const email = formData.get('email');
+    const message = formData.get('message');
+
+    const hasMissingFields =
+      typeof name !== 'string' ||
+      name.trim() === '' ||
+      typeof email !== 'string' ||
+      email.trim() === '' ||
+      typeof message !== 'string' ||
+      message.trim() === '';
+
+    if (hasMissingFields) {
+      throw new Error('Name, email, and message are required.');
+    }
+
+    const contactMessage = {
+      name: name.trim(),
+      email: email.trim(),
+      message: message.trim(),
+    };
+
+    // Replace with real persistence layer (database, API, etc.).
+    console.log('Saving contact message:', contactMessage);
+  }
+
+  return (
+    <section>
+      <h2>Contact Us</h2>
+      <form action={submitContactMessage}>
+        <div>
+          <label htmlFor=\"contact-name\">Name</label>
+          <input id=\"contact-name\" name=\"name\" type=\"text\" required />
+        </div>
+
+        <div>
+          <label htmlFor=\"contact-email\">Email</label>
+          <input id=\"contact-email\" name=\"email\" type=\"email\" required />
+        </div>
+
+        <div>
+          <label htmlFor=\"contact-message\">Message</label>
+          <textarea id=\"contact-message\" name=\"message\" rows={5} required />
+        </div>
+
+        <button type=\"submit\">Send Message</button>
+      </form>
+    </section>
+  );
+}
+"
+
+ ❯ EVAL.ts:50:19
+     48|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     49| 
+     50|   expect(content).toMatch(/!name\s*\|\|\s*!email\s*\|\|\s*!message|if\…
+       |                   ^
+     51| });
+     52| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -1,0 +1,172 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 2 failed) 11ms
+   × renders contact form with Contact Us heading 7ms
+     → expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+   × uses server action instead of client-side submission 1ms
+     → expected '"use client";\n\nimport { useActionSt…' not to match /['"]use client['"];?/
+   ✓ processes form data using FormData API 1ms
+   ✓ has proper form structure with action attribute 1ms
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  21:50:39
+   Duration  291ms (transform 39ms, setup 0ms, collect 31ms, tests 11ms, environment 0ms, prepare 83ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > renders contact form with Contact Us heading
+AssertionError: expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+
+[32m- Expected:[39m 
+/Contact\s+Us/
+
+[31m+ Received:[39m 
+"import ContactForm from './ContactForm';
+
+// Example of existing server action
+async function updateProfile(formData: FormData) {
+  'use server';
+
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+
+  // Simulate database update
+  console.log('Updating profile:', { name, email });
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      
+      <form action={updateProfile}>
+        <input name=\"name\" placeholder=\"Name\" required />
+        <input name=\"email\" type=\"email\" placeholder=\"Email\" required />
+        <button type=\"submit\">Update Profile</button>
+      </form>
+      
+      <ContactForm />
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:17:19
+     15| test('renders contact form with Contact Us heading', () => {
+     16|   const content = readFileSync(join(process.cwd(), 'app', 'page.tsx'),…
+     17|   expect(content).toMatch(/Contact\s+Us/);
+       |                   ^
+     18| });
+     19| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > uses server action instead of client-side submission
+AssertionError: expected '"use client";\n\nimport { useActionSt…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"\"use client\";
+
+import { useActionState } from \"react\";
+
+type FormState = {
+  errors?: {
+    name?: string[];
+    email?: string[];
+    message?: string[];
+  };
+  success?: boolean;
+};
+
+async function submitContactForm(prevState: FormState, formData: FormData): Promise<FormState> {
+  const name = formData.get(\"name\") as string;
+  const email = formData.get(\"email\") as string;
+  const message = formData.get(\"message\") as string;
+
+  const errors: FormState[\"errors\"] = {};
+
+  if (!name || name.trim() === \"\") {
+    errors.name = [\"Name is required\"];
+  }
+
+  if (!email || email.trim() === \"\") {
+    errors.email = [\"Email is required\"];
+  }
+
+  if (!message || message.trim() === \"\") {
+    errors.message = [\"Message is required\"];
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { errors };
+  }
+
+  // Simulate saving contact message
+  console.log(\"Contact form submitted:\", { name, email, message });
+
+  return { success: true };
+}
+
+const initialState: FormState = {
+  errors: {},
+  success: false,
+};
+
+export default function ContactForm() {
+  const [state, formAction, isPending] = useActionState(submitContactForm, initialState);
+
+  if (state.success) {
+    return (
+      <div>
+        <h2>Contact Us</h2>
+        <p>Thank you for your message! We'll get back to you soon.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>Contact Us</h2>
+      <form action={formAction}>
+        <div>
+          <label htmlFor=\"name\">Name:</label>
+          <input type=\"text\" id=\"name\" name=\"name\" />
+          {state.errors?.name && <p>{state.errors.name[0]}</p>}
+        </div>
+        <div>
+          <label htmlFor=\"email\">Email:</label>
+          <input type=\"email\" id=\"email\" name=\"email\" />
+          {state.errors?.email && <p>{state.errors.email[0]}</p>}
+        </div>
+        <div>
+          <label htmlFor=\"message\">Message:</label>
+          <textarea id=\"message\" name=\"message\" />
+          {state.errors?.message && <p>{state.errors.message[0]}</p>}
+        </div>
+        <button type=\"submit\" disabled={isPending}>
+          {isPending ? \"Submitting...\" : \"Submit\"}
+        </button>
+      </form>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:23:23
+     21|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     22| 
+     23|   expect(content).not.toMatch(/['"]use client['"];?/);
+       |                       ^
+     24|   expect(content).not.toMatch(/onSubmit|fetch\s*\(|useState|preventDef…
+     25|   expect(content).toMatch(/['"]use server['"];?/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

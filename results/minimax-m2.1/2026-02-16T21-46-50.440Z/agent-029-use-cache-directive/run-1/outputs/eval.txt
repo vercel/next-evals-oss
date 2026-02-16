@@ -1,0 +1,99 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page has child component with use cache directive 1ms
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   × Component uses cache tag for products 5ms
+     → expected 'import { revalidateTag } from \'next/…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+   ✓ Page has server action for cache invalidation 0ms
+   ✓ Page has form that calls server action 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  21:50:33
+   Duration  211ms (transform 28ms, setup 0ms, collect 22ms, tests 8ms, environment 0ms, prepare 62ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Component uses cache tag for products
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /cacheTag\(['"]products['"]\)|cacheTag…/
+
+[32m- Expected:[39m 
+/cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache';
+import { getAllProducts, Product } from '@/lib/db';
+
+async function getCachedProducts(): Promise<Product[]> {
+  'use cache';
+  return getAllProducts();
+}
+
+async function invalidateProductsCache(): Promise<void> {
+  'use server';
+  revalidateTag('products');
+}
+
+export default function Page() {
+  return (
+    <div className=\"p-8\">
+      <h1 className=\"text-2xl font-bold mb-6\">Product Listing</h1>
+      <ProductList />
+      <CacheInvalidationForm />
+    </div>
+  );
+}
+
+async function ProductList() {
+  const products = await getCachedProducts();
+  
+  return (
+    <ul className=\"space-y-2 mb-8\">
+      {products.map((product) => (
+        <li key={product.id} className=\"p-4 border rounded\">
+          {product.name} - ${product.price}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CacheInvalidationForm() {
+  const invalidateCache = async (): Promise<void> => {
+    'use server';
+    revalidateTag('products');
+  };
+
+  return (
+    <form
+      action={async () => {
+        'use server';
+        await revalidateTag('products');
+      }}
+      className=\"p-4 border rounded\"
+    >
+      <h2 className=\"text-lg font-semibold mb-4\">Cache Management</h2>
+      <button
+        type=\"submit\"
+        className=\"px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600\"
+      >
+        Refresh Products Cache
+      </button>
+    </form>
+  );
+}
+"
+
+ ❯ EVAL.ts:48:23
+     46| 
+     47|   // Should use cacheTag() function with "products" tag
+     48|   expect(pageContent).toMatch(
+       |                       ^
+     49|     /cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
+     50|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,189 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 3 failed) 10ms
+   × renders contact form with Contact Us heading 6ms
+     → expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+   × uses server action instead of client-side submission 1ms
+     → expected 'import ContactFormFields from \'./Con…' to match /async\s+function\s+\w+.*FormData/
+   ✓ processes form data using FormData API 0ms
+   × has proper form structure with action attribute 1ms
+     → expected 'import ContactFormFields from \'./Con…' to match /<form[^>]*action\s*=\s*{[^}]+}/
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  21:52:53
+   Duration  221ms (transform 42ms, setup 0ms, collect 28ms, tests 10ms, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > renders contact form with Contact Us heading
+AssertionError: expected 'import ContactForm from \'./ContactFo…' to match /Contact\s+Us/
+
+[32m- Expected:[39m 
+/Contact\s+Us/
+
+[31m+ Received:[39m 
+"import ContactForm from './ContactForm';
+
+// Example of existing server action
+async function updateProfile(formData: FormData) {
+  'use server';
+
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+
+  // Simulate database update
+  console.log('Updating profile:', { name, email });
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      
+      <form action={updateProfile}>
+        <input name=\"name\" placeholder=\"Name\" required />
+        <input name=\"email\" type=\"email\" placeholder=\"Email\" required />
+        <button type=\"submit\">Update Profile</button>
+      </form>
+      
+      <ContactForm />
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:17:19
+     15| test('renders contact form with Contact Us heading', () => {
+     16|   const content = readFileSync(join(process.cwd(), 'app', 'page.tsx'),…
+     17|   expect(content).toMatch(/Contact\s+Us/);
+       |                   ^
+     18| });
+     19| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > uses server action instead of client-side submission
+AssertionError: expected 'import ContactFormFields from \'./Con…' to match /async\s+function\s+\w+.*FormData/
+
+[32m- Expected:[39m 
+/async\s+function\s+\w+.*FormData/
+
+[31m+ Received:[39m 
+"import ContactFormFields from './ContactFormFields';
+
+type ContactFormState = {
+  success?: boolean;
+  error?: string;
+};
+
+const initialState: ContactFormState = {};
+
+export default function ContactForm() {
+  async function submitContact(
+    _prevState: ContactFormState,
+    formData: FormData
+  ): Promise<ContactFormState> {
+    'use server';
+
+    const name = formData.get('name')?.toString().trim();
+    const email = formData.get('email')?.toString().trim();
+    const message = formData.get('message')?.toString().trim();
+
+    if (!name) {
+      return { success: false, error: 'Name is required' };
+    }
+    if (!email) {
+      return { success: false, error: 'Email is required' };
+    }
+    if (!message) {
+      return { success: false, error: 'Message is required' };
+    }
+
+    // TODO: Save contact message (e.g., to database)
+    return { success: true };
+  }
+
+  return (
+    <ContactFormFields
+      action={submitContact}
+      initialState={initialState}
+    />
+  );
+}
+"
+
+ ❯ EVAL.ts:26:19
+     24|   expect(content).not.toMatch(/onSubmit|fetch\s*\(|useState|preventDef…
+     25|   expect(content).toMatch(/['"]use server['"];?/);
+     26|   expect(content).toMatch(/async\s+function\s+\w+.*FormData/);
+       |                   ^
+     27| });
+     28| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > has proper form structure with action attribute
+AssertionError: expected 'import ContactFormFields from \'./Con…' to match /<form[^>]*action\s*=\s*{[^}]+}/
+
+[32m- Expected:[39m 
+/<form[^>]*action\s*=\s*{[^}]+}/
+
+[31m+ Received:[39m 
+"import ContactFormFields from './ContactFormFields';
+
+type ContactFormState = {
+  success?: boolean;
+  error?: string;
+};
+
+const initialState: ContactFormState = {};
+
+export default function ContactForm() {
+  async function submitContact(
+    _prevState: ContactFormState,
+    formData: FormData
+  ): Promise<ContactFormState> {
+    'use server';
+
+    const name = formData.get('name')?.toString().trim();
+    const email = formData.get('email')?.toString().trim();
+    const message = formData.get('message')?.toString().trim();
+
+    if (!name) {
+      return { success: false, error: 'Name is required' };
+    }
+    if (!email) {
+      return { success: false, error: 'Email is required' };
+    }
+    if (!message) {
+      return { success: false, error: 'Message is required' };
+    }
+
+    // TODO: Save contact message (e.g., to database)
+    return { success: true };
+  }
+
+  return (
+    <ContactFormFields
+      action={submitContact}
+      initialState={initialState}
+    />
+  );
+}
+"
+
+ ❯ EVAL.ts:40:19
+     38|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     39| 
+     40|   expect(content).toMatch(/<form[^>]*action\s*=\s*{[^}]+}/);
+       |                   ^
+     41|   expect(content).toMatch(/name\s*=\s*['"]name['"]/);
+     42|   expect(content).toMatch(/name\s*=\s*['"]email['"]/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
