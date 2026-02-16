@@ -31,6 +31,13 @@ interface AgentResult {
   };
 }
 
+interface DocsImpact {
+  baseSuccessRate: number;
+  docsSuccessRate: number;
+  delta: number;
+  newlyPassed: string[];
+}
+
 interface ExportedData {
   metadata: {
     exportedAt: string;
@@ -39,6 +46,7 @@ interface ExportedData {
       timestamp: string;
       modelName: string;
       agentHarness: string;
+      docsImpact?: DocsImpact;
     }>;
   };
   results: Record<string, AgentResult[]>;
@@ -88,6 +96,10 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
   'v0-1.5-md': 'v0 1.5 MD',
   'cursor-composer-1.5': 'Cursor Composer 1.5',
+  'cursor-composer-1.5--agents-md': 'Cursor Composer 1.5 + AGENTS.md',
+  'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
+  'gpt-5.3-codex-xhigh--agents-md': 'GPT 5.3 Codex (xhigh) + AGENTS.md',
+  'gemini-3-pro-preview--agents-md': 'Gemini 3.0 Pro Preview + AGENTS.md',
   'gemini-3-pro-preview-gemini-cli': 'Gemini 3.0 Pro Preview',
 };
 
@@ -241,6 +253,62 @@ async function main(): Promise<void> {
     exportedData.results[experiment] = agentResults.sort((a, b) =>
       a.evalPath.localeCompare(b.evalPath)
     );
+  }
+
+  // Merge --agents-md variants into base experiments
+  // variant → base (must use the same agent harness)
+  const AGENTS_MD_PAIRS: Record<string, string> = {
+    'claude-opus-4.6--agents-md': 'claude-opus-4.6',
+    'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
+    'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
+    'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
+    'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
+  };
+
+  for (const [variantName, baseName] of Object.entries(AGENTS_MD_PAIRS)) {
+    const baseExp = exportedData.metadata.experiments.find((e) => e.name === baseName);
+    const variantExp = exportedData.metadata.experiments.find((e) => e.name === variantName);
+    const baseResults = exportedData.results[baseName];
+    const variantResults = exportedData.results[variantName];
+
+    if (!baseExp || !variantExp || !baseResults || !variantResults) continue;
+
+    // Compute success rates
+    const baseSuccessRate =
+      (baseResults.filter((r) => r.result.success).length / baseResults.length) * 100;
+    const docsSuccessRate =
+      (variantResults.filter((r) => r.result.success).length / variantResults.length) * 100;
+
+    // Find evals that flipped fail→pass
+    const baseFailSet = new Set(
+      baseResults.filter((r) => !r.result.success).map((r) => r.evalPath),
+    );
+    const newlyPassed = variantResults
+      .filter((r) => r.result.success && baseFailSet.has(r.evalPath))
+      .map((r) => r.evalPath);
+
+    // Attach docsImpact to the base experiment
+    baseExp.docsImpact = {
+      baseSuccessRate: Math.round(baseSuccessRate),
+      docsSuccessRate: Math.round(docsSuccessRate),
+      delta: Math.round(docsSuccessRate - baseSuccessRate),
+      newlyPassed,
+    };
+
+    // Use the variant's timestamp if it's newer
+    baseExp.timestamp = variantExp.timestamp;
+
+    // Replace base results with the --agents-md results (better scores)
+    exportedData.results[baseName] = variantResults.map((r) => ({
+      ...r,
+      // Keep the evalPath as-is
+    }));
+
+    // Remove the variant from metadata and results
+    exportedData.metadata.experiments = exportedData.metadata.experiments.filter(
+      (e) => e.name !== variantName,
+    );
+    delete exportedData.results[variantName];
   }
 
   // Count stats

@@ -1,0 +1,198 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.tsx (6 tests | 1 failed) 87ms
+   ✓ renders contact form component 78ms
+   × uses server action instead of client-side submission 6ms
+     → expected '\'use client\'\n\nimport { useActionS…' not to match /['"]use client['"];?/
+   ✓ processes form data using FormData API 1ms
+   ✓ has proper form structure with action attribute 1ms
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  21:01:20
+   Duration  990ms (transform 61ms, setup 0ms, collect 162ms, tests 87ms, environment 512ms, prepare 82ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.tsx > uses server action instead of client-side submission
+AssertionError: expected '\'use client\'\n\nimport { useActionS…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useActionState } from 'react'
+
+type FormState = {
+  message?: string
+  success?: boolean
+  errors?: {
+    name?: string
+    email?: string
+    message?: string
+  }
+}
+
+const initialState: FormState = {
+  message: '',
+}
+
+export default function ContactForm() {
+  async function submitContact(prevState: FormState, formData: FormData): Promise<FormState> {
+    'use server'
+
+    const name = formData.get('name')
+    const email = formData.get('email')
+    const message = formData.get('message')
+
+    // JavaScript validation to check all fields are provided
+    const errors: FormState['errors'] = {}
+
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      errors.name = 'Name is required'
+    }
+
+    if (!email || typeof email !== 'string' || email.trim() === '') {
+      errors.email = 'Email is required'
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+
+    if (!message || typeof message !== 'string' || message.trim() === '') {
+      errors.message = 'Message is required'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return {
+        success: false,
+        errors,
+      }
+    }
+
+    // Simulate saving the contact message
+    console.log('Contact message submitted:', {
+      name: name.toString().trim(),
+      email: email.toString().trim(),
+      message: message.toString().trim(),
+    })
+
+    return {
+      success: true,
+      message: 'Thank you for your message! We will get back to you soon.',
+    }
+  }
+
+  const [state, formAction, pending] = useActionState(submitContact, initialState)
+
+  return (
+    <div>
+      <h2>Contact Us</h2>
+      <form action={formAction} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '500px' }}>
+        <div>
+          <label htmlFor=\"name\" style={{ display: 'block', marginBottom: '0.25rem' }}>
+            Name:
+          </label>
+          <input
+            type=\"text\"
+            id=\"name\"
+            name=\"name\"
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+            }}
+          />
+          {state?.errors?.name && (
+            <p style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+              {state.errors.name}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor=\"email\" style={{ display: 'block', marginBottom: '0.25rem' }}>
+            Email:
+          </label>
+          <input
+            type=\"email\"
+            id=\"email\"
+            name=\"email\"
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+            }}
+          />
+          {state?.errors?.email && (
+            <p style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+              {state.errors.email}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor=\"message\" style={{ display: 'block', marginBottom: '0.25rem' }}>
+            Message:
+          </label>
+          <textarea
+            id=\"message\"
+            name=\"message\"
+            rows={5}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+            }}
+          />
+          {state?.errors?.message && (
+            <p style={{ color: 'red', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+              {state.errors.message}
+            </p>
+          )}
+        </div>
+
+        <button
+          type=\"submit\"
+          disabled={pending}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: pending ? '#ccc' : '#0070f3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: pending ? 'not-allowed' : 'pointer',
+            fontSize: '1rem',
+          }}
+        >
+          {pending ? 'Submitting...' : 'Submit'}
+        </button>
+
+        {state?.success && (
+          <p style={{ color: 'green', marginTop: '1rem' }} aria-live=\"polite\">
+            {state.message}
+          </p>
+        )}
+      </form>
+    </div>
+  )
+}"
+
+ ❯ EVAL.tsx:26:23
+     24|   const content = readFileSync(join(process.cwd(), 'app', 'ContactForm…
+     25|   
+     26|   expect(content).not.toMatch(/['"]use client['"];?/);
+       |                       ^
+     27|   expect(content).not.toMatch(/onSubmit|fetch\s*\(|useState|preventDef…
+     28|   expect(content).toMatch(/['"]use server['"];?/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

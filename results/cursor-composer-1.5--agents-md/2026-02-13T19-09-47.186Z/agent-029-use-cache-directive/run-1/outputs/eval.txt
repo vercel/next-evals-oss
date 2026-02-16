@@ -1,0 +1,106 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page has child component with use cache directive 1ms
+   ✓ Component fetches data using getAllProducts from lib/db 0ms
+   ✓ Component uses cache tag for products 0ms
+   × Page has server action for cache invalidation 5ms
+     → expected 'import { cacheTag, updateTag } from "…' to match /revalidateTag|revalidate.*tag/i
+   ✓ Page has form that calls server action 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  19:10:53
+   Duration  206ms (transform 34ms, setup 0ms, collect 23ms, tests 8ms, environment 0ms, prepare 64ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has server action for cache invalidation
+AssertionError: expected 'import { cacheTag, updateTag } from "…' to match /revalidateTag|revalidate.*tag/i
+
+[32m- Expected:[39m 
+/revalidateTag|revalidate.*tag/i
+
+[31m+ Received:[39m 
+"import { cacheTag, updateTag } from \"next/cache\";
+import { getAllProducts } from \"@/lib/db\";
+
+/**
+ * Cached product listing component.
+ * Uses 'use cache' with \"products\" tag for efficient caching.
+ * Data is invalidated on-demand when the invalidation form is submitted.
+ */
+async function ProductListing() {
+  \"use cache\";
+  cacheTag(\"products\");
+
+  const products = await getAllProducts();
+
+  return (
+    <section className=\"space-y-4\">
+      <h2 className=\"text-xl font-semibold\">Product Catalog</h2>
+      <ul className=\"grid gap-4 sm:grid-cols-2 lg:grid-cols-3\">
+        {products.map((product) => (
+          <li
+            key={product.id}
+            className=\"rounded-lg border border-gray-200 bg-white p-4 shadow-sm\"
+          >
+            <h3 className=\"font-medium text-gray-900\">{product.name}</h3>
+            <p className=\"mt-1 text-sm text-gray-600\">{product.description}</p>
+            <p className=\"mt-2 font-semibold text-indigo-600\">
+              ${product.price.toFixed(2)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export default function Page() {
+  // Inline server action: invalidates \"products\" cache when form is submitted.
+  // Uses updateTag for immediate invalidation (read-your-writes semantics).
+  async function invalidateProductsCache() {
+    \"use server\";
+    updateTag(\"products\");
+  }
+
+  return (
+    <div className=\"mx-auto max-w-4xl space-y-8 p-8\">
+      <h1 className=\"text-2xl font-bold\">Product Listing</h1>
+
+      {/* Form with inline server action for cache invalidation */}
+      <form
+        action={invalidateProductsCache}
+        className=\"rounded-lg border border-amber-200 bg-amber-50 p-4\"
+      >
+        <p className=\"mb-3 text-sm text-amber-800\">
+          After adding or updating products in your database, click below to
+          refresh the cached product listing.
+        </p>
+        <button
+          type=\"submit\"
+          className=\"rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700\"
+        >
+          Invalidate Products Cache
+        </button>
+      </form>
+
+      <ProductListing />
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:66:23
+     64| 
+     65|   // Should invalidate cache using revalidateTag
+     66|   expect(pageContent).toMatch(/revalidateTag|revalidate.*tag/i);
+       |                       ^
+     67| 
+     68|   // Should invalidate the "products" tag
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
