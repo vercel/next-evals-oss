@@ -36,6 +36,7 @@ interface DocsImpact {
   docsSuccessRate: number;
   delta: number;
   newlyPassed: string[];
+  newlyFailed: string[];
 }
 
 interface ExportedData {
@@ -279,12 +280,18 @@ async function main(): Promise<void> {
     const docsSuccessRate =
       (variantResults.filter((r) => r.result.success).length / variantResults.length) * 100;
 
-    // Find evals that flipped fail→pass
+    // Find evals that flipped fail→pass and pass→fail
     const baseFailSet = new Set(
       baseResults.filter((r) => !r.result.success).map((r) => r.evalPath),
     );
+    const basePassSet = new Set(
+      baseResults.filter((r) => r.result.success).map((r) => r.evalPath),
+    );
     const newlyPassed = variantResults
       .filter((r) => r.result.success && baseFailSet.has(r.evalPath))
+      .map((r) => r.evalPath);
+    const newlyFailed = variantResults
+      .filter((r) => !r.result.success && basePassSet.has(r.evalPath))
       .map((r) => r.evalPath);
 
     // Attach docsImpact to the base experiment
@@ -293,6 +300,7 @@ async function main(): Promise<void> {
       docsSuccessRate: Math.round(docsSuccessRate),
       delta: Math.round(docsSuccessRate - baseSuccessRate),
       newlyPassed,
+      newlyFailed,
     };
 
     // Use the variant's timestamp if it's newer
