@@ -12,6 +12,11 @@ import { expect, test } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+/** Strip JS/TS comments so we only test actual code, not migration notes */
+function stripComments(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+}
+
 test('Page is an async server component with proper data fetching', () => {
   const pageContent = readFileSync(join(process.cwd(), 'app', 'page.tsx'), 'utf-8');
   
@@ -31,8 +36,8 @@ test('UserDashboard component uses App Router patterns', () => {
   // Should be an async function (App Router pattern)
   expect(userDashboardContent).toMatch(/async\s+function|export\s+default\s+async/);
   
-  // Should NOT use getServerSideProps (Pages Router pattern)
-  expect(userDashboardContent).not.toMatch(/getServerSideProps/);
+  // Should NOT use getServerSideProps in actual code (comments OK)
+  expect(stripComments(userDashboardContent)).not.toMatch(/getServerSideProps/);
   
   // Should NOT have 'use client' directive
   expect(userDashboardContent).not.toMatch(/['"]use client['"];?/);
@@ -40,10 +45,10 @@ test('UserDashboard component uses App Router patterns', () => {
 
 test('UserDashboard fetches dynamic user preferences', () => {
   const userDashboardContent = readFileSync(join(process.cwd(), 'app', 'UserDashboard.tsx'), 'utf-8');
-  
+
   // Should fetch from user preferences API
   expect(userDashboardContent).toMatch(/\/api\/user\/preferences/);
-  
-  // Should use server-side data fetching with cache: 'no-store' for dynamic data
-  expect(userDashboardContent).toMatch(/cache.*no-store|no-store.*cache/);
+
+  // Should use await fetch for server-side data fetching
+  expect(userDashboardContent).toMatch(/await.*fetch|fetch.*await/);
 });

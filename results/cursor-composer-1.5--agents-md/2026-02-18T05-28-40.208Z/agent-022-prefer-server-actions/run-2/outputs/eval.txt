@@ -1,0 +1,134 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 1 failed) 9ms
+   ✓ renders contact form with Contact Us heading 1ms
+   × uses server action instead of client-side submission 5ms
+     → expected 'import { ContactFormFields } from \'.…' to match /async\s+function\s+\w+.*FormData/
+   ✓ processes form data using FormData API 0ms
+   ✓ has proper form structure with action attribute 0ms
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  05:30:01
+   Duration  198ms (transform 30ms, setup 0ms, collect 23ms, tests 9ms, environment 0ms, prepare 59ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > uses server action instead of client-side submission
+AssertionError: expected 'import { ContactFormFields } from \'.…' to match /async\s+function\s+\w+.*FormData/
+
+[32m- Expected:[39m 
+/async\s+function\s+\w+.*FormData/
+
+[31m+ Received:[39m 
+"import { ContactFormFields } from './ContactFormFields'
+
+export default function ContactForm() {
+  async function submitContactForm(
+    _prevState: { success: boolean | null; message: string; errors: string[] },
+    formData: FormData
+  ) {
+    'use server'
+
+    const name = formData.get('name')?.toString().trim() ?? ''
+    const email = formData.get('email')?.toString().trim() ?? ''
+    const message = formData.get('message')?.toString().trim() ?? ''
+
+    const errors: string[] = []
+
+    if (!name) {
+      errors.push('Name is required.')
+    }
+    if (!email) {
+      errors.push('Email is required.')
+    }
+    if (!message) {
+      errors.push('Message is required.')
+    }
+
+    if (errors.length > 0) {
+      return { success: false, message: '', errors }
+    }
+
+    // TODO: Persist contact message (e.g., save to database)
+    return { success: true, message: 'Thank you for your message!', errors: [] }
+  }
+
+  return (
+    <div>
+      <h2>Contact Us</h2>
+      <ContactFormFields formAction={submitContactForm} />
+    </div>
+  )
+}
+
+'use client'
+
+import { useActionState } from 'react'
+
+const initialState = {
+  success: null as boolean | null,
+  message: '' as string,
+  errors: [] as string[],
+}
+
+type FormAction = (
+  prevState: typeof initialState,
+  formData: FormData
+) => Promise<typeof initialState>
+
+export function ContactFormFields({
+  formAction,
+}: {
+  formAction: FormAction
+}) {
+  const [state, action, pending] = useActionState(formAction, initialState)
+
+  return (
+    <form action={action}>
+      <div>
+        <label htmlFor=\"name\">Name</label>
+        <input type=\"text\" id=\"name\" name=\"name\" required />
+      </div>
+      <div>
+        <label htmlFor=\"email\">Email</label>
+        <input type=\"email\" id=\"email\" name=\"email\" required />
+      </div>
+      <div>
+        <label htmlFor=\"message\">Message</label>
+        <textarea id=\"message\" name=\"message\" rows={5} required />
+      </div>
+      {state.errors.length > 0 && (
+        <ul aria-live=\"polite\" style={{ color: 'red' }}>
+          {state.errors.map((err, i) => (
+            <li key={i}>{err}</li>
+          ))}
+        </ul>
+      )}
+      {state.success === true && (
+        <p aria-live=\"polite\" style={{ color: 'green' }}>
+          {state.message}
+        </p>
+      )}
+      <button type=\"submit\" disabled={pending}>
+        {pending ? 'Sending...' : 'Send Message'}
+      </button>
+    </form>
+  )
+}
+"
+
+ ❯ EVAL.ts:72:22
+     70|   expect(allRelated).toMatch(/['"]use server['"];?/);
+     71|   // Must have an async server action function that accepts FormData
+     72|   expect(allRelated).toMatch(/async\s+function\s+\w+.*FormData/);
+       |                      ^
+     73| });
+     74| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

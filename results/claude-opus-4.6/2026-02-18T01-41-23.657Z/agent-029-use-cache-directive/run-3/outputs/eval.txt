@@ -1,0 +1,82 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 8ms
+   ✓ Catalog reads use use-cache directive and products cache tag 1ms
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 5ms
+     → expected 'import { revalidateTag } from "next/c…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  01:43:53
+   Duration  211ms (transform 30ms, setup 0ms, collect 29ms, tests 8ms, environment 0ms, prepare 58ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { revalidateTag } from "next/c…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from \"next/cache\";
+import { unstable_cacheTag as cacheTag } from \"next/cache\";
+import { getAllProducts } from \"@/lib/db\";
+
+async function getCachedProducts() {
+  \"use cache\";
+  cacheTag(\"products\");
+  return getAllProducts();
+}
+
+export default async function CatalogPage() {
+  const products = await getCachedProducts();
+
+  async function syncCatalog() {
+    \"use server\";
+    revalidateTag(\"products\");
+  }
+
+  return (
+    <main>
+      <h1>Product Catalog</h1>
+      <form action={syncCatalog}>
+        <button type=\"submit\">Sync latest catalog</button>
+      </form>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id}>
+              <td>{product.id}</td>
+              <td>{product.name}</td>
+              <td>${product.price}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  );
+}
+"
+
+ ❯ EVAL.ts:102:41
+    100| 
+    101|   // Require the same explicit products tag and a profile/second argum…
+    102|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(\s*…
+       |                                         ^
+    103| 
+    104|   // Avoid read-your-own-writes invalidation API in this scenario.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

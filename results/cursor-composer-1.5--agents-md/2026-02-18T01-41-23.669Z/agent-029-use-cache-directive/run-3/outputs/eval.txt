@@ -1,0 +1,376 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 8ms
+   ✓ Catalog reads use use-cache directive and products cache tag 1ms
+   × Page fetches products via lib/db 5ms
+     → expected 'import { getProducts } from \'@/lib/p…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { getProducts } from \'@/lib/p…' to match /import.*revalidateTag.*from\…/cache['"]
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  01:44:13
+   Duration  241ms (transform 30ms, setup 0ms, collect 29ms, tests 8ms, environment 0ms, prepare 61ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { getProducts } from \'@/lib/p…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { getProducts } from '@/lib/products';
+import { runCatalogSync } from '@/lib/sync-catalog';
+
+export default async function AdminCatalogPage() {
+  const products = await getProducts();
+
+  async function syncCatalog() {
+    'use server';
+    // Fire-and-forget: do not await. Admin gets immediate response.
+    // runCatalogSync updates the store and calls revalidateTag('products', 'max') when done.
+    runCatalogSync();
+  }
+
+  return (
+    <div className=\"min-h-screen bg-zinc-50 p-8\">
+      <header className=\"mb-8 flex items-center justify-between\">
+        <h1 className=\"text-2xl font-semibold text-zinc-900\">
+          Admin Product Catalog
+        </h1>
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            className=\"rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800\"
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </header>
+
+      <p className=\"mb-6 text-sm text-zinc-500\">
+        Catalog data is cached for fast browsing. Use &quot;Sync latest
+        catalog&quot; when upstream ERP/PIM data changes. Sync runs in the
+        background; data will refresh shortly across all catalog views.
+      </p>
+
+      <div className=\"overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm\">
+        <table className=\"min-w-full divide-y divide-zinc-200\">
+          <thead>
+            <tr>
+              <th className=\"px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                SKU
+              </th>
+              <th className=\"px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Name
+              </th>
+              <th className=\"px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Price
+              </th>
+              <th className=\"px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Inventory
+              </th>
+              <th className=\"px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Available
+              </th>
+            </tr>
+          </thead>
+          <tbody className=\"divide-y divide-zinc-200\">
+            {products.map((product) => (
+              <tr key={product.sku} className=\"hover:bg-zinc-50\">
+                <td className=\"whitespace-nowrap px-6 py-4 text-sm font-medium text-zinc-900\">
+                  {product.sku}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-sm text-zinc-700\">
+                  {product.name}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-right text-sm text-zinc-700\">
+                  ${product.price.toFixed(2)}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-right text-sm text-zinc-700\">
+                  {product.inventory}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-center\">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      product.available
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-zinc-100 text-zinc-600'
+                    }`}
+                  >
+                    {product.available ? 'Yes' : 'No'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Admin Catalog',
+  description: 'E-commerce admin product catalog'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+import Link from 'next/link';
+
+export default function Page() {
+  return (
+    <div className=\"p-8\">
+      <h1 className=\"text-2xl font-semibold\">Home</h1>
+      <p className=\"mt-4\">
+        <Link
+          href=\"/admin/catalog\"
+          className=\"text-blue-600 hover:underline\"
+        >
+          Admin Product Catalog →
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+import { cacheTag } from 'next/cache';
+
+export type Product = {
+  sku: string;
+  name: string;
+  price: number;
+  inventory: number;
+  available: boolean;
+};
+
+// Simulates ERP/PIM data store. In production this would be a DB or external API.
+let catalogStore: Product[] = [
+  { sku: 'SKU-001', name: 'Widget A', price: 29.99, inventory: 150, available: true },
+  { sku: 'SKU-002', name: 'Widget B', price: 49.99, inventory: 80, available: true },
+  { sku: 'SKU-003', name: 'Widget C', price: 19.99, inventory: 0, available: false },
+  { sku: 'SKU-004', name: 'Gadget X', price: 99.99, inventory: 25, available: true },
+  { sku: 'SKU-005', name: 'Gadget Y', price: 149.99, inventory: 12, available: true },
+];
+
+export function getCatalogStore(): Product[] {
+  return catalogStore;
+}
+
+export function setCatalogStore(products: Product[]): void {
+  catalogStore = products;
+}
+
+export async function getProducts(): Promise<Product[]> {
+  'use cache';
+  cacheTag('products');
+  const store = getCatalogStore();
+  return [...store];
+}
+
+import { revalidateTag } from 'next/cache';
+import {
+  getCatalogStore,
+  setCatalogStore,
+  type Product,
+} from './products';
+
+/**
+ * Simulates syncing from upstream ERP/PIM. Runs in background.
+ * When complete, updates the catalog store and revalidates the \"products\" cache tag
+ * so subsequent requests get fresh data (stale-while-revalidate).
+ */
+export async function runCatalogSync(): Promise<void> {
+  // Simulate fetching from ERP/PIM (in production: API calls, DB writes)
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  const current = getCatalogStore();
+  const synced: Product[] = current.map((p) => ({
+    ...p,
+    // Simulate upstream data changes (e.g. price/inventory updates)
+    price: Math.round(p.price * (0.98 + Math.random() * 0.06) * 100) / 100,
+    inventory: Math.max(0, p.inventory + Math.floor((Math.random() - 0.3) * 20)),
+    available: p.inventory > 0,
+  }));
+
+  setCatalogStore(synced);
+
+  // Mark \"products\" cache as stale; next visit uses stale-while-revalidate
+  revalidateTag('products', 'max');
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { getProducts } from \'@/lib/p…' to match /import.*revalidateTag.*from\…/cache['"]
+
+[32m- Expected:[39m 
+/import.*revalidateTag.*from\s+['"]next\/cache['"]/
+
+[31m+ Received:[39m 
+"import { getProducts } from '@/lib/products';
+import { runCatalogSync } from '@/lib/sync-catalog';
+
+export default async function AdminCatalogPage() {
+  const products = await getProducts();
+
+  async function syncCatalog() {
+    'use server';
+    // Fire-and-forget: do not await. Admin gets immediate response.
+    // runCatalogSync updates the store and calls revalidateTag('products', 'max') when done.
+    runCatalogSync();
+  }
+
+  return (
+    <div className=\"min-h-screen bg-zinc-50 p-8\">
+      <header className=\"mb-8 flex items-center justify-between\">
+        <h1 className=\"text-2xl font-semibold text-zinc-900\">
+          Admin Product Catalog
+        </h1>
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            className=\"rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800\"
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </header>
+
+      <p className=\"mb-6 text-sm text-zinc-500\">
+        Catalog data is cached for fast browsing. Use &quot;Sync latest
+        catalog&quot; when upstream ERP/PIM data changes. Sync runs in the
+        background; data will refresh shortly across all catalog views.
+      </p>
+
+      <div className=\"overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm\">
+        <table className=\"min-w-full divide-y divide-zinc-200\">
+          <thead>
+            <tr>
+              <th className=\"px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                SKU
+              </th>
+              <th className=\"px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Name
+              </th>
+              <th className=\"px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Price
+              </th>
+              <th className=\"px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Inventory
+              </th>
+              <th className=\"px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-zinc-500\">
+                Available
+              </th>
+            </tr>
+          </thead>
+          <tbody className=\"divide-y divide-zinc-200\">
+            {products.map((product) => (
+              <tr key={product.sku} className=\"hover:bg-zinc-50\">
+                <td className=\"whitespace-nowrap px-6 py-4 text-sm font-medium text-zinc-900\">
+                  {product.sku}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-sm text-zinc-700\">
+                  {product.name}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-right text-sm text-zinc-700\">
+                  ${product.price.toFixed(2)}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-right text-sm text-zinc-700\">
+                  {product.inventory}
+                </td>
+                <td className=\"whitespace-nowrap px-6 py-4 text-center\">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                      product.available
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-zinc-100 text-zinc-600'
+                    }`}
+                  >
+                    {product.available ? 'Yes' : 'No'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+"
+
+ ❯ EVAL.ts:98:41
+     96| 
+     97|   // The chosen API should be revalidateTag in this workflow.
+     98|   expect(revalidateFile?.content ?? '').toMatch(/import.*revalidateTag…
+       |                                         ^
+     99|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(/);
+    100| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

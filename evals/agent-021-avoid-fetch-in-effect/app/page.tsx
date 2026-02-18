@@ -4,7 +4,7 @@ import UserProfile from './UserProfile';
 // Example of existing server component with data fetching
 async function getProducts() {
   try {
-    const res = await fetch('https://api.example.com/products');
+    const res = await fetch('/api/products');
     return res.json();
   } catch {
     // Return mock data for build time

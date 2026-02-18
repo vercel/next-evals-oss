@@ -1,88 +1,106 @@
 /**
  * Use Cache Directive
  *
- * Tests whether the agent implements the 'use cache' directive with cacheTag()
- * for server-side caching and revalidateTag() for invalidation.
- *
- * Tricky because agents trained on older Next.js use fetch revalidate options
- * or unstable_cache instead of the 'use cache' directive and cacheTag/cacheLife.
+ * Generic behavior checks for this scenario:
+ * - product reads use cache + cacheTag("products")
+ * - getAllProducts() from lib/db is used
+ * - an inline Server Action flow exists and is form-triggered
+ * - revalidateTag("products", profile) is used
+ * - updateTag is not used
  */
 
 import { expect, test } from 'vitest';
-import { readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 
-test('Page has child component with use cache directive', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
+type SourceFile = { path: string; content: string };
 
-  // Should render a child component
-  expect(pageContent).toMatch(/<[A-Z][a-zA-Z]*\s*\/?>|<[A-Z][a-zA-Z]*[^>]*>/);
+const IGNORE_DIRS = new Set([
+  '.git',
+  '.next',
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+]);
 
-  // Should have 'use cache' directive somewhere in the file or child component
-  expect(pageContent).toMatch(/['"]use cache['"];?/);
+const IGNORE_FILES = new Set(['EVAL.ts', 'PROMPT.md']);
+
+function readSourceFiles(dir: string): SourceFile[] {
+  if (!existsSync(dir)) return [];
+
+  const files: SourceFile[] = [];
+  for (const entry of readdirSync(dir)) {
+    if (IGNORE_DIRS.has(entry)) continue;
+
+    const fullPath = join(dir, entry);
+    const stats = statSync(fullPath);
+
+    if (stats.isDirectory()) {
+      files.push(...readSourceFiles(fullPath));
+      continue;
+    }
+
+    if (IGNORE_FILES.has(entry)) continue;
+
+    if (/\.(ts|tsx|js|jsx)$/.test(entry)) {
+      files.push({
+        path: fullPath,
+        content: readFileSync(fullPath, 'utf-8'),
+      });
+    }
+  }
+
+  return files;
+}
+
+const sourceFiles = readSourceFiles(process.cwd());
+const source = sourceFiles.map(file => file.content).join('\n');
+
+function fileWith(pattern: RegExp): SourceFile | undefined {
+  return sourceFiles.find(file => pattern.test(file.content));
+}
+
+test('Catalog reads use use-cache directive and products cache tag', () => {
+  // Allow caching logic to live in app or lib helper modules.
+  expect(source).toMatch(/['"]use cache['"];?/);
+
+  // Tagged invalidation should target the required products key.
+  expect(source).toMatch(/cacheTag\s*\(\s*['"]products['"]\s*\)/);
 });
 
-test('Component fetches data using getAllProducts from lib/db', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
-
-  // Should import getAllProducts from lib/db
-  expect(pageContent).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/db/);
-
-  // Should call getAllProducts function
-  expect(pageContent).toMatch(/getAllProducts\(\)|await.*getAllProducts/);
+test('Page fetches products via lib/db', () => {
+  // Keep data source expectation explicit without location assumptions.
+  expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/db/);
+  expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s*\(/);
 });
 
-test('Component uses cache tag for products', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
+test('Inline form-triggered Server Action flow exists', () => {
+  const inlineActionFile = sourceFiles.find(file => {
+    return (
+      /<form[\s\S]*action\s*=\s*\{/.test(file.content) &&
+      /['"]use server['"];?/.test(file.content) &&
+      (/async\s+function\s+\w+/.test(file.content) || /const\s+\w+\s*=\s*async\s*\(/.test(file.content))
+    );
+  });
 
-  // Should use cacheTag() function with "products" tag
-  expect(pageContent).toMatch(
-    /cacheTag\(['"]products['"]\)|cacheTag\s*\(['"]products['"]\)/
-  );
+  expect(
+    inlineActionFile,
+    'Expected one file to contain form action={...} and inline Server Action markers'
+  ).toBeDefined();
 });
 
-test('Page has server action for cache invalidation', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
+test('Server Action revalidates products using revalidateTag profile', () => {
+  const revalidateFile = fileWith(/revalidateTag\s*\(/);
+  expect(revalidateFile, 'Expected source to call revalidateTag').toBeDefined();
 
-  // Should have server action with 'use server' directive
-  expect(pageContent).toMatch(/['"]use server['"];?/);
+  // The chosen API should be revalidateTag in this workflow.
+  expect(revalidateFile?.content ?? '').toMatch(/import.*revalidateTag.*from\s+['"]next\/cache['"]/);
+  expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(/);
 
-  // Should have an async function for server action
-  expect(pageContent).toMatch(/async\s+function/);
+  // Require the same explicit products tag and a profile/second argument.
+  expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(\s*['"]products['"]\s*,/);
 
-  // Should invalidate cache using revalidateTag
-  expect(pageContent).toMatch(/revalidateTag|revalidate.*tag/i);
-
-  // Should invalidate the "products" tag
-  expect(pageContent).toMatch(
-    /revalidateTag.*['"]products['"]|['"]products['"].*revalidateTag/
-  );
-});
-
-test('Page has form that calls server action', () => {
-  const pageContent = readFileSync(
-    join(process.cwd(), 'app', 'page.tsx'),
-    'utf-8'
-  );
-
-  // Should have a form element
-  expect(pageContent).toMatch(/<form/);
-
-  // Should have form action
-  expect(pageContent).toMatch(/action.*=/);
-
-  // Should have submit button
-  expect(pageContent).toMatch(/type.*=.*['"]submit['"]|<button.*type.*submit/);
+  // Avoid read-your-own-writes invalidation API in this scenario.
+  expect(source).not.toMatch(/\bupdateTag\s*\(/);
 });
