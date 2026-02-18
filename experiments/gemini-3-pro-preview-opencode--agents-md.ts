@@ -1,8 +1,8 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
-  agent: 'codex',
-  model: 'gpt-5.3-codex-api-preview?reasoningEffort=xhigh',
+  agent: 'vercel-ai-gateway/opencode',
+  model: 'vercel/google/gemini-3-pro-preview',
   scripts: ['build'],
   runs: 4,
   earlyExit: true,
@@ -17,7 +17,7 @@ const config: ExperimentConfig = {
       'AGENTS.md': `<!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in \`node_modules/next/dist/docs/\` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in \`node_modules/next/dist/docs/\` before writing any code.
 <!-- END:nextjs-agent-rules -->
 `,
       'CLAUDE.md': '@AGENTS.md\n',

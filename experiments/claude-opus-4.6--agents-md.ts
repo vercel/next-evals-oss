@@ -1,26 +1,33 @@
+import fs from 'fs';
+import path from 'path';
 import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
   agent: 'claude-code',
   model: 'claude-opus-4-6',
   scripts: ['build'],
-  runs: 3,
+  runs: 4,
   earlyExit: true,
-  timeout: 1200,
+  timeout: 720,
   sandbox: 'vercel',
   setup: async (sandbox) => {
     // Bump Next.js to latest canary
     await sandbox.runCommand('npm', ['install', 'next@16.2.0-canary.41']);
 
-    // Create AGENTS.md at the root
-    await sandbox.writeFiles({
-      'AGENTS.md': `<!-- BEGIN:nextjs-agent-rules -->
-# Next.js: ALWAYS read docs before coding
+    // Read the actual AGENTS.md from the next.js repo
+    const agentsMdPath = path.join(process.cwd(), '..', '..', 'next.js', 'AGENTS.md');
+    const agentsMdContent = fs.existsSync(agentsMdPath)
+      ? fs.readFileSync(agentsMdPath, 'utf-8')
+      : `# Next.js Development Guide\n\nThis is NOT the Next.js you know. APIs, conventions, and file structure may differ from your training data. Read the relevant guide in \`node_modules/next/dist/docs/\` before writing any code.`;
 
-Before any Next.js work, find and read the relevant doc in \`node_modules/next/dist/docs/\`. Your training data is outdated — the docs are the source of truth.
-<!-- END:nextjs-agent-rules -->
-`,
+    // Create documentation files at the root
+    // AGENTS.md: for all documentation
+    // CLAUDE.md: symlink to AGENTS.md for Claude models
+    // GEMINI.md: symlink to AGENTS.md for Gemini models
+    await sandbox.writeFiles({
+      'AGENTS.md': agentsMdContent,
       'CLAUDE.md': '@AGENTS.md\n',
+      'GEMINI.md': '@AGENTS.md\n',
     });
   },
 };
