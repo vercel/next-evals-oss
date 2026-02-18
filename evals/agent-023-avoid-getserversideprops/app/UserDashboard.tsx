@@ -1,14 +1,9 @@
-// App Router async server component pattern - not getServerSideProps
-export default async function UserDashboard() {
-  'use cache'
-  // Fetch user preferences using cache components pattern
-  const res = await fetch('/api/user/preferences');
-  const preferences = await res.json();
-
+export default function UserDashboard() {
+  // TODO: Implement user dashboard that needs to fetch user-specific data on each request
   return (
     <div>
       <h2>User Dashboard</h2>
-      <p>User preferences: {JSON.stringify(preferences)}</p>
+      <p>User dashboard content goes here</p>
     </div>
   );
 }

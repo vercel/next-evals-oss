@@ -47,7 +47,7 @@ test('UserDashboard fetches dynamic user preferences', () => {
   const userDashboardContent = readFileSync(join(process.cwd(), 'app', 'UserDashboard.tsx'), 'utf-8');
 
   // Should fetch from user preferences API
-  expect(userDashboardContent).toMatch(/\/api\/user\/preferences/);
+  expect(userDashboardContent).toMatch(/api\.example\.com\/user\/preferences/);
 
   // Should use await fetch for server-side data fetching
   expect(userDashboardContent).toMatch(/await.*fetch|fetch.*await/);
