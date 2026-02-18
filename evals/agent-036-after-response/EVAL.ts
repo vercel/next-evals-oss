@@ -9,93 +9,48 @@
  */
 
 import { expect, test } from 'vitest';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
+function readAppFiles(): string {
+  const appDir = join(process.cwd(), 'app');
+  if (!existsSync(appDir)) return '';
+  const entries = readdirSync(appDir, { recursive: true }) as string[];
+  const files = entries.filter(f => f.endsWith('.tsx') || f.endsWith('.ts'));
+  return files.map(f => readFileSync(join(appDir, f), 'utf-8')).join('\n');
+}
+
 test('Component imports after from next/server', () => {
-  const pagePath = join(process.cwd(), 'app', 'page.tsx');
-  const layoutPath = join(process.cwd(), 'app', 'layout.tsx');
+  const content = readAppFiles();
 
-  let foundImport = false;
-
-  for (const path of [pagePath, layoutPath]) {
-    if (existsSync(path)) {
-      const content = readFileSync(path, 'utf-8');
-      if (content.match(/import.*after.*from\s+['"]next\/server['"]/)) {
-        foundImport = true;
-        break;
-      }
-    }
-  }
-
-  expect(foundImport).toBe(true);
+  expect(content).toMatch(/import.*after.*from\s+['"]next\/server['"]/);
 });
 
 test('Component uses after() with callback', () => {
-  const pagePath = join(process.cwd(), 'app', 'page.tsx');
-  const layoutPath = join(process.cwd(), 'app', 'layout.tsx');
+  const content = readAppFiles();
 
-  let foundAfterCall = false;
-
-  for (const path of [pagePath, layoutPath]) {
-    if (existsSync(path)) {
-      const content = readFileSync(path, 'utf-8');
-      // Should call after() with a callback function
-      if (content.match(/after\s*\(\s*(\(|async\s*\(|function|async\s+function)/)) {
-        foundAfterCall = true;
-        break;
-      }
-    }
-  }
-
-  expect(foundAfterCall).toBe(true);
+  // Should call after() with a callback function
+  expect(content).toMatch(/after\s*\(\s*(\(|async\s*\(|function|async\s+function)/);
 });
 
 test('after() callback contains logging logic', () => {
-  const pagePath = join(process.cwd(), 'app', 'page.tsx');
-  const layoutPath = join(process.cwd(), 'app', 'layout.tsx');
+  const content = readAppFiles();
 
-  let hasLogging = false;
-
-  for (const path of [pagePath, layoutPath]) {
-    if (existsSync(path)) {
-      const content = readFileSync(path, 'utf-8');
-      // Should have some logging-related code
-      if (content.match(/after\s*\(/) && content.match(/log|analytics|track|console/i)) {
-        hasLogging = true;
-        break;
-      }
-    }
-  }
-
-  expect(hasLogging).toBe(true);
+  // Should have some logging-related code
+  expect(content).toMatch(/after\s*\(/);
+  expect(content).toMatch(/log|analytics|track|console/i);
 });
 
 test('Does NOT use waitUntil directly', () => {
-  const pagePath = join(process.cwd(), 'app', 'page.tsx');
-  const layoutPath = join(process.cwd(), 'app', 'layout.tsx');
+  const content = readAppFiles();
 
-  for (const path of [pagePath, layoutPath]) {
-    if (existsSync(path)) {
-      const content = readFileSync(path, 'utf-8');
-      // Should NOT use waitUntil directly (platform-specific)
-      expect(content).not.toMatch(/waitUntil\s*\(/);
-    }
-  }
+  // Should NOT use waitUntil directly (platform-specific)
+  expect(content).not.toMatch(/waitUntil\s*\(/);
 });
 
 test('Does NOT await the logging operation inline', () => {
-  const pagePath = join(process.cwd(), 'app', 'page.tsx');
-  const layoutPath = join(process.cwd(), 'app', 'layout.tsx');
+  const content = readAppFiles();
 
-  for (const path of [pagePath, layoutPath]) {
-    if (existsSync(path)) {
-      const content = readFileSync(path, 'utf-8');
-      // The after() function should be used - not awaiting log operations directly
-      if (content.match(/after\s*\(/)) {
-        // Good - using after()
-        expect(content).toMatch(/after\s*\(/);
-      }
-    }
-  }
+  // The after() function should be used - not awaiting log operations directly
+  expect(content).toMatch(/after\s*\(/);
 });

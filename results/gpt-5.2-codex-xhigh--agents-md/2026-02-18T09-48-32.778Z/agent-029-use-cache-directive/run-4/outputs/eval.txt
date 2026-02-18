@@ -1,0 +1,469 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 8ms
+   ✓ Catalog reads use use-cache directive and products cache tag 1ms
+   × Page fetches products via lib/db 5ms
+     → expected 'import type { Metadata } from \'next\…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  09:56:46
+   Duration  214ms (transform 38ms, setup 0ms, collect 23ms, tests 8ms, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next';
+
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Catalog Admin',
+  description: 'Admin catalog workspace for ecommerce teams.'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+import { revalidateTag } from 'next/cache';
+
+import { getCatalogSnapshot, requestCatalogSync } from '@/lib/catalog';
+
+const currency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0
+});
+
+const dateTime = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short'
+});
+
+const dateOnly = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium'
+});
+
+function availabilityClass(availability: string) {
+  return availability.toLowerCase().replace(' ', '-');
+}
+
+export default async function Page() {
+  const catalog = await getCatalogSnapshot();
+
+  async function syncLatestCatalog() {
+    'use server';
+    await requestCatalogSync();
+    revalidateTag('products', 'max');
+  }
+
+  return (
+    <main className=\"page\">
+      <header className=\"page-header\">
+        <div>
+          <div className=\"eyebrow\">Catalog Admin</div>
+          <h1>Product Catalog</h1>
+          <p>
+            Read-heavy catalog views are cached for speed. Trigger a background sync
+            whenever ERP/PIM data changes and the cache will refresh shortly after.
+          </p>
+        </div>
+        <aside className=\"sync-panel\">
+          <h2>Catalog Sync</h2>
+          <form action={syncLatestCatalog}>
+            <button className=\"button button--primary\" type=\"submit\">
+              Sync latest catalog
+            </button>
+          </form>
+          <div className=\"sync-meta\">
+            Runs in the background so admins can keep working while data catches up.
+          </div>
+          <div className=\"sync-meta\">Last refresh: {dateTime.format(new Date(catalog.refreshedAt))}</div>
+        </aside>
+      </header>
+
+      <section className=\"stats\">
+        <div className=\"stat-card\">
+          <span>Total SKUs</span>
+          <strong>{catalog.stats.totalSkus}</strong>
+          <div className=\"sync-meta\">Across {catalog.stats.activeChannels} channels</div>
+        </div>
+        <div className=\"stat-card\">
+          <span>Low Stock</span>
+          <strong>{catalog.stats.lowStock}</strong>
+          <div className=\"sync-meta\">Below reorder threshold</div>
+        </div>
+        <div className=\"stat-card\">
+          <span>Out of Stock</span>
+          <strong>{catalog.stats.outOfStock}</strong>
+          <div className=\"sync-meta\">Backorder priority</div>
+        </div>
+        <div className=\"stat-card\">
+          <span>Paused / Archived</span>
+          <strong>{catalog.stats.paused}</strong>
+          <div className=\"sync-meta\">Requires review</div>
+        </div>
+      </section>
+
+      <section className=\"filters\">
+        <input
+          className=\"search-input\"
+          placeholder=\"Search by SKU, product name, or category\"
+          aria-label=\"Search catalog\"
+        />
+        <div className=\"chip-group\">
+          <button className=\"chip active\" type=\"button\">
+            All
+          </button>
+          <button className=\"chip\" type=\"button\">
+            Apparel
+          </button>
+          <button className=\"chip\" type=\"button\">
+            Footwear
+          </button>
+          <button className=\"chip\" type=\"button\">
+            Accessories
+          </button>
+          <button className=\"chip\" type=\"button\">
+            Equipment
+          </button>
+        </div>
+        <div className=\"actions\">
+          <button className=\"button button--ghost\" type=\"button\">
+            Export CSV
+          </button>
+          <button className=\"button\" type=\"button\">
+            Bulk Edit
+          </button>
+        </div>
+      </section>
+
+      <section className=\"catalog\">
+        <div className=\"catalog-header\">
+          <h2>Catalog overview</h2>
+          <div className=\"sync-meta\">Cache tag: products</div>
+        </div>
+        <div className=\"table-wrap\">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Inventory</th>
+                <th>Availability</th>
+                <th>Status</th>
+                <th>Channel</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catalog.products.map(product => {
+                const statusClass = product.status.toLowerCase();
+                return (
+                  <tr key={product.id}>
+                    <td>{product.sku}</td>
+                    <td>{product.name}</td>
+                    <td>{product.category}</td>
+                    <td>{currency.format(product.price)}</td>
+                    <td>{product.inventory}</td>
+                    <td>
+                      <span className={`badge ${availabilityClass(product.availability)}`}>
+                        {product.availability}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status ${statusClass}`}>
+                        <span className=\"status-dot\" />
+                        {product.status}
+                      </span>
+                    </td>
+                    <td>{product.channel}</td>
+                    <td>{dateOnly.format(new Date(product.updatedAt))}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+import { cacheLife, cacheTag } from 'next/cache';
+
+export type Product = {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  inventory: number;
+  availability: 'In stock' | 'Low stock' | 'Backorder' | 'Discontinued';
+  status: 'Active' | 'Paused' | 'Archived';
+  channel: 'DTC' | 'Wholesale' | 'Marketplace';
+  updatedAt: string;
+};
+
+type CatalogSnapshot = {
+  refreshedAt: string;
+  products: Product[];
+  stats: {
+    totalSkus: number;
+    lowStock: number;
+    outOfStock: number;
+    paused: number;
+    activeChannels: number;
+  };
+};
+
+type ProductSeed = Omit<Product, 'updatedAt' | 'availability'> & {
+  updatedHoursAgo: number;
+};
+
+const PRODUCT_SEEDS: ProductSeed[] = [
+  {
+    id: 'prod_aurora_001',
+    sku: 'AR-7412',
+    name: 'Aurora Runner',
+    category: 'Footwear',
+    price: 128,
+    inventory: 84,
+    status: 'Active',
+    channel: 'DTC',
+    updatedHoursAgo: 6
+  },
+  {
+    id: 'prod_solstice_014',
+    sku: 'SO-3198',
+    name: 'Solstice Shell Jacket',
+    category: 'Outerwear',
+    price: 198,
+    inventory: 12,
+    status: 'Active',
+    channel: 'Wholesale',
+    updatedHoursAgo: 18
+  },
+  {
+    id: 'prod_drift_022',
+    sku: 'DR-2204',
+    name: 'Drift Utility Pack',
+    category: 'Accessories',
+    price: 164,
+    inventory: 0,
+    status: 'Paused',
+    channel: 'DTC',
+    updatedHoursAgo: 30
+  },
+  {
+    id: 'prod_fjord_110',
+    sku: 'FJ-8819',
+    name: 'Fjord Trail Boot',
+    category: 'Footwear',
+    price: 212,
+    inventory: 34,
+    status: 'Active',
+    channel: 'Marketplace',
+    updatedHoursAgo: 10
+  },
+  {
+    id: 'prod_lumen_209',
+    sku: 'LU-5521',
+    name: 'Lumen Tech Tee',
+    category: 'Apparel',
+    price: 54,
+    inventory: 140,
+    status: 'Active',
+    channel: 'DTC',
+    updatedHoursAgo: 4
+  },
+  {
+    id: 'prod_mica_402',
+    sku: 'MI-4413',
+    name: 'Mica Insulated Bottle',
+    category: 'Equipment',
+    price: 42,
+    inventory: 9,
+    status: 'Active',
+    channel: 'Marketplace',
+    updatedHoursAgo: 12
+  },
+  {
+    id: 'prod_orbit_318',
+    sku: 'OR-3182',
+    name: 'Orbit Studio Mat',
+    category: 'Fitness',
+    price: 88,
+    inventory: 56,
+    status: 'Active',
+    channel: 'Wholesale',
+    updatedHoursAgo: 26
+  },
+  {
+    id: 'prod_summit_076',
+    sku: 'SU-0764',
+    name: 'Summit Ridge Vest',
+    category: 'Outerwear',
+    price: 156,
+    inventory: 22,
+    status: 'Active',
+    channel: 'DTC',
+    updatedHoursAgo: 9
+  },
+  {
+    id: 'prod_tidal_205',
+    sku: 'TI-2050',
+    name: 'Tidal Compression Tight',
+    category: 'Apparel',
+    price: 94,
+    inventory: 0,
+    status: 'Archived',
+    channel: 'Marketplace',
+    updatedHoursAgo: 72
+  },
+  {
+    id: 'prod_vertex_911',
+    sku: 'VE-9113',
+    name: 'Vertex Trekking Pole',
+    category: 'Equipment',
+    price: 118,
+    inventory: 18,
+    status: 'Active',
+    channel: 'Wholesale',
+    updatedHoursAgo: 15
+  },
+  {
+    id: 'prod_windfall_357',
+    sku: 'WI-3576',
+    name: 'Windfall Field Hat',
+    category: 'Accessories',
+    price: 38,
+    inventory: 64,
+    status: 'Active',
+    channel: 'DTC',
+    updatedHoursAgo: 8
+  },
+  {
+    id: 'prod_zenith_640',
+    sku: 'ZE-6401',
+    name: 'Zenith Weatherproof Duffel',
+    category: 'Accessories',
+    price: 176,
+    inventory: 5,
+    status: 'Active',
+    channel: 'Marketplace',
+    updatedHoursAgo: 20
+  }
+];
+
+function resolveAvailability(inventory: number, status: Product['status']): Product['availability'] {
+  if (status === 'Archived') {
+    return 'Discontinued';
+  }
+  if (inventory === 0) {
+    return 'Backorder';
+  }
+  if (inventory < 20) {
+    return 'Low stock';
+  }
+  return 'In stock';
+}
+
+export async function requestCatalogSync(): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 60));
+}
+
+export async function getCatalogSnapshot(): Promise<CatalogSnapshot> {
+  'use cache';
+  cacheLife('max');
+  cacheTag('products');
+
+  const now = new Date();
+  const products = PRODUCT_SEEDS.map(seed => {
+    const updatedAt = new Date(now.getTime() - seed.updatedHoursAgo * 60 * 60 * 1000);
+    return {
+      ...seed,
+      updatedAt: updatedAt.toISOString(),
+      availability: resolveAvailability(seed.inventory, seed.status)
+    };
+  });
+
+  const lowStock = products.filter(product => product.availability === 'Low stock').length;
+  const outOfStock = products.filter(product => product.inventory === 0).length;
+  const paused = products.filter(product => product.status !== 'Active').length;
+  const activeChannels = new Set(products.map(product => product.channel)).size;
+
+  return {
+    refreshedAt: now.toISOString(),
+    products,
+    stats: {
+      totalSkus: products.length,
+      lowStock,
+      outOfStock,
+      paused,
+      activeChannels
+    }
+  };
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {
+  cacheComponents: true
+};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

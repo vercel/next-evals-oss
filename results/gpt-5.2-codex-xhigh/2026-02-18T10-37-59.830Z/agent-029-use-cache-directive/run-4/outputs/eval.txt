@@ -1,0 +1,569 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 9ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { unstable_cache, revalidateTa…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  10:42:18
+   Duration  215ms (transform 31ms, setup 0ms, collect 28ms, tests 9ms, environment 0ms, prepare 61ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next';
+import { IBM_Plex_Sans, Space_Grotesk } from 'next/font/google';
+import './globals.css';
+
+const bodyFont = IBM_Plex_Sans({
+  subsets: ['latin'],
+  variable: '--font-body',
+  weight: ['400', '500', '600']
+});
+
+const displayFont = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['400', '500', '600', '700']
+});
+
+export const metadata: Metadata = {
+  title: 'Catalog Admin',
+  description: 'Admin catalog with background sync'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body className={`${bodyFont.variable} ${displayFont.variable}`}>
+        {children}
+      </body>
+    </html>
+  );
+}
+
+import { unstable_cache, revalidateTag } from 'next/cache';
+
+import { getCatalogSnapshot, syncCatalog } from '@/lib/db';
+
+const getCachedCatalog = unstable_cache(
+  async () => getCatalogSnapshot(),
+  ['catalog-snapshot'],
+  {
+    tags: ['products']
+  }
+);
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+
+const formatNumber = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0
+  }).format(value);
+
+const formatDateTime = (value: string) =>
+  new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
+
+const availabilityClass: Record<string, string> = {
+  'In stock': 'pill success',
+  'Low stock': 'pill warn',
+  'Out of stock': 'pill danger'
+};
+
+export default async function Page() {
+  const { products, lastSyncedAt } = await getCachedCatalog();
+
+  const totalSkus = products.length;
+  const totalInventory = products.reduce(
+    (sum, product) => sum + product.inventory,
+    0
+  );
+  const lowStock = products.filter(
+    (product) => product.inventory <= 10 && product.inventory > 0
+  ).length;
+  const outOfStock = products.filter((product) => product.inventory === 0).length;
+  const onHandValue = products.reduce(
+    (sum, product) => sum + product.inventory * product.price,
+    0
+  );
+
+  async function syncLatestCatalog() {
+    'use server';
+
+    // Fire-and-forget: keep UI responsive while the ERP/PIM sync runs.
+    void (async () => {
+      await syncCatalog();
+      revalidateTag('products');
+    })();
+  }
+
+  return (
+    <main>
+      <div className=\"page\">
+        <header className=\"header\">
+          <div>
+            <p className=\"eyebrow\">Admin Console</p>
+            <h1 className=\"title\">Product Catalog</h1>
+            <p className=\"subtitle\">
+              Read-optimized catalog view with cached product data. Sync runs in
+              the background so operators can keep working while changes roll
+              out across catalog-dependent views.
+            </p>
+          </div>
+          <div className=\"actions\">
+            <form action={syncLatestCatalog}>
+              <button className=\"button\" type=\"submit\">
+                Sync latest catalog
+              </button>
+            </form>
+            <div className=\"sync-meta\">
+              <span>Last synced</span>
+              <strong>{formatDateTime(lastSyncedAt)}</strong>
+            </div>
+            <div className=\"sync-note\">
+              Sync jobs update pricing, inventory, and availability without
+              blocking this view.
+            </div>
+          </div>
+        </header>
+
+        <section className=\"stats\">
+          <div className=\"card\">
+            <div className=\"label\">Total SKUs</div>
+            <div className=\"value\">{formatNumber(totalSkus)}</div>
+            <p className=\"hint\">Active products in the catalog snapshot.</p>
+          </div>
+          <div className=\"card\">
+            <div className=\"label\">On-hand Units</div>
+            <div className=\"value\">{formatNumber(totalInventory)}</div>
+            <p className=\"hint\">Inventory visible to fulfillment teams.</p>
+          </div>
+          <div className=\"card\">
+            <div className=\"label\">Low Stock</div>
+            <div className=\"value\">{formatNumber(lowStock)}</div>
+            <p className=\"hint\">Items with ≤10 units remaining.</p>
+          </div>
+          <div className=\"card\">
+            <div className=\"label\">On-hand Value</div>
+            <div className=\"value\">{formatCurrency(onHandValue)}</div>
+            <p className=\"hint\">Estimated retail value of inventory.</p>
+          </div>
+        </section>
+
+        <section className=\"table-wrap\">
+          <div className=\"table-header\">
+            <h2>Catalog snapshot</h2>
+            <div className=\"table-meta\">
+              Cached under tag <strong>products</strong> for fast browsing.
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Inventory</th>
+                <th>Availability</th>
+                <th>Channel</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <span className=\"product-name\">{product.name}</span>
+                    <span className=\"product-sku\">{product.sku}</span>
+                  </td>
+                  <td>{product.category}</td>
+                  <td>{formatCurrency(product.price)}</td>
+                  <td>{formatNumber(product.inventory)}</td>
+                  <td>
+                    <span
+                      className={availabilityClass[product.availability] ?? 'pill'}
+                    >
+                      {product.availability}
+                    </span>
+                  </td>
+                  <td>{product.channel}</td>
+                  <td>
+                    <span
+                      className={`status ${product.status.toLowerCase()}`}
+                    >
+                      {product.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let syncRun = 0;
+let lastSyncedAt = new Date(Date.now() - 1000 * 60 * 27);
+
+let products = [
+  {
+    id: 1,
+    sku: 'LPT-8841',
+    name: 'Nimbus Laptop 14',
+    category: 'Computers',
+    price: 1199,
+    inventory: 42,
+    channel: 'Online + Stores',
+    status: 'Active'
+  },
+  {
+    id: 2,
+    sku: 'PHN-2230',
+    name: 'Orion Phone Max',
+    category: 'Mobile',
+    price: 899,
+    inventory: 8,
+    channel: 'Online',
+    status: 'Active'
+  },
+  {
+    id: 3,
+    sku: 'TAB-3102',
+    name: 'Atlas Tablet Air',
+    category: 'Tablets',
+    price: 649,
+    inventory: 0,
+    channel: 'Retail',
+    status: 'Backorder'
+  },
+  {
+    id: 4,
+    sku: 'AUD-7721',
+    name: 'Pulse Headphones',
+    category: 'Audio',
+    price: 249,
+    inventory: 110,
+    channel: 'Online + Stores',
+    status: 'Active'
+  },
+  {
+    id: 5,
+    sku: 'WCH-9024',
+    name: 'Sable Smartwatch',
+    category: 'Wearables',
+    price: 329,
+    inventory: 24,
+    channel: 'Online',
+    status: 'Active'
+  },
+  {
+    id: 6,
+    sku: 'CAM-1818',
+    name: 'Crest Action Cam',
+    category: 'Imaging',
+    price: 399,
+    inventory: 12,
+    channel: 'Online + Stores',
+    status: 'Seasonal'
+  },
+  {
+    id: 7,
+    sku: 'HME-1133',
+    name: 'Haven Speaker Mini',
+    category: 'Audio',
+    price: 149,
+    inventory: 64,
+    channel: 'Retail',
+    status: 'Active'
+  }
+];
+
+const getAvailability = (inventory) => {
+  if (inventory === 0) return 'Out of stock';
+  if (inventory <= 10) return 'Low stock';
+  return 'In stock';
+};
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await delay(120);
+
+  return products.map((product) => ({
+    ...product,
+    availability: getAvailability(product.inventory)
+  }));
+}
+
+export async function getCatalogSnapshot() {
+  const catalog = await getAllProducts();
+  return {
+    products: catalog,
+    lastSyncedAt: lastSyncedAt.toISOString()
+  };
+}
+
+export async function syncCatalog() {
+  // Simulate a heavier ERP/PIM sync that touches many SKUs.
+  await delay(1200);
+  syncRun += 1;
+
+  products = products.map((product) => {
+    const inventoryShift = ((syncRun + product.id) % 5) - 2;
+    const priceShift = (syncRun + product.id) % 4 === 0 ? 15 : 0;
+    return {
+      ...product,
+      inventory: Math.max(0, product.inventory + inventoryShift),
+      price: Math.max(0, product.price + priceShift)
+    };
+  });
+
+  lastSyncedAt = new Date();
+  return {
+    updated: products.length,
+    lastSyncedAt: lastSyncedAt.toISOString()
+  };
+}
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/);
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { unstable_cache, revalidateTa…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { unstable_cache, revalidateTag } from 'next/cache';
+
+import { getCatalogSnapshot, syncCatalog } from '@/lib/db';
+
+const getCachedCatalog = unstable_cache(
+  async () => getCatalogSnapshot(),
+  ['catalog-snapshot'],
+  {
+    tags: ['products']
+  }
+);
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(value);
+
+const formatNumber = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0
+  }).format(value);
+
+const formatDateTime = (value: string) =>
+  new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
+
+const availabilityClass: Record<string, string> = {
+  'In stock': 'pill success',
+  'Low stock': 'pill warn',
+  'Out of stock': 'pill danger'
+};
+
+export default async function Page() {
+  const { products, lastSyncedAt } = await getCachedCatalog();
+
+  const totalSkus = products.length;
+  const totalInventory = products.reduce(
+    (sum, product) => sum + product.inventory,
+    0
+  );
+  const lowStock = products.filter(
+    (product) => product.inventory <= 10 && product.inventory > 0
+  ).length;
+  const outOfStock = products.filter((product) => product.inventory === 0).length;
+  const onHandValue = products.reduce(
+    (sum, product) => sum + product.inventory * product.price,
+    0
+  );
+
+  async function syncLatestCatalog() {
+    'use server';
+
+    // Fire-and-forget: keep UI responsive while the ERP/PIM sync runs.
+    void (async () => {
+      await syncCatalog();
+      revalidateTag('products');
+    })();
+  }
+
+  return (
+    <main>
+      <div className=\"page\">
+        <header className=\"header\">
+          <div>
+            <p className=\"eyebrow\">Admin Console</p>
+            <h1 className=\"title\">Product Catalog</h1>
+            <p className=\"subtitle\">
+              Read-optimized catalog view with cached product data. Sync runs in
+              the background so operators can keep working while changes roll
+              out across catalog-dependent views.
+            </p>
+          </div>
+          <div className=\"actions\">
+            <form action={syncLatestCatalog}>
+              <button className=\"button\" type=\"submit\">
+                Sync latest catalog
+              </button>
+            </form>
+            <div className=\"sync-meta\">
+              <span>Last synced</span>
+              <strong>{formatDateTime(lastSyncedAt)}</strong>
+            </div>
+            <div className=\"sync-note\">
+              Sync jobs update pricing, inventory, and availability without
+              blocking this view.
+            </div>
+          </div>
+        </header>
+
+        <section className=\"stats\">
+          <div className=\"card\">
+            <div className=\"label\">Total SKUs</div>
+            <div className=\"value\">{formatNumber(totalSkus)}</div>
+            <p className=\"hint\">Active products in the catalog snapshot.</p>
+          </div>
+          <div className=\"card\">
+            <div className=\"label\">On-hand Units</div>
+            <div className=\"value\">{formatNumber(totalInventory)}</div>
+            <p className=\"hint\">Inventory visible to fulfillment teams.</p>
+          </div>
+          <div className=\"card\">
+            <div className=\"label\">Low Stock</div>
+            <div className=\"value\">{formatNumber(lowStock)}</div>
+            <p className=\"hint\">Items with ≤10 units remaining.</p>
+          </div>
+          <div className=\"card\">
+            <div className=\"label\">On-hand Value</div>
+            <div className=\"value\">{formatCurrency(onHandValue)}</div>
+            <p className=\"hint\">Estimated retail value of inventory.</p>
+          </div>
+        </section>
+
+        <section className=\"table-wrap\">
+          <div className=\"table-header\">
+            <h2>Catalog snapshot</h2>
+            <div className=\"table-meta\">
+              Cached under tag <strong>products</strong> for fast browsing.
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Inventory</th>
+                <th>Availability</th>
+                <th>Channel</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => (
+                <tr key={product.id}>
+                  <td>
+                    <span className=\"product-name\">{product.name}</span>
+                    <span className=\"product-sku\">{product.sku}</span>
+                  </td>
+                  <td>{product.category}</td>
+                  <td>{formatCurrency(product.price)}</td>
+                  <td>{formatNumber(product.inventory)}</td>
+                  <td>
+                    <span
+                      className={availabilityClass[product.availability] ?? 'pill'}
+                    >
+                      {product.availability}
+                    </span>
+                  </td>
+                  <td>{product.channel}</td>
+                  <td>
+                    <span
+                      className={`status ${product.status.toLowerCase()}`}
+                    >
+                      {product.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+  );
+}
+"
+
+ ❯ EVAL.ts:102:41
+    100| 
+    101|   // Require the same explicit products tag and a profile/second argum…
+    102|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(\s*…
+       |                                         ^
+    103| 
+    104|   // Avoid read-your-own-writes invalidation API in this scenario.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -31,6 +31,14 @@ interface AgentResult {
   };
 }
 
+interface DocsImpact {
+  baseSuccessRate: number;
+  docsSuccessRate: number;
+  delta: number;
+  newlyPassed: string[];
+  newlyFailed: string[];
+}
+
 interface ExportedData {
   metadata: {
     exportedAt: string;
@@ -39,6 +47,7 @@ interface ExportedData {
       timestamp: string;
       modelName: string;
       agentHarness: string;
+      docsImpact?: DocsImpact;
     }>;
   };
   results: Record<string, AgentResult[]>;
@@ -46,49 +55,19 @@ interface ExportedData {
 
 const MODEL_NAMES: Record<string, string> = {
   'claude-opus-4.6': 'Claude Opus 4.6',
-  'claude-opus-4.5': 'Claude Opus 4.5',
-  'claude-opus-4.5-agents-md': 'Claude Opus 4.5 + AGENTS.md',
-  'claude-opus-4.1': 'Claude Opus 4.1',
+  'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
-  'claude-sonnet-4.5-agentic-rag': 'Claude Sonnet 4.5 + Agentic RAG',
-  'claude-sonnet-4': 'Claude Sonnet 4',
-  'claude-haiku-4.5': 'Claude Haiku 4.5',
-  'claude-3.7-sonnet': 'Claude 3.7 Sonnet',
-  'gemini-3-pro-preview': 'Gemini 3.0 Pro Preview',
-  'gemini-3-pro-preview-agents-md': 'Gemini 3.0 Pro Preview + AGENTS.md',
-  'gemini-3-flash': 'Gemini 3.0 Flash',
-  'gemini-3-flash-agents-md': 'Gemini 3.0 Flash + AGENTS.md',
-  'gemini-2.5-pro': 'Gemini 2.5 Pro',
-  'gemini-2.5-flash': 'Gemini 2.5 Flash',
-  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
-  'gemini-2.0-flash': 'Gemini 2.0 Flash',
-  'gemini-2.0-flash-lite': 'Gemini 2.0 Flash Lite',
-  'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
-  'gpt-5.3-codex': 'GPT 5.3 Codex',
-  'gpt-5-codex': 'GPT 5 Codex',
-  'gpt-5': 'GPT 5',
-  'gpt-5-mini': 'GPT 5 Mini',
-  'gpt-5-nano': 'GPT 5 Nano',
-  'gpt-4o': 'GPT 4o',
-  'gpt-4o-mini': 'GPT 4o Mini',
-  'gpt-4.1-mini': 'GPT 4.1 Mini',
-  'gpt-oss-120b': 'GPT OSS 120B',
-  'grok-4': 'Grok 4',
-  'grok-4-fast-reasoning': 'Grok 4 Fast Reasoning',
-  'qwen3-coder': 'Qwen3 Coder',
-  'qwen3-max': 'Qwen3 Max',
-  'kimi-k2-turbo': 'Kimi K2 Turbo',
-  'kimi-k2-0905': 'Kimi K2 0905',
-  'kimi-k2.5': 'Kimi K2.5',
-  'devstral-2': 'Devstral 2',
-  'minimax-m2.1': 'Minimax M2.1',
-  'minimax-m2.1-agents-md': 'Minimax M2.1 + AGENTS.md',
-  'kat-coder-pro-v1': 'Kat Coder Pro V1',
-  'glm-4.6': 'GLM 4.6',
-  'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
-  'v0-1.5-md': 'v0 1.5 MD',
+  'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
   'cursor-composer-1.5': 'Cursor Composer 1.5',
+  'cursor-composer-1.5--agents-md': 'Cursor Composer 1.5 + AGENTS.md',
+  'gemini-3-pro-preview': 'Gemini 3.0 Pro Preview',
+  'gemini-3-pro-preview--agents-md': 'Gemini 3.0 Pro Preview + AGENTS.md',
   'gemini-3-pro-preview-gemini-cli': 'Gemini 3.0 Pro Preview',
+  'gemini-3-pro-preview-opencode--agents-md': 'Gemini 3.0 Pro Preview + AGENTS.md',
+  'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
+  'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
+  'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
+  'gpt-5.3-codex-xhigh--agents-md': 'GPT 5.3 Codex (xhigh) + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
@@ -241,6 +220,71 @@ async function main(): Promise<void> {
     exportedData.results[experiment] = agentResults.sort((a, b) =>
       a.evalPath.localeCompare(b.evalPath)
     );
+  }
+
+  // Merge --agents-md variants into base experiments
+  // variant → base (must use the same agent harness)
+  const AGENTS_MD_PAIRS: Record<string, string> = {
+    'claude-opus-4.6--agents-md': 'claude-opus-4.6',
+    'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
+    'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
+    'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
+    'gemini-3-pro-preview-opencode--agents-md': 'gemini-3-pro-preview',
+    'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
+    'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
+  };
+
+  for (const [variantName, baseName] of Object.entries(AGENTS_MD_PAIRS)) {
+    const baseExp = exportedData.metadata.experiments.find((e) => e.name === baseName);
+    const variantExp = exportedData.metadata.experiments.find((e) => e.name === variantName);
+    const baseResults = exportedData.results[baseName];
+    const variantResults = exportedData.results[variantName];
+
+    if (!baseExp || !variantExp || !baseResults || !variantResults) continue;
+
+    // Compute success rates
+    const baseSuccessRate =
+      (baseResults.filter((r) => r.result.success).length / baseResults.length) * 100;
+    const docsSuccessRate =
+      (variantResults.filter((r) => r.result.success).length / variantResults.length) * 100;
+
+    // Find evals that flipped fail→pass and pass→fail
+    const baseFailSet = new Set(
+      baseResults.filter((r) => !r.result.success).map((r) => r.evalPath),
+    );
+    const basePassSet = new Set(
+      baseResults.filter((r) => r.result.success).map((r) => r.evalPath),
+    );
+    const newlyPassed = variantResults
+      .filter((r) => r.result.success && baseFailSet.has(r.evalPath))
+      .map((r) => r.evalPath);
+    const newlyFailed = variantResults
+      .filter((r) => !r.result.success && basePassSet.has(r.evalPath))
+      .map((r) => r.evalPath);
+
+    // Attach docsImpact to the base experiment
+    baseExp.docsImpact = {
+      baseSuccessRate: Math.round(baseSuccessRate),
+      docsSuccessRate: Math.round(docsSuccessRate),
+      delta: Math.round(docsSuccessRate - baseSuccessRate),
+      newlyPassed,
+      newlyFailed,
+    };
+
+    // Use the variant's timestamp if it's newer
+    baseExp.timestamp = variantExp.timestamp;
+
+    // Replace base results with the --agents-md results (better scores)
+    exportedData.results[baseName] = variantResults.map((r) => ({
+      ...r,
+      // Keep the evalPath as-is
+    }));
+
+    // Remove the variant from metadata and results
+    exportedData.metadata.experiments = exportedData.metadata.experiments.filter(
+      (e) => e.name !== variantName,
+    );
+    delete exportedData.results[variantName];
   }
 
   // Count stats

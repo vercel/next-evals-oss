@@ -13,7 +13,7 @@ async function getStaticData() {
 
 export default async function Page() {
   const stats = await getStaticData();
-  
+
   return (
     <div>
       <h1>Dashboard</h1>

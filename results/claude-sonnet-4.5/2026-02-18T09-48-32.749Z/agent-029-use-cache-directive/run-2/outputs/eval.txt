@@ -1,0 +1,234 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 13ms
+   × Catalog reads use use-cache directive and products cache tag 8ms
+     → expected 'import { unstable_cache, revalidateTa…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 1ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 3ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  09:52:04
+   Duration  221ms (transform 34ms, setup 0ms, collect 26ms, tests 13ms, environment 0ms, prepare 68ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { unstable_cache, revalidateTa…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { unstable_cache, revalidateTag } from 'next/cache';
+import { getAllProducts } from '@/lib/db';
+
+// Cached product fetcher with \"products\" tag
+const getCachedProducts = unstable_cache(
+  async () => {
+    const products = await getAllProducts();
+    return products;
+  },
+  ['products-list'],
+  {
+    tags: ['products'],
+    revalidate: false // Only revalidate on explicit tag invalidation
+  }
+);
+
+export default async function AdminCatalogPage() {
+  const products = await getCachedProducts();
+
+  // Inline Server Action for sync trigger
+  async function syncCatalog() {
+    'use server';
+
+    // Immediately invalidate to trigger fresh data fetch on next page load
+    // This makes the cache revalidate in the background
+    // The second parameter is required in Next.js 16 for cache profile config
+    revalidateTag('products', {});
+
+    // In production, you would trigger a background job here:
+    // - Queue a job to your ERP/PIM sync system
+    // - Use a webhook or event to notify when sync completes
+    // - The revalidateTag above ensures next request gets fresh data
+  }
+
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1 style={{ margin: 0, fontSize: '2rem' }}>Product Catalog</h1>
+
+        {/* Sync form with inline Server Action */}
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#0070f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <div style={{
+        backgroundColor: '#f5f5f5',
+        padding: '0.75rem 1rem',
+        borderRadius: '6px',
+        marginBottom: '1.5rem',
+        fontSize: '0.875rem',
+        color: '#666'
+      }}>
+        📊 Showing {products.length} products (cached for fast browsing)
+      </div>
+
+      <div style={{ display: 'grid', gap: '1rem' }}>
+        {products.map((product) => (
+          <div
+            key={product.id}
+            style={{
+              padding: '1.5rem',
+              backgroundColor: 'white',
+              border: '1px solid #e0e0e0',
+              borderRadius: '8px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <div>
+              <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>
+                {product.name}
+              </h3>
+              <p style={{ margin: 0, color: '#666', fontSize: '0.875rem' }}>
+                Product ID: {product.id}
+              </p>
+            </div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#0070f3' }}>
+              ${product.price}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        marginTop: '2rem',
+        padding: '1rem',
+        backgroundColor: '#fffbeb',
+        border: '1px solid #fde68a',
+        borderRadius: '6px',
+        fontSize: '0.875rem'
+      }}>
+        <strong>ℹ️ How sync works:</strong>
+        <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1.5rem' }}>
+          <li>Click \"Sync latest catalog\" to trigger background refresh</li>
+          <li>You can continue working immediately after submission</li>
+          <li>Data updates shortly after and stays fresh across all catalog views</li>
+          <li>Uses cache tag \"products\" for consistent invalidation</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'E-commerce Admin',
+  description: 'Admin product catalog with background sync'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+import Link from 'next/link';
+
+export default function Page() {
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
+      <h1>E-commerce Admin</h1>
+      <nav style={{ marginTop: '2rem' }}>
+        <Link
+          href=\"/admin/catalog\"
+          style={{
+            display: 'inline-block',
+            padding: '1rem 2rem',
+            backgroundColor: '#0070f3',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '8px',
+            fontSize: '1.125rem'
+          }}
+        >
+          Go to Product Catalog →
+        </Link>
+      </nav>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/);
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

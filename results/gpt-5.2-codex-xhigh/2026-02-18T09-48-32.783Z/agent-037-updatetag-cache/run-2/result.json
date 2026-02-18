@@ -1,0 +1,87 @@
+{
+  "status": "failed",
+  "duration": 185.536,
+  "model": "gpt-5.2-codex?reasoningEffort=xhigh",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 1,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc ls",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg -n \"posts\" app'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls app'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat app/page.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'mkdir -p data lib'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat <<'EOF' > data/posts.json\n[]\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat <<'EOF' > lib/posts.ts\nimport { randomUUID } from 'node:crypto';\nimport { mkdir, readFile, writeFile } from 'node:fs/promises';\nimport path from 'node:path';\nimport { unstable_cache } from 'next/cache';\n\nexport type Post = {\n  id: string;\n  title: string;\n  body: string;\n  createdAt: string;\n};\n\nconst DATA_DIR = path.join(process.cwd(), 'data');\nconst POSTS_PATH = path.join(DATA_DIR, 'posts.json');\n\nasync function ensureDataFile(): Promise<void> {\n  await mkdir(DATA_DIR, { recursive: true });\n  try {\n    await readFile(POSTS_PATH, 'utf8');\n  } catch {\n    await writeFile(POSTS_PATH, '[]\\\\n', 'utf8');\n  }\n}\n\nasync function readPosts(): Promise<Post[]> {\n  await ensureDataFile();\n  const file = await readFile(POSTS_PATH, 'utf8');\n  const parsed = JSON.parse(file) as Post[];\n  if (\"'!Array.isArray(parsed)) {\n    return [];\n  }\n  return parsed;\n}\n\nasync function writePosts(posts: Post[]): Promise<void> {\n  await ensureDataFile();\n  await writeFile(POSTS_PATH, `${JSON.stringify(posts, null, 2)}'\"\\\\n\"'`, '\"'utf8');\n}\n\nexport const getPosts = unstable_cache(\n  async () => {\n    return readPosts();\n  },\n  ['posts'],\n  { tags: ['posts'] }\n);\n\nexport async function createPost(input: { title: string; body: string }): Promise<Post> {\n  const { title, body } = input;\n  const post: Post = {\n    id: randomUUID(),\n    title,\n    body,\n    createdAt: new Date().toISOString(),\n  };\n\n  const posts = await readPosts();\n  posts.unshift(post);\n  await writePosts(posts);\n\n  return post;\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat <<'EOF' > app/actions.ts\n'use server';\n\nimport { revalidateTag } from 'next/cache';\nimport { redirect } from 'next/navigation';\nimport { createPost } from '../lib/posts';\n\nfunction getRequiredField(formData: FormData, name: string): string {\n  const value = formData.get(name);\n  if (typeof value \"'!== '\"'string') {\n    throw new Error(\"'`${name} is required.`);\n  }\n  const trimmed = value.trim();\n  if (!trimmed) {\n    throw new Error(`${name} is required.`);\n  }\n  return trimmed;\n}\n\nexport async function createPostAction(formData: FormData): Promise<void> {\n  const title = getRequiredField(formData, '\"'title');\n  const body = getRequiredField(formData, 'body');\n\n  await createPost({ title, body });\n\n  // Immediately invalidate the posts cache so the next request fetches fresh data.\n  revalidateTag('posts');\n\n  redirect('/');\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat <<'EOF' > app/page.tsx\nimport { createPostAction } from './actions';\nimport { getPosts } from '../lib/posts';\n\nexport default async function Home() {\n  const posts = await getPosts();\n\n  return (\n    <main>\n      <h1>Posts</h1>\n      <form action={createPostAction}>\n        <label htmlFor=\\\"title\\\">Title</label>\n        <input id=\\\"title\\\" name=\\\"title\\\" type=\\\"text\\\" required />\n\n        <label htmlFor=\\\"body\\\">Body</label>\n        <textarea id=\\\"body\\\" name=\\\"body\\\" rows={4} required />\n\n        <button type=\\\"submit\\\">Create post</button>\n      </form>\n\n      {posts.length === 0 ? (\n        <p>No posts yet.</p>\n      ) : (\n        <ul>\n          {posts.map((post) => (\n            <li key={post.id}>\n              <article>\n                <h2>{post.title}</h2>\n                <p>{post.body}</p>\n                <small>{new Date(post.createdAt).toLocaleString()}</small>\n              </article>\n            </li>\n          ))}\n        </ul>\n      )}\n    </main>\n  );\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 14
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -4,9 +4,9 @@ const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
   model: 'vercel/google/gemini-3-pro-preview',
   scripts: ['build'],
-  runs: 2,
+  runs: 4,
   earlyExit: true,
-  timeout: 1200,
+  timeout: 720,
   sandbox: 'vercel',
 };
 

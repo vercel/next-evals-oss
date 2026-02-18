@@ -1,0 +1,549 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 9ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { unstable_cache, revalidateTa…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  10:44:09
+   Duration  246ms (transform 49ms, setup 0ms, collect 34ms, tests 9ms, environment 0ms, prepare 81ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next';
+import { Space_Grotesk, Spline_Sans_Mono } from 'next/font/google';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Catalog Admin',
+  description: 'Read-optimized product catalog admin for e-commerce teams.'
+};
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap'
+});
+
+const splineMono = Spline_Sans_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap'
+});
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body className={`${spaceGrotesk.variable} ${splineMono.variable}`}>
+        {children}
+      </body>
+    </html>
+  );
+}
+
+import { unstable_cache, revalidateTag } from 'next/cache';
+import { after } from 'next/server';
+import SyncButton from './sync-button';
+import { getCatalogSnapshot, runCatalogSync } from '@/lib/db';
+
+const currency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD'
+});
+
+const formatTimestamp = value =>
+  new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
+
+const getCachedCatalog = unstable_cache(
+  async () => getCatalogSnapshot(),
+  ['catalog-snapshot'],
+  { tags: ['products'] }
+);
+
+const availabilityTone = availability => {
+  if (availability === 'In Stock') return 'good';
+  if (availability === 'Low Stock') return 'warn';
+  return 'bad';
+};
+
+export default async function Page() {
+  const { items, lastSyncedAt, syncInFlight } = await getCachedCatalog();
+
+  async function syncCatalogAction() {
+    'use server';
+
+    after(async () => {
+      const result = await runCatalogSync();
+      if (!result?.skipped) {
+        revalidateTag('products');
+      }
+    });
+  }
+
+  return (
+    <main className=\"page\">
+      <div className=\"page__wash\" aria-hidden=\"true\" />
+      <section className=\"hero\">
+        <div className=\"hero__copy\">
+          <p className=\"eyebrow\">Admin catalog</p>
+          <h1>Product catalog control</h1>
+          <p className=\"lead\">
+            Read-optimized browsing backed by cached catalog data. Trigger
+            background syncs when ERP/PIM updates roll in.
+          </p>
+        </div>
+        <form className=\"hero__form\" action={syncCatalogAction}>
+          <SyncButton />
+          <p className=\"hint\">
+            Syncs run asynchronously. Continue working while catalog data
+            refreshes in the background.
+          </p>
+        </form>
+      </section>
+
+      <section className=\"status-grid\">
+        <div className=\"status-card\">
+          <span className=\"status-label\">Last synced</span>
+          <span className=\"status-value\">{formatTimestamp(lastSyncedAt)}</span>
+        </div>
+        <div className=\"status-card\">
+          <span className=\"status-label\">Cache tag</span>
+          <span className=\"status-value\">products</span>
+        </div>
+        <div className=\"status-card\">
+          <span className=\"status-label\">Sync state</span>
+          <span className=\"status-value\">
+            {syncInFlight ? 'Syncing in background' : 'Idle / cached'}
+          </span>
+        </div>
+      </section>
+
+      <section className=\"table-card\">
+        <header className=\"table-card__header\">
+          <div>
+            <h2>SKU overview</h2>
+            <p className=\"subtle\">
+              {items.length} active products. Cached for fast, read-heavy admin
+              use.
+            </p>
+          </div>
+          <div className=\"pill-group\">
+            <span className=\"pill\">Region: Global</span>
+            <span className=\"pill\">Channel: DTC + Retail</span>
+            <span className=\"pill\">Pricing: USD</span>
+          </div>
+        </header>
+        <div className=\"table-scroll\">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Availability</th>
+                <th className=\"numeric\">Inventory</th>
+                <th className=\"numeric\">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((product, index) => (
+                <tr
+                  key={product.id}
+                  style={{ '--row': index } as { '--row': number }}
+                >
+                  <td className=\"mono\">{product.id}</td>
+                  <td>{product.name}</td>
+                  <td>{product.category}</td>
+                  <td>
+                    <span className=\"badge badge--neutral\">
+                      {product.status}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge badge--${availabilityTone(
+                        product.availability
+                      )}`}
+                    >
+                      {product.availability}
+                    </span>
+                  </td>
+                  <td className=\"numeric mono\">{product.inventory}</td>
+                  <td className=\"numeric mono\">{currency.format(product.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+'use client';
+
+import { useFormStatus } from 'react-dom';
+
+export default function SyncButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      className=\"sync-button\"
+      type=\"submit\"
+      data-pending={pending ? 'true' : 'false'}
+      aria-busy={pending}
+    >
+      <span className=\"sync-button__title\">
+        {pending ? 'Sync queued' : 'Sync latest catalog'}
+      </span>
+      <span className=\"sync-button__meta\">
+        {pending ? 'Running in the background' : 'ERP/PIM to product cache'}
+      </span>
+      <span className=\"sync-button__indicator\" aria-hidden=\"true\" />
+    </button>
+  );
+}
+
+const seedProducts = [
+  {
+    id: 'sku-atlas-14',
+    name: 'Atlas Laptop 14\"',
+    category: 'Computers',
+    status: 'Active',
+    price: 1299,
+    inventory: 42,
+    availability: 'In Stock'
+  },
+  {
+    id: 'sku-aurora-5g',
+    name: 'Aurora Phone 5G',
+    category: 'Mobile',
+    status: 'Active',
+    price: 799,
+    inventory: 26,
+    availability: 'In Stock'
+  },
+  {
+    id: 'sku-orbit-tab',
+    name: 'Orbit Tablet 11',
+    category: 'Tablets',
+    status: 'Active',
+    price: 549,
+    inventory: 18,
+    availability: 'Low Stock'
+  },
+  {
+    id: 'sku-sonic-max',
+    name: 'Sonic Max Headphones',
+    category: 'Audio',
+    status: 'Active',
+    price: 249,
+    inventory: 64,
+    availability: 'In Stock'
+  },
+  {
+    id: 'sku-pulse-watch',
+    name: 'Pulse Watch Series 4',
+    category: 'Wearables',
+    status: 'Active',
+    price: 329,
+    inventory: 12,
+    availability: 'Low Stock'
+  },
+  {
+    id: 'sku-lumen-cam',
+    name: 'Lumen Action Cam',
+    category: 'Cameras',
+    status: 'Active',
+    price: 399,
+    inventory: 0,
+    availability: 'Out of Stock'
+  },
+  {
+    id: 'sku-nova-stand',
+    name: 'Nova Stand',
+    category: 'Accessories',
+    status: 'Active',
+    price: 89,
+    inventory: 150,
+    availability: 'In Stock'
+  },
+  {
+    id: 'sku-zenith-dock',
+    name: 'Zenith Dock Pro',
+    category: 'Accessories',
+    status: 'Active',
+    price: 179,
+    inventory: 33,
+    availability: 'In Stock'
+  }
+];
+
+let products = seedProducts.map(product => ({ ...product }));
+let lastSyncedAt = new Date();
+let syncInFlight = false;
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const getAvailability = inventory => {
+  if (inventory <= 0) return 'Out of Stock';
+  if (inventory <= 15) return 'Low Stock';
+  return 'In Stock';
+};
+
+const updateProduct = (product, index) => {
+  const priceMultiplier = index % 2 === 0 ? 1.02 : 0.985;
+  const inventoryDelta = (index % 3 === 0 ? -8 : 6) + Math.floor(Math.random() * 6);
+  const nextInventory = clamp(product.inventory + inventoryDelta, 0, 180);
+  const nextPrice = Math.round(product.price * priceMultiplier * 100) / 100;
+
+  return {
+    ...product,
+    price: nextPrice,
+    inventory: nextInventory,
+    availability: getAvailability(nextInventory),
+    updatedAt: new Date().toISOString()
+  };
+};
+
+export async function getAllProducts() {
+  await delay(80);
+  return products.map(product => ({ ...product }));
+}
+
+export async function getCatalogSnapshot() {
+  const items = await getAllProducts();
+  return {
+    items,
+    lastSyncedAt: lastSyncedAt.toISOString(),
+    syncInFlight
+  };
+}
+
+export async function runCatalogSync() {
+  if (syncInFlight) {
+    return { skipped: true };
+  }
+
+  syncInFlight = true;
+  await delay(1200);
+
+  products = products.map(updateProduct);
+  lastSyncedAt = new Date();
+  syncInFlight = false;
+
+  return { completedAt: lastSyncedAt.toISOString() };
+}
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/);
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { unstable_cache, revalidateTa…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { unstable_cache, revalidateTag } from 'next/cache';
+import { after } from 'next/server';
+import SyncButton from './sync-button';
+import { getCatalogSnapshot, runCatalogSync } from '@/lib/db';
+
+const currency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD'
+});
+
+const formatTimestamp = value =>
+  new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
+
+const getCachedCatalog = unstable_cache(
+  async () => getCatalogSnapshot(),
+  ['catalog-snapshot'],
+  { tags: ['products'] }
+);
+
+const availabilityTone = availability => {
+  if (availability === 'In Stock') return 'good';
+  if (availability === 'Low Stock') return 'warn';
+  return 'bad';
+};
+
+export default async function Page() {
+  const { items, lastSyncedAt, syncInFlight } = await getCachedCatalog();
+
+  async function syncCatalogAction() {
+    'use server';
+
+    after(async () => {
+      const result = await runCatalogSync();
+      if (!result?.skipped) {
+        revalidateTag('products');
+      }
+    });
+  }
+
+  return (
+    <main className=\"page\">
+      <div className=\"page__wash\" aria-hidden=\"true\" />
+      <section className=\"hero\">
+        <div className=\"hero__copy\">
+          <p className=\"eyebrow\">Admin catalog</p>
+          <h1>Product catalog control</h1>
+          <p className=\"lead\">
+            Read-optimized browsing backed by cached catalog data. Trigger
+            background syncs when ERP/PIM updates roll in.
+          </p>
+        </div>
+        <form className=\"hero__form\" action={syncCatalogAction}>
+          <SyncButton />
+          <p className=\"hint\">
+            Syncs run asynchronously. Continue working while catalog data
+            refreshes in the background.
+          </p>
+        </form>
+      </section>
+
+      <section className=\"status-grid\">
+        <div className=\"status-card\">
+          <span className=\"status-label\">Last synced</span>
+          <span className=\"status-value\">{formatTimestamp(lastSyncedAt)}</span>
+        </div>
+        <div className=\"status-card\">
+          <span className=\"status-label\">Cache tag</span>
+          <span className=\"status-value\">products</span>
+        </div>
+        <div className=\"status-card\">
+          <span className=\"status-label\">Sync state</span>
+          <span className=\"status-value\">
+            {syncInFlight ? 'Syncing in background' : 'Idle / cached'}
+          </span>
+        </div>
+      </section>
+
+      <section className=\"table-card\">
+        <header className=\"table-card__header\">
+          <div>
+            <h2>SKU overview</h2>
+            <p className=\"subtle\">
+              {items.length} active products. Cached for fast, read-heavy admin
+              use.
+            </p>
+          </div>
+          <div className=\"pill-group\">
+            <span className=\"pill\">Region: Global</span>
+            <span className=\"pill\">Channel: DTC + Retail</span>
+            <span className=\"pill\">Pricing: USD</span>
+          </div>
+        </header>
+        <div className=\"table-scroll\">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Availability</th>
+                <th className=\"numeric\">Inventory</th>
+                <th className=\"numeric\">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((product, index) => (
+                <tr
+                  key={product.id}
+                  style={{ '--row': index } as { '--row': number }}
+                >
+                  <td className=\"mono\">{product.id}</td>
+                  <td>{product.name}</td>
+                  <td>{product.category}</td>
+                  <td>
+                    <span className=\"badge badge--neutral\">
+                      {product.status}
+                    </span>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge badge--${availabilityTone(
+                        product.availability
+                      )}`}
+                    >
+                      {product.availability}
+                    </span>
+                  </td>
+                  <td className=\"numeric mono\">{product.inventory}</td>
+                  <td className=\"numeric mono\">{currency.format(product.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  );
+}
+"
+
+ ❯ EVAL.ts:102:41
+    100| 
+    101|   // Require the same explicit products tag and a profile/second argum…
+    102|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(\s*…
+       |                                         ^
+    103| 
+    104|   // Avoid read-your-own-writes invalidation API in this scenario.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

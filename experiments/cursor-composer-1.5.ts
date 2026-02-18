@@ -4,9 +4,9 @@ const config: ExperimentConfig = {
   agent: 'cursor',
   model: 'composer-1.5',
   scripts: ['build'],
-  runs: 2,
+  runs: 4,
   earlyExit: true,
-  timeout: 1200,
+  timeout: 720,
   sandbox: 'vercel',
 };
 
