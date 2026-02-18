@@ -1,0 +1,345 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 8ms
+   ✓ Catalog reads use use-cache directive and products cache tag 1ms
+   × Page fetches products via lib/db 5ms
+     → expected 'import { getProducts, syncProductsInB…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  09:52:43
+   Duration  209ms (transform 34ms, setup 0ms, collect 24ms, tests 8ms, environment 0ms, prepare 63ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { getProducts, syncProductsInB…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { getProducts, syncProductsInBackground } from '@/lib/products';
+import { revalidateTag } from 'next/cache';
+
+export default async function AdminCatalogPage() {
+  const products = await getProducts();
+
+  // Inline Server Action for syncing catalog
+  async function syncCatalog() {
+    'use server';
+
+    // Trigger background sync without blocking
+    // This runs asynchronously - the action returns immediately
+    syncProductsInBackground().then(() => {
+      // Invalidate the 'products' cache tag after sync completes
+      // Using default cache profile (empty object)
+      revalidateTag('products', {});
+    });
+
+    // Return immediately so admin can continue working
+  }
+
+  return (
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Product Catalog</h1>
+
+        {/* Sync trigger form */}
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#0070f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.25rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <div style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
+        Showing {products.length} products
+      </div>
+
+      {/* Product table */}
+      <div style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead style={{ backgroundColor: '#f9fafb' }}>
+            <tr>
+              <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#6b7280' }}>
+                SKU
+              </th>
+              <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#6b7280' }}>
+                Product Name
+              </th>
+              <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#6b7280' }}>
+                Price
+              </th>
+              <th style={{ padding: '0.75rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#6b7280' }}>
+                Inventory
+              </th>
+              <th style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#6b7280' }}>
+                Status
+              </th>
+              <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase', color: '#6b7280' }}>
+                Last Updated
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product, index) => (
+              <tr
+                key={product.id}
+                style={{
+                  borderTop: index === 0 ? 'none' : '1px solid #e5e7eb',
+                  backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb'
+                }}
+              >
+                <td style={{ padding: '1rem', fontSize: '0.875rem', fontFamily: 'monospace', color: '#374151' }}>
+                  {product.sku}
+                </td>
+                <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#111827', fontWeight: '500' }}>
+                  {product.name}
+                </td>
+                <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', color: '#111827' }}>
+                  ${product.price.toFixed(2)}
+                </td>
+                <td style={{ padding: '1rem', fontSize: '0.875rem', textAlign: 'right', color: product.inventory === 0 ? '#dc2626' : '#111827' }}>
+                  {product.inventory}
+                </td>
+                <td style={{ padding: '1rem', textAlign: 'center' }}>
+                  <span
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      borderRadius: '9999px',
+                      backgroundColor: product.available ? '#d1fae5' : '#fee2e2',
+                      color: product.available ? '#065f46' : '#991b1b'
+                    }}
+                  >
+                    {product.available ? 'Available' : 'Out of Stock'}
+                  </span>
+                </td>
+                <td style={{ padding: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                  {product.lastUpdated.toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f0f9ff', borderLeft: '4px solid #0ea5e9', borderRadius: '0.25rem' }}>
+        <p style={{ fontSize: '0.875rem', color: '#0c4a6e' }}>
+          <strong>Note:</strong> Clicking \"Sync latest catalog\" triggers a background refresh.
+          You can continue working immediately. Data will update shortly across all views.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+export interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  inventory: number;
+  available: boolean;
+  lastUpdated: Date;
+}
+
+// Simulates fetching from upstream ERP/PIM system
+export async function fetchProductsFromUpstream(): Promise<Product[]> {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  const timestamp = new Date();
+
+  return [
+    {
+      id: '1',
+      name: 'Wireless Keyboard',
+      sku: 'KB-WL-001',
+      price: 79.99,
+      inventory: 145,
+      available: true,
+      lastUpdated: timestamp
+    },
+    {
+      id: '2',
+      name: 'Ergonomic Mouse',
+      sku: 'MS-ER-002',
+      price: 49.99,
+      inventory: 89,
+      available: true,
+      lastUpdated: timestamp
+    },
+    {
+      id: '3',
+      name: 'USB-C Hub',
+      sku: 'HB-UC-003',
+      price: 129.99,
+      inventory: 12,
+      available: true,
+      lastUpdated: timestamp
+    },
+    {
+      id: '4',
+      name: 'Laptop Stand',
+      sku: 'ST-LP-004',
+      price: 59.99,
+      inventory: 0,
+      available: false,
+      lastUpdated: timestamp
+    },
+    {
+      id: '5',
+      name: '4K Monitor',
+      sku: 'MN-4K-005',
+      price: 499.99,
+      inventory: 23,
+      available: true,
+      lastUpdated: timestamp
+    },
+    {
+      id: '6',
+      name: 'Mechanical Keyboard',
+      sku: 'KB-MC-006',
+      price: 159.99,
+      inventory: 67,
+      available: true,
+      lastUpdated: timestamp
+    },
+    {
+      id: '7',
+      name: 'Webcam HD',
+      sku: 'WC-HD-007',
+      price: 89.99,
+      inventory: 34,
+      available: true,
+      lastUpdated: timestamp
+    },
+    {
+      id: '8',
+      name: 'Desk Lamp LED',
+      sku: 'LM-LD-008',
+      price: 39.99,
+      inventory: 156,
+      available: true,
+      lastUpdated: timestamp
+    }
+  ];
+}
+
+// Cached product fetching with 'products' tag
+export async function getProducts(): Promise<Product[]> {
+  'use cache';
+  const { cacheTag } = await import('next/cache');
+  cacheTag('products');
+  const products = await fetchProductsFromUpstream();
+  return products;
+}
+
+// Background sync simulation - in production this would trigger actual sync job
+export async function syncProductsInBackground(): Promise<void> {
+  // Simulate long-running sync job
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Fetch fresh data from upstream
+  await fetchProductsFromUpstream();
+
+  // In production, you might:
+  // - Update database
+  // - Process thousands of SKUs
+  // - Update search indices
+  // - etc.
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {
+  cacheComponents: true
+};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

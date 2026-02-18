@@ -1,0 +1,386 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 9ms
+   ✓ Catalog reads use use-cache directive and products cache tag 1ms
+   × Page fetches products via lib/db 6ms
+     → expected 'import { revalidateTag } from \'next/…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  09:51:34
+   Duration  209ms (transform 29ms, setup 0ms, collect 25ms, tests 9ms, environment 0ms, prepare 61ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache';
+import { getProducts } from '@/lib/products';
+
+export default async function AdminCatalogPage() {
+  const products = await getProducts();
+
+  async function syncCatalog() {
+    'use server';
+
+    // Simulate syncing with ERP/PIM system
+    // In a real implementation, this would trigger background jobs
+    // to fetch and update thousands of SKUs
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Mark the products cache as stale
+    // Fresh data will be fetched in the background on next visit
+    revalidateTag('products', 'max');
+  }
+
+  return (
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+        }}
+      >
+        <h1 style={{ margin: 0 }}>Product Catalog</h1>
+
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#0070f3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </header>
+
+      <div
+        style={{
+          backgroundColor: '#f5f5f5',
+          padding: '1rem',
+          borderRadius: '5px',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
+          Total products: {products.length} | Last synced: Just now
+        </p>
+      </div>
+
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          backgroundColor: 'white',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        }}
+      >
+        <thead>
+          <tr style={{ backgroundColor: '#f9fafb' }}>
+            <th
+              style={{
+                padding: '1rem',
+                textAlign: 'left',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              ID
+            </th>
+            <th
+              style={{
+                padding: '1rem',
+                textAlign: 'left',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              Product Name
+            </th>
+            <th
+              style={{
+                padding: '1rem',
+                textAlign: 'right',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              Price
+            </th>
+            <th
+              style={{
+                padding: '1rem',
+                textAlign: 'right',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              Inventory
+            </th>
+            <th
+              style={{
+                padding: '1rem',
+                textAlign: 'left',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              Availability
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr
+              key={product.id}
+              style={{ borderBottom: '1px solid #e5e7eb' }}
+            >
+              <td style={{ padding: '1rem' }}>{product.id}</td>
+              <td style={{ padding: '1rem', fontWeight: 500 }}>
+                {product.name}
+              </td>
+              <td style={{ padding: '1rem', textAlign: 'right' }}>
+                ${product.price.toFixed(2)}
+              </td>
+              <td style={{ padding: '1rem', textAlign: 'right' }}>
+                {product.inventory}
+              </td>
+              <td style={{ padding: '1rem' }}>
+                <span
+                  style={{
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.875rem',
+                    backgroundColor:
+                      product.availability === 'in-stock'
+                        ? '#d1fae5'
+                        : product.availability === 'out-of-stock'
+                          ? '#fee2e2'
+                          : '#fef3c7',
+                    color:
+                      product.availability === 'in-stock'
+                        ? '#065f46'
+                        : product.availability === 'out-of-stock'
+                          ? '#991b1b'
+                          : '#92400e',
+                  }}
+                >
+                  {product.availability}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div
+        style={{
+          marginTop: '1.5rem',
+          padding: '1rem',
+          backgroundColor: '#eff6ff',
+          borderRadius: '5px',
+          borderLeft: '4px solid #3b82f6',
+        }}
+      >
+        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem' }}>
+          How syncing works
+        </h3>
+        <ul
+          style={{
+            margin: 0,
+            paddingLeft: '1.5rem',
+            fontSize: '0.9rem',
+            lineHeight: '1.6',
+          }}
+        >
+          <li>
+            Product data is cached for fast browsing and reduced load on
+            upstream systems
+          </li>
+          <li>
+            Click \"Sync latest catalog\" when ERP/PIM data changes (pricing,
+            inventory, availability)
+          </li>
+          <li>
+            The page responds immediately - you can continue working without
+            waiting
+          </li>
+          <li>
+            Fresh data is fetched in the background and appears on the next page
+            visit
+          </li>
+          <li>
+            This approach prioritizes admin responsiveness and eventual
+            consistency
+          </li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+import Link from 'next/link';
+
+export default function Page() {
+  return (
+    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      <h1>E-Commerce Admin</h1>
+      <p style={{ fontSize: '1.1rem', marginTop: '1rem', color: '#666' }}>
+        Welcome to the admin dashboard
+      </p>
+      <div style={{ marginTop: '2rem' }}>
+        <Link
+          href=\"/admin/catalog\"
+          style={{
+            display: 'inline-block',
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#0070f3',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '5px',
+            fontSize: '1rem',
+          }}
+        >
+          Go to Product Catalog →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+import { cacheTag } from 'next/cache';
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  inventory: number;
+  availability: 'in-stock' | 'out-of-stock' | 'backordered';
+}
+
+export async function getProducts(): Promise<Product[]> {
+  'use cache';
+  cacheTag('products');
+
+  // Simulate fetching from ERP/PIM system
+  // In a real implementation, this would fetch from your actual data source
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  return [
+    {
+      id: '1',
+      name: 'Wireless Mouse',
+      price: 29.99,
+      inventory: 150,
+      availability: 'in-stock',
+    },
+    {
+      id: '2',
+      name: 'Mechanical Keyboard',
+      price: 89.99,
+      inventory: 45,
+      availability: 'in-stock',
+    },
+    {
+      id: '3',
+      name: 'USB-C Hub',
+      price: 49.99,
+      inventory: 0,
+      availability: 'out-of-stock',
+    },
+    {
+      id: '4',
+      name: 'Laptop Stand',
+      price: 39.99,
+      inventory: 220,
+      availability: 'in-stock',
+    },
+    {
+      id: '5',
+      name: 'Webcam HD',
+      price: 79.99,
+      inventory: 5,
+      availability: 'backordered',
+    },
+  ];
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

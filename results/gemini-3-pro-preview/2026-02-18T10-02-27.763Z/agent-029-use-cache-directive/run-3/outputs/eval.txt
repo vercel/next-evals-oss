@@ -1,0 +1,397 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 8ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { Suspense } from \'react\';\n…' to match /['"]use cache['"];?/
+   × Page fetches products via lib/db 1ms
+     → expected 'import { Suspense } from \'react\';\n…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  10:09:15
+   Duration  211ms (transform 30ms, setup 0ms, collect 26ms, tests 8ms, environment 0ms, prepare 60ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { Suspense } from \'react\';\n…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react';
+import { unstable_cache, revalidateTag } from 'next/cache';
+
+// Simulate a slow database fetch
+const getProducts = unstable_cache(
+  async () => {
+    // Simulate network delay to ERP/PIM
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    
+    return [
+      { id: '101', name: 'Ergonomic Office Chair', price: 249.99, stock: 45 },
+      { id: '102', name: 'Wireless Mechanical Keyboard', price: 129.99, stock: 120 },
+      { id: '103', name: 'USB-C Docking Station', price: 89.99, stock: 15 },
+      { id: '104', name: 'Ultrawide Monitor 34\"', price: 499.99, stock: 8 },
+      { id: '105', name: 'Noise Cancelling Headphones', price: 199.99, stock: 32 },
+    ];
+  },
+  ['products-key'], 
+  { 
+    tags: ['products'],
+    revalidate: 3600 // Cache for 1 hour by default
+  }
+);
+
+async function ProductTable() {
+  const products = await getProducts();
+  const lastRefreshed = new Date().toLocaleTimeString();
+  
+  return (
+    <div className=\"border rounded-lg overflow-hidden shadow-sm\">
+      <div className=\"bg-gray-50 px-4 py-2 text-xs text-gray-500 border-b flex justify-end\">
+        Data fetched at: {lastRefreshed}
+      </div>
+      <table className=\"w-full text-left border-collapse\">
+        <thead className=\"bg-gray-50\">
+          <tr>
+            <th className=\"p-4 border-b font-medium text-gray-600\">ID</th>
+            <th className=\"p-4 border-b font-medium text-gray-600\">Product Name</th>
+            <th className=\"p-4 border-b font-medium text-gray-600\">Price</th>
+            <th className=\"p-4 border-b font-medium text-gray-600\">Stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id} className=\"hover:bg-gray-50\">
+              <td className=\"p-4 border-b text-gray-500 font-mono text-sm\">{product.id}</td>
+              <td className=\"p-4 border-b font-medium\">{product.name}</td>
+              <td className=\"p-4 border-b\">${product.price.toFixed(2)}</td>
+              <td className=\"p-4 border-b\">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  product.stock < 10 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                }`}>
+                  {product.stock} units
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProductTableSkeleton() {
+  return (
+    <div className=\"border rounded-lg overflow-hidden shadow-sm h-64 bg-gray-50 animate-pulse flex items-center justify-center text-gray-400\">
+      Loading latest product data...
+    </div>
+  );
+}
+
+export default function AdminCatalogPage() {
+  async function syncCatalog() {
+    'use server';
+    // The prompt requests \"eventual consistency\" and \"continue working immediately\".
+    // revalidateTag invalidates the cache. The next render (triggered by the action)
+    // will re-fetch data. Because we wrapped ProductTable in Suspense, 
+    // the page shell updates immediately, and the table shows a skeleton while fetching.
+    // In this specific Next.js version (likely canary), revalidateTag might require a profile/config.
+    revalidateTag('products', { expire: 0 });
+  }
+
+  return (
+    <div className=\"p-8 font-sans\">
+      <div className=\"flex justify-between items-center mb-6\">
+        <h1 className=\"text-2xl font-bold\">Admin Product Catalog</h1>
+        <div className=\"flex items-center gap-4\">
+          <form action={syncCatalog}>
+            <button 
+              type=\"submit\"
+              className=\"bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors\"
+            >
+              Sync Latest Catalog
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <Suspense fallback={<ProductTableSkeleton />}>
+        <ProductTable />
+      </Suspense>
+      
+      <p className=\"mt-4 text-sm text-gray-500 max-w-2xl\">
+        Note: The catalog is cached for performance. Click \"Sync Latest Catalog\" to refresh data from the upstream ERP system. 
+        Updates may take a moment to reflect.
+      </p>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/);
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { Suspense } from \'react\';\n…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react';
+import { unstable_cache, revalidateTag } from 'next/cache';
+
+// Simulate a slow database fetch
+const getProducts = unstable_cache(
+  async () => {
+    // Simulate network delay to ERP/PIM
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    
+    return [
+      { id: '101', name: 'Ergonomic Office Chair', price: 249.99, stock: 45 },
+      { id: '102', name: 'Wireless Mechanical Keyboard', price: 129.99, stock: 120 },
+      { id: '103', name: 'USB-C Docking Station', price: 89.99, stock: 15 },
+      { id: '104', name: 'Ultrawide Monitor 34\"', price: 499.99, stock: 8 },
+      { id: '105', name: 'Noise Cancelling Headphones', price: 199.99, stock: 32 },
+    ];
+  },
+  ['products-key'], 
+  { 
+    tags: ['products'],
+    revalidate: 3600 // Cache for 1 hour by default
+  }
+);
+
+async function ProductTable() {
+  const products = await getProducts();
+  const lastRefreshed = new Date().toLocaleTimeString();
+  
+  return (
+    <div className=\"border rounded-lg overflow-hidden shadow-sm\">
+      <div className=\"bg-gray-50 px-4 py-2 text-xs text-gray-500 border-b flex justify-end\">
+        Data fetched at: {lastRefreshed}
+      </div>
+      <table className=\"w-full text-left border-collapse\">
+        <thead className=\"bg-gray-50\">
+          <tr>
+            <th className=\"p-4 border-b font-medium text-gray-600\">ID</th>
+            <th className=\"p-4 border-b font-medium text-gray-600\">Product Name</th>
+            <th className=\"p-4 border-b font-medium text-gray-600\">Price</th>
+            <th className=\"p-4 border-b font-medium text-gray-600\">Stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id} className=\"hover:bg-gray-50\">
+              <td className=\"p-4 border-b text-gray-500 font-mono text-sm\">{product.id}</td>
+              <td className=\"p-4 border-b font-medium\">{product.name}</td>
+              <td className=\"p-4 border-b\">${product.price.toFixed(2)}</td>
+              <td className=\"p-4 border-b\">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  product.stock < 10 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                }`}>
+                  {product.stock} units
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProductTableSkeleton() {
+  return (
+    <div className=\"border rounded-lg overflow-hidden shadow-sm h-64 bg-gray-50 animate-pulse flex items-center justify-center text-gray-400\">
+      Loading latest product data...
+    </div>
+  );
+}
+
+export default function AdminCatalogPage() {
+  async function syncCatalog() {
+    'use server';
+    // The prompt requests \"eventual consistency\" and \"continue working immediately\".
+    // revalidateTag invalidates the cache. The next render (triggered by the action)
+    // will re-fetch data. Because we wrapped ProductTable in Suspense, 
+    // the page shell updates immediately, and the table shows a skeleton while fetching.
+    // In this specific Next.js version (likely canary), revalidateTag might require a profile/config.
+    revalidateTag('products', { expire: 0 });
+  }
+
+  return (
+    <div className=\"p-8 font-sans\">
+      <div className=\"flex justify-between items-center mb-6\">
+        <h1 className=\"text-2xl font-bold\">Admin Product Catalog</h1>
+        <div className=\"flex items-center gap-4\">
+          <form action={syncCatalog}>
+            <button 
+              type=\"submit\"
+              className=\"bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors\"
+            >
+              Sync Latest Catalog
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <Suspense fallback={<ProductTableSkeleton />}>
+        <ProductTable />
+      </Suspense>
+      
+      <p className=\"mt-4 text-sm text-gray-500 max-w-2xl\">
+        Note: The catalog is cached for performance. Click \"Sync Latest Catalog\" to refresh data from the upstream ERP system. 
+        Updates may take a moment to reflect.
+      </p>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 }
+  ];
+}
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
