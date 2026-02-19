@@ -1,0 +1,1 @@
+Navigating from home to the products page is slow. The title should appear immediately. It's okay if the content streams in later.
