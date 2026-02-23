@@ -1,0 +1,297 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 7ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { unstable_cache } from \'next…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  20:21:37
+   Duration  195ms (transform 28ms, setup 0ms, collect 25ms, tests 7ms, environment 0ms, prepare 53ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { unstable_cache } from \'next…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { unstable_cache } from 'next/cache';
+import { revalidateTag } from 'next/cache';
+import { after } from 'next/server';
+import { getAllProducts, syncFromERP } from '@/lib/db';
+
+// Cache the catalog query and tag it so it can be invalidated
+// as a group after a sync completes.
+const getCachedProducts = unstable_cache(getAllProducts, ['products'], {
+  tags: ['products'],
+});
+
+const availabilityLabel: Record<string, string> = {
+  in_stock: 'In stock',
+  low_stock: 'Low stock',
+  out_of_stock: 'Out of stock',
+  discontinued: 'Discontinued',
+};
+
+const availabilityColor: Record<string, string> = {
+  in_stock: '#16a34a',
+  low_stock: '#d97706',
+  out_of_stock: '#dc2626',
+  discontinued: '#6b7280',
+};
+
+export default async function CatalogPage() {
+  const products = await getCachedProducts();
+
+  // Inline Server Action — the form POSTs here via the HTML action attribute.
+  // `after()` defers the heavy ERP sync until after the response has been
+  // flushed, so the admin is unblocked immediately. Once the sync finishes,
+  // `revalidateTag` marks every cached result carrying the \"products\" tag as
+  // stale; the next request for any catalog view will fetch fresh data.
+  async function syncCatalog() {
+    'use server';
+
+    after(async () => {
+      await syncFromERP();
+      revalidateTag('products', {});
+    });
+  }
+
+  return (
+    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 960, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Product Catalog</h1>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+            {products.length} products &mdash; served from cache, refreshed on sync
+          </p>
+        </div>
+
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.5rem 1rem',
+              background: '#0f172a',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            ↻ Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
+              <th style={thStyle}>SKU</th>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Inventory</th>
+              <th style={thStyle}>Availability</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product, i) => (
+              <tr
+                key={product.id}
+                style={{ borderBottom: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#f9fafb' }}
+              >
+                <td style={{ ...tdStyle, fontFamily: 'monospace', color: '#6b7280' }}>{product.sku}</td>
+                <td style={{ ...tdStyle, fontWeight: 500 }}>{product.name}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  ${product.price.toFixed(2)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{product.inventory}</td>
+                <td style={tdStyle}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: 999,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: availabilityColor[product.availability] ?? '#374151',
+                      background: (availabilityColor[product.availability] ?? '#374151') + '1a',
+                    }}
+                  >
+                    {availabilityLabel[product.availability] ?? product.availability}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p style={{ marginTop: '1.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+        Catalog data is cached and served instantly. &ldquo;Sync latest catalog&rdquo; pulls
+        updated pricing, inventory, and availability from the ERP/PIM in the background
+        and refreshes this view automatically when the job completes.
+      </p>
+    </main>
+  );
+}
+
+const thStyle: React.CSSProperties = {
+  padding: '0.625rem 0.75rem',
+  fontWeight: 600,
+  color: '#374151',
+  whiteSpace: 'nowrap',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '0.625rem 0.75rem',
+  color: '#111827',
+  verticalAlign: 'middle',
+};
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+import { redirect } from 'next/navigation';
+
+export default function Page() {
+  redirect('/admin/catalog');
+}
+
+export async function getAllProducts() {
+  // Simulate database latency
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  return [
+    {
+      id: 1,
+      sku: 'LT-PRO-001',
+      name: 'Laptop Pro 15\"',
+      price: 1299.99,
+      inventory: 42,
+      availability: 'in_stock',
+    },
+    {
+      id: 2,
+      sku: 'PH-X-002',
+      name: 'Phone X',
+      price: 799.00,
+      inventory: 0,
+      availability: 'out_of_stock',
+    },
+    {
+      id: 3,
+      sku: 'TB-AIR-003',
+      name: 'Tablet Air',
+      price: 549.50,
+      inventory: 8,
+      availability: 'low_stock',
+    },
+    {
+      id: 4,
+      sku: 'HP-PRO-004',
+      name: 'Headphones Pro',
+      price: 249.95,
+      inventory: 134,
+      availability: 'in_stock',
+    },
+    {
+      id: 5,
+      sku: 'WC-S9-005',
+      name: 'Watch Series 9',
+      price: 399.00,
+      inventory: 27,
+      availability: 'in_stock',
+    },
+    {
+      id: 6,
+      sku: 'KB-MEC-006',
+      name: 'Mechanical Keyboard',
+      price: 159.00,
+      inventory: 3,
+      availability: 'low_stock',
+    },
+    {
+      id: 7,
+      sku: 'MN-4K-007',
+      name: '4K Monitor 27\"',
+      price: 649.00,
+      inventory: 0,
+      availability: 'discontinued',
+    },
+  ];
+}
+
+/**
+ * Simulates pulling updated pricing, inventory, and availability
+ * data from an upstream ERP/PIM system. In production this would
+ * fan out over thousands of SKUs via batch API calls.
+ */
+export async function syncFromERP() {
+  // Simulate a slow upstream sync (real jobs can take many seconds)
+  await new Promise(resolve => setTimeout(resolve, 3000));
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/);
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

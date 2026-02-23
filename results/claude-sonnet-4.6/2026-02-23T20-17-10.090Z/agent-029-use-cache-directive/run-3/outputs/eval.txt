@@ -1,0 +1,481 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 3 failed) 8ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { updateTag } from \'next/cach…' to match /['"]use cache['"];?/
+   × Page fetches products via lib/db 1ms
+     → expected 'import { updateTag } from \'next/cach…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { unstable_cache } from \'next…' to match /import.*revalidateTag.*from\…/cache['"]
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  20:23:23
+   Duration  198ms (transform 27ms, setup 0ms, collect 24ms, tests 8ms, environment 0ms, prepare 55ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { updateTag } from \'next/cach…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { updateTag } from 'next/cache';
+import { getCachedProducts } from '@/lib/products';
+
+// Render on every request so the cached data layer is always consulted.
+// The page itself is never statically frozen; only the Data Cache entry
+// (keyed by the 'products' tag) provides the caching benefit.
+export const dynamic = 'force-dynamic';
+
+export default async function AdminCatalogPage() {
+  const products = await getCachedProducts();
+
+  // Inline Server Action — submitted via a plain HTML form POST.
+  // updateTag purges the 'products' Data Cache entry so the next request
+  // to any view that calls getCachedProducts fetches fresh ERP/PIM data.
+  // The action returns immediately; no request blocks on the upstream sync.
+  async function syncCatalog() {
+    'use server';
+    updateTag('products');
+  }
+
+  return (
+    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 900, margin: '0 auto', padding: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Product Catalog</h1>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+            {products.length} products &mdash; data served from cache
+          </p>
+        </div>
+
+        {/*
+          Regular HTML form with a Server Action.
+          Submitting invalidates the 'products' cache tag so all catalog
+          views pick up the latest ERP/PIM data on their next render.
+          The admin is not blocked waiting for the upstream sync to complete.
+        */}
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1.125rem',
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+        <thead>
+          <tr style={{ background: '#f9fafb' }}>
+            {(['SKU', 'Name', 'Price', 'Stock', 'Status'] as const).map(h => (
+              <th
+                key={h}
+                style={{
+                  padding: '0.625rem 0.75rem',
+                  textAlign: h === 'Price' || h === 'Stock' ? 'right' : h === 'Status' ? 'center' : 'left',
+                  borderBottom: '2px solid #e5e7eb',
+                  color: '#374151',
+                  fontWeight: 600,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product, i) => (
+            <tr key={product.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+              <td style={{ padding: '0.625rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontFamily: 'monospace', color: '#6b7280' }}>
+                {product.sku}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                {product.name}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>
+                ${product.price.toLocaleString()}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>
+                {product.stock}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center', borderBottom: '1px solid #e5e7eb' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: product.available ? '#dcfce7' : '#fee2e2',
+                    color: product.available ? '#15803d' : '#b91c1c',
+                  }}
+                >
+                  {product.available ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database/ERP fetch latency
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  return [
+    { id: 1, sku: 'LAP-PRO-15',  name: 'Laptop Pro 15\"',      price: 1299, stock: 42,  available: true  },
+    { id: 2, sku: 'PHN-X-128',   name: 'Smartphone X 128GB',  price: 699,  stock: 0,   available: false },
+    { id: 3, sku: 'TAB-AIR-10',  name: 'Tablet Air 10\"',      price: 499,  stock: 15,  available: true  },
+    { id: 4, sku: 'AUD-WH-BT',   name: 'Wireless Headphones', price: 199,  stock: 88,  available: true  },
+    { id: 5, sku: 'WCH-SMRT-1',  name: 'Smart Watch Series 1',price: 299,  stock: 5,   available: true  },
+    { id: 6, sku: 'ACC-HUB-7P',  name: 'USB-C Hub 7-Port',    price: 79,   stock: 130, available: true  },
+    { id: 7, sku: 'KBD-MECH-TK', name: 'Mechanical Keyboard', price: 149,  stock: 0,   available: false },
+    { id: 8, sku: 'MON-CRV-27',  name: 'Curved Monitor 27\"',  price: 449,  stock: 8,   available: true  },
+  ];
+}
+
+import { unstable_cache } from 'next/cache';
+import { getAllProducts } from './db';
+
+/**
+ * Cached wrapper around getAllProducts.
+ *
+ * Data is served from Next.js's Data Cache until revalidateTag('products') is
+ * called, at which point the next request re-populates the cache from the
+ * source.  All routes that call getCachedProducts share this single cache
+ * entry, so one invalidation propagates across every catalog view.
+ */
+export const getCachedProducts = unstable_cache(
+  getAllProducts,
+  ['products'],
+  { tags: ['products'] },
+);
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/);
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { updateTag } from \'next/cach…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { updateTag } from 'next/cache';
+import { getCachedProducts } from '@/lib/products';
+
+// Render on every request so the cached data layer is always consulted.
+// The page itself is never statically frozen; only the Data Cache entry
+// (keyed by the 'products' tag) provides the caching benefit.
+export const dynamic = 'force-dynamic';
+
+export default async function AdminCatalogPage() {
+  const products = await getCachedProducts();
+
+  // Inline Server Action — submitted via a plain HTML form POST.
+  // updateTag purges the 'products' Data Cache entry so the next request
+  // to any view that calls getCachedProducts fetches fresh ERP/PIM data.
+  // The action returns immediately; no request blocks on the upstream sync.
+  async function syncCatalog() {
+    'use server';
+    updateTag('products');
+  }
+
+  return (
+    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 900, margin: '0 auto', padding: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Product Catalog</h1>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+            {products.length} products &mdash; data served from cache
+          </p>
+        </div>
+
+        {/*
+          Regular HTML form with a Server Action.
+          Submitting invalidates the 'products' cache tag so all catalog
+          views pick up the latest ERP/PIM data on their next render.
+          The admin is not blocked waiting for the upstream sync to complete.
+        */}
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1.125rem',
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+        <thead>
+          <tr style={{ background: '#f9fafb' }}>
+            {(['SKU', 'Name', 'Price', 'Stock', 'Status'] as const).map(h => (
+              <th
+                key={h}
+                style={{
+                  padding: '0.625rem 0.75rem',
+                  textAlign: h === 'Price' || h === 'Stock' ? 'right' : h === 'Status' ? 'center' : 'left',
+                  borderBottom: '2px solid #e5e7eb',
+                  color: '#374151',
+                  fontWeight: 600,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product, i) => (
+            <tr key={product.id} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+              <td style={{ padding: '0.625rem 0.75rem', borderBottom: '1px solid #e5e7eb', fontFamily: 'monospace', color: '#6b7280' }}>
+                {product.sku}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                {product.name}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>
+                ${product.price.toLocaleString()}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'right', borderBottom: '1px solid #e5e7eb' }}>
+                {product.stock}
+              </td>
+              <td style={{ padding: '0.625rem 0.75rem', textAlign: 'center', borderBottom: '1px solid #e5e7eb' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    background: product.available ? '#dcfce7' : '#fee2e2',
+                    color: product.available ? '#15803d' : '#b91c1c',
+                  }}
+                >
+                  {product.available ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  );
+}
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database/ERP fetch latency
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  return [
+    { id: 1, sku: 'LAP-PRO-15',  name: 'Laptop Pro 15\"',      price: 1299, stock: 42,  available: true  },
+    { id: 2, sku: 'PHN-X-128',   name: 'Smartphone X 128GB',  price: 699,  stock: 0,   available: false },
+    { id: 3, sku: 'TAB-AIR-10',  name: 'Tablet Air 10\"',      price: 499,  stock: 15,  available: true  },
+    { id: 4, sku: 'AUD-WH-BT',   name: 'Wireless Headphones', price: 199,  stock: 88,  available: true  },
+    { id: 5, sku: 'WCH-SMRT-1',  name: 'Smart Watch Series 1',price: 299,  stock: 5,   available: true  },
+    { id: 6, sku: 'ACC-HUB-7P',  name: 'USB-C Hub 7-Port',    price: 79,   stock: 130, available: true  },
+    { id: 7, sku: 'KBD-MECH-TK', name: 'Mechanical Keyboard', price: 149,  stock: 0,   available: false },
+    { id: 8, sku: 'MON-CRV-27',  name: 'Curved Monitor 27\"',  price: 449,  stock: 8,   available: true  },
+  ];
+}
+
+import { unstable_cache } from 'next/cache';
+import { getAllProducts } from './db';
+
+/**
+ * Cached wrapper around getAllProducts.
+ *
+ * Data is served from Next.js's Data Cache until revalidateTag('products') is
+ * called, at which point the next request re-populates the cache from the
+ * source.  All routes that call getCachedProducts share this single cache
+ * entry, so one invalidation propagates across every catalog view.
+ */
+export const getCachedProducts = unstable_cache(
+  getAllProducts,
+  ['products'],
+  { tags: ['products'] },
+);
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { unstable_cache } from \'next…' to match /import.*revalidateTag.*from\…/cache['"]
+
+[32m- Expected:[39m 
+/import.*revalidateTag.*from\s+['"]next\/cache['"]/
+
+[31m+ Received:[39m 
+"import { unstable_cache } from 'next/cache';
+import { getAllProducts } from './db';
+
+/**
+ * Cached wrapper around getAllProducts.
+ *
+ * Data is served from Next.js's Data Cache until revalidateTag('products') is
+ * called, at which point the next request re-populates the cache from the
+ * source.  All routes that call getCachedProducts share this single cache
+ * entry, so one invalidation propagates across every catalog view.
+ */
+export const getCachedProducts = unstable_cache(
+  getAllProducts,
+  ['products'],
+  { tags: ['products'] },
+);
+"
+
+ ❯ EVAL.ts:98:41
+     96| 
+     97|   // The chosen API should be revalidateTag in this workflow.
+     98|   expect(revalidateFile?.content ?? '').toMatch(/import.*revalidateTag…
+       |                                         ^
+     99|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(/);
+    100| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
