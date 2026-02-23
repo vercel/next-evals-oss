@@ -58,6 +58,8 @@ const MODEL_NAMES: Record<string, string> = {
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
   'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
+  'claude-sonnet-4.6': 'Claude Sonnet 4.6',
+  'claude-sonnet-4.6--agents-md': 'Claude Sonnet 4.6 + AGENTS.md',
   'cursor-composer-1.5': 'Cursor Composer 1.5',
   'cursor-composer-1.5--agents-md': 'Cursor Composer 1.5 + AGENTS.md',
   'gemini-3-pro-preview': 'Gemini 3.0 Pro Preview',
@@ -227,6 +229,7 @@ async function main(): Promise<void> {
   const AGENTS_MD_PAIRS: Record<string, string> = {
     'claude-opus-4.6--agents-md': 'claude-opus-4.6',
     'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
+    'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
     'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
     'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
     'gemini-3-pro-preview-opencode--agents-md': 'gemini-3-pro-preview',
