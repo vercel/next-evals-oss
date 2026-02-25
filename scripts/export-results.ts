@@ -56,6 +56,7 @@ interface ExportedData {
 const MODEL_NAMES: Record<string, string> = {
   'claude-opus-4.6': 'Claude Opus 4.6',
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
+  'claude-sonnet-4.6--web-docs': 'Claude Sonnet 4.6 + Web Docs',
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
   'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
   'claude-sonnet-4.6': 'Claude Sonnet 4.6',
