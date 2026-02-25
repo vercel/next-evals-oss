@@ -1,0 +1,78 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 1 failed) 10ms
+   ✓ Catalog reads use use-cache directive and products cache tag 2ms
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 7ms
+     → expected 'import { revalidateTag } from \'next/…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  19:47:40
+   Duration  257ms (transform 39ms, setup 0ms, collect 33ms, tests 10ms, environment 0ms, prepare 76ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache';
+import { getAllProducts } from '@/lib/db';
+
+export default async function Page() {
+  const products = await getAllProducts();
+
+  async function syncCatalog() {
+    'use server';
+    revalidateTag('products');
+  }
+
+  return (
+    <main style={{ fontFamily: 'sans-serif', maxWidth: 800, margin: '2rem auto', padding: '0 1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <h1 style={{ margin: 0 }}>Product Catalog</h1>
+        <form action={syncCatalog}>
+          <button type=\"submit\">Sync latest catalog</button>
+        </form>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ borderBottom: '2px solid #ccc', textAlign: 'left' }}>
+            <th style={{ padding: '0.5rem 1rem' }}>ID</th>
+            <th style={{ padding: '0.5rem 1rem' }}>Name</th>
+            <th style={{ padding: '0.5rem 1rem' }}>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product: { id: number; name: string; price: number }) => (
+            <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
+              <td style={{ padding: '0.5rem 1rem' }}>{product.id}</td>
+              <td style={{ padding: '0.5rem 1rem' }}>{product.name}</td>
+              <td style={{ padding: '0.5rem 1rem' }}>${product.price}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  );
+}
+"
+
+ ❯ EVAL.ts:102:41
+    100| 
+    101|   // Require the same explicit products tag and a profile/second argum…
+    102|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(\s*…
+       |                                         ^
+    103| 
+    104|   // Avoid read-your-own-writes invalidation API in this scenario.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

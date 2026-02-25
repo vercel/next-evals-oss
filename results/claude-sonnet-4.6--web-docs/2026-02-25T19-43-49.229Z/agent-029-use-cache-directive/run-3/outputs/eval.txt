@@ -1,0 +1,413 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 10ms
+   ✓ Catalog reads use use-cache directive and products cache tag 2ms
+   × Page fetches products via lib/db 6ms
+     → expected 'import { after } from \'next/server\'…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { after } from \'next/server\'…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  19:47:15
+   Duration  248ms (transform 35ms, setup 0ms, collect 28ms, tests 10ms, environment 0ms, prepare 68ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { after } from \'next/server\'…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { after } from 'next/server';
+import { revalidateTag } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { getProducts, type Product } from '@/lib/products';
+
+const STATUS_LABELS: Record<Product['status'], string> = {
+  active: 'Active',
+  low_stock: 'Low stock',
+  out_of_stock: 'Out of stock',
+};
+
+const STATUS_COLORS: Record<Product['status'], string> = {
+  active: '#16a34a',
+  low_stock: '#d97706',
+  out_of_stock: '#dc2626',
+};
+
+export default async function AdminCatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ synced?: string }>;
+}) {
+  const { synced } = await searchParams;
+  const products = await getProducts();
+
+  async function syncCatalog() {
+    'use server';
+
+    // Schedule the expensive ERP/PIM sync to run in the background after the
+    // response is sent so the admin isn't blocked waiting for it to finish.
+    after(async () => {
+      // In production this would call the upstream ERP/PIM API and write
+      // results back to the database. We simulate that work with a delay.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Invalidate all cache entries tagged \"products\" so the next request
+      // to any view that depends on this tag picks up fresh data.
+      revalidateTag('products');
+    });
+
+    redirect('/admin/catalog?synced=1');
+  }
+
+  return (
+    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 900, margin: '0 auto', padding: '2rem 1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Product Catalog</h1>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+            {products.length} products
+          </p>
+        </div>
+
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      {synced && (
+        <div
+          role=\"status\"
+          style={{
+            marginBottom: '1.25rem',
+            padding: '0.75rem 1rem',
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '0.375rem',
+            color: '#1d4ed8',
+            fontSize: '0.875rem',
+          }}
+        >
+          Sync triggered — catalog data will refresh in the background shortly.
+        </div>
+      )}
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
+              <th style={thStyle}>SKU</th>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Stock</th>
+              <th style={thStyle}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <td style={{ ...tdStyle, fontFamily: 'monospace', color: '#6b7280' }}>{product.sku}</td>
+                <td style={{ ...tdStyle, fontWeight: 500 }}>{product.name}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>${product.price.toLocaleString()}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{product.stock}</td>
+                <td style={tdStyle}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: STATUS_COLORS[product.status],
+                      background: STATUS_COLORS[product.status] + '18',
+                    }}
+                  >
+                    {STATUS_LABELS[product.status]}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  );
+}
+
+const thStyle: React.CSSProperties = {
+  padding: '0.625rem 0.75rem',
+  fontWeight: 600,
+  color: '#374151',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '0.75rem',
+  color: '#111827',
+};
+
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app'
+};
+
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  );
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  );
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  return [
+    { id: 1, sku: 'LT-001', name: 'Laptop',      price: 999,  stock: 42,  status: 'active' },
+    { id: 2, sku: 'PH-001', name: 'Phone',        price: 699,  stock: 128, status: 'active' },
+    { id: 3, sku: 'TB-001', name: 'Tablet',       price: 499,  stock: 15,  status: 'active' },
+    { id: 4, sku: 'HP-001', name: 'Headphones',   price: 199,  stock: 0,   status: 'out_of_stock' },
+    { id: 5, sku: 'WC-001', name: 'Watch',        price: 299,  stock: 7,   status: 'low_stock' },
+  ];
+}
+import { cacheTag } from 'next/cache';
+import { getAllProducts } from './db.js';
+
+export type Product = {
+  id: number;
+  sku: string;
+  name: string;
+  price: number;
+  stock: number;
+  status: 'active' | 'low_stock' | 'out_of_stock';
+};
+
+export async function getProducts(): Promise<Product[]> {
+  'use cache';
+  cacheTag('products');
+  return getAllProducts();
+}
+
+import type { NextConfig } from \"next\";
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+};
+
+export default nextConfig;
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { after } from \'next/server\'…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { after } from 'next/server';
+import { revalidateTag } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { getProducts, type Product } from '@/lib/products';
+
+const STATUS_LABELS: Record<Product['status'], string> = {
+  active: 'Active',
+  low_stock: 'Low stock',
+  out_of_stock: 'Out of stock',
+};
+
+const STATUS_COLORS: Record<Product['status'], string> = {
+  active: '#16a34a',
+  low_stock: '#d97706',
+  out_of_stock: '#dc2626',
+};
+
+export default async function AdminCatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ synced?: string }>;
+}) {
+  const { synced } = await searchParams;
+  const products = await getProducts();
+
+  async function syncCatalog() {
+    'use server';
+
+    // Schedule the expensive ERP/PIM sync to run in the background after the
+    // response is sent so the admin isn't blocked waiting for it to finish.
+    after(async () => {
+      // In production this would call the upstream ERP/PIM API and write
+      // results back to the database. We simulate that work with a delay.
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // Invalidate all cache entries tagged \"products\" so the next request
+      // to any view that depends on this tag picks up fresh data.
+      revalidateTag('products');
+    });
+
+    redirect('/admin/catalog?synced=1');
+  }
+
+  return (
+    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 900, margin: '0 auto', padding: '2rem 1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Product Catalog</h1>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+            {products.length} products
+          </p>
+        </div>
+
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      {synced && (
+        <div
+          role=\"status\"
+          style={{
+            marginBottom: '1.25rem',
+            padding: '0.75rem 1rem',
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '0.375rem',
+            color: '#1d4ed8',
+            fontSize: '0.875rem',
+          }}
+        >
+          Sync triggered — catalog data will refresh in the background shortly.
+        </div>
+      )}
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
+              <th style={thStyle}>SKU</th>
+              <th style={thStyle}>Name</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Stock</th>
+              <th style={thStyle}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <td style={{ ...tdStyle, fontFamily: 'monospace', color: '#6b7280' }}>{product.sku}</td>
+                <td style={{ ...tdStyle, fontWeight: 500 }}>{product.name}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>${product.price.toLocaleString()}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{product.stock}</td>
+                <td style={tdStyle}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: STATUS_COLORS[product.status],
+                      background: STATUS_COLORS[product.status] + '18',
+                    }}
+                  >
+                    {STATUS_LABELS[product.status]}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  );
+}
+
+const thStyle: React.CSSProperties = {
+  padding: '0.625rem 0.75rem',
+  fontWeight: 600,
+  color: '#374151',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '0.75rem',
+  color: '#111827',
+};
+"
+
+ ❯ EVAL.ts:102:41
+    100| 
+    101|   // Require the same explicit products tag and a profile/second argum…
+    102|   expect(revalidateFile?.content ?? '').toMatch(/revalidateTag\s*\(\s*…
+       |                                         ^
+    103| 
+    104|   // Avoid read-your-own-writes invalidation API in this scenario.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
