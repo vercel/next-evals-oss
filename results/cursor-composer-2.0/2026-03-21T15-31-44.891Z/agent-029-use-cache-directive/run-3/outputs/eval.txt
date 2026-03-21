@@ -1,0 +1,647 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 9ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected '\'use client\'\n\nimport Link from \'…' to match /['"]use cache['"];?/
+   × Page fetches products via lib/db 1ms
+     → expected '\'use client\'\n\nimport Link from \'…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  15:33:51
+   Duration  216ms (transform 35ms, setup 0ms, collect 24ms, tests 9ms, environment 0ms, prepare 68ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected '\'use client\'\n\nimport Link from \'…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+export function AdminNav() {
+  const pathname = usePathname() ?? ''
+
+  return (
+    <nav className=\"admin-nav\" aria-label=\"Admin\">
+      <Link href=\"/admin/catalog\" data-active={pathname.startsWith('/admin/catalog')}>
+        Product catalog
+      </Link>
+      <Link href=\"/admin/overview\" data-active={pathname.startsWith('/admin/overview')}>
+        Overview
+      </Link>
+    </nav>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import { getCachedCatalog } from '@/lib/catalog'
+import { runCatalogSyncJob } from '@/lib/catalog-store'
+import { SyncCatalogSubmit } from './sync-button'
+
+function formatUsd(cents: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cents / 100)
+}
+
+export default async function AdminCatalogPage() {
+  async function syncLatestCatalog() {
+    'use server'
+    after(async () => {
+      await runCatalogSyncJob()
+      revalidateTag('products', 'max')
+    })
+  }
+
+  const { products, revision, lastUpstreamSyncAt } = await getCachedCatalog()
+
+  return (
+    <>
+      <div className=\"admin-toolbar\">
+        <div>
+          <h1>Product catalog</h1>
+          <p className=\"admin-meta\">
+            Revision {revision} · Last upstream sync {new Date(lastUpstreamSyncAt).toLocaleString()}
+          </p>
+        </div>
+        <form className=\"sync-form\" action={syncLatestCatalog}>
+          <SyncCatalogSubmit />
+        </form>
+      </div>
+
+      <div className=\"catalog-table-wrap\">
+        <table className=\"catalog-table\">
+          <thead>
+            <tr>
+              <th scope=\"col\">SKU</th>
+              <th scope=\"col\">Name</th>
+              <th scope=\"col\" className=\"num\">
+                Price
+              </th>
+              <th scope=\"col\" className=\"num\">
+                Inventory
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.sku}>
+                <td>{p.sku}</td>
+                <td>{p.name}</td>
+                <td className=\"num\">{formatUsd(p.priceCents)}</td>
+                <td className=\"num\">{p.inventory}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SyncCatalogSubmit() {
+  const { pending } = useFormStatus()
+
+  return (
+    <>
+      <button type=\"submit\" disabled={pending}>
+        {pending ? 'Sync queued…' : 'Sync latest catalog'}
+      </button>
+      <p className=\"sync-hint\">
+        Runs upstream sync in the background. You can keep working; the list may be briefly stale
+        until the job finishes and cache tag <code>products</code> is invalidated.
+      </p>
+    </>
+  )
+}
+
+import type { Metadata } from 'next'
+import { AdminNav } from './admin-nav'
+import './admin.css'
+
+export const metadata: Metadata = {
+  title: 'Admin — Catalog',
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className=\"admin-shell\">
+      <AdminNav />
+      <main className=\"admin-main\">{children}</main>
+    </div>
+  )
+}
+
+import { getCachedCatalog } from '@/lib/catalog'
+
+export default async function AdminOverviewPage() {
+  const { products, revision, lastUpstreamSyncAt } = await getCachedCatalog()
+  const totalInventory = products.reduce((sum, p) => sum + p.inventory, 0)
+  const skus = products.length
+
+  return (
+    <>
+      <div className=\"admin-toolbar\">
+        <div>
+          <h1>Catalog overview</h1>
+          <p className=\"admin-meta\">
+            Same cached snapshot as the catalog page (tag <code>products</code>). Revision{' '}
+            {revision} · Last upstream sync {new Date(lastUpstreamSyncAt).toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      <div className=\"overview-cards\">
+        <div className=\"overview-card\">
+          <h2>SKUs</h2>
+          <p>{skus.toLocaleString()}</p>
+        </div>
+        <div className=\"overview-card\">
+          <h2>Total units</h2>
+          <p>{totalInventory.toLocaleString()}</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div style={{ fontFamily: 'system-ui', padding: '2rem' }}>
+      <h1>Home</h1>
+      <p>
+        <Link href=\"/admin/catalog\">Admin product catalog</Link>
+      </p>
+    </div>
+  )
+}
+
+export type CatalogProduct = {
+  sku: string
+  name: string
+  priceCents: number
+  inventory: number
+}
+
+type CatalogSnapshot = {
+  revision: number
+  lastUpstreamSyncAt: string
+  products: CatalogProduct[]
+}
+
+let revision = 0
+let lastUpstreamSyncAt = new Date().toISOString()
+
+const seedNames = [
+  'Laptop',
+  'Phone',
+  'Tablet',
+  'Headphones',
+  'Watch',
+  'Keyboard',
+  'Monitor',
+  'Webcam',
+  'Dock',
+  'Router',
+]
+
+function buildInitialProducts(): CatalogProduct[] {
+  const out: CatalogProduct[] = []
+  for (let i = 0; i < 48; i++) {
+    const name = seedNames[i % seedNames.length]
+    const variant = Math.floor(i / seedNames.length)
+    out.push({
+      sku: `SKU-${10000 + i}`,
+      name: variant > 0 ? `${name} (${variant + 1})` : name,
+      priceCents: 9999 + i * 137,
+      inventory: 12 + (i * 7) % 180,
+    })
+  }
+  return out
+}
+
+let products = buildInitialProducts()
+
+/** Snapshot read by the cached catalog loader (must stay pure aside from reading module state). */
+export function readCatalogSnapshot(): CatalogSnapshot {
+  return {
+    revision,
+    lastUpstreamSyncAt,
+    products: products.map((p) => ({ ...p })),
+  }
+}
+
+/**
+ * Simulates a long-running ERP/PIM pull (many SKUs). Call from `after()` so the admin
+ * request returns immediately; then invalidate the `products` tag so readers pick up fresh data.
+ */
+export async function runCatalogSyncJob(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 1400))
+  revision += 1
+  products = products.map((p) => ({
+    ...p,
+    inventory: Math.max(0, p.inventory + Math.floor(Math.random() * 9) - 2),
+    priceCents: p.priceCents + (Math.random() > 0.65 ? Math.floor(Math.random() * 5) * 100 : 0),
+  }))
+  lastUpstreamSyncAt = new Date().toISOString()
+}
+
+import { unstable_cache } from 'next/cache'
+import { readCatalogSnapshot } from '@/lib/catalog-store'
+
+const getCachedCatalogSnapshot = unstable_cache(
+  async () => readCatalogSnapshot(),
+  ['admin-catalog-snapshot'],
+  { tags: ['products'] }
+)
+
+/** Shared catalog read for any admin view; avoids recomputing on every request. */
+export function getCachedCatalog() {
+  return getCachedCatalogSnapshot()
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected '\'use client\'\n\nimport Link from \'…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+export function AdminNav() {
+  const pathname = usePathname() ?? ''
+
+  return (
+    <nav className=\"admin-nav\" aria-label=\"Admin\">
+      <Link href=\"/admin/catalog\" data-active={pathname.startsWith('/admin/catalog')}>
+        Product catalog
+      </Link>
+      <Link href=\"/admin/overview\" data-active={pathname.startsWith('/admin/overview')}>
+        Overview
+      </Link>
+    </nav>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import { getCachedCatalog } from '@/lib/catalog'
+import { runCatalogSyncJob } from '@/lib/catalog-store'
+import { SyncCatalogSubmit } from './sync-button'
+
+function formatUsd(cents: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cents / 100)
+}
+
+export default async function AdminCatalogPage() {
+  async function syncLatestCatalog() {
+    'use server'
+    after(async () => {
+      await runCatalogSyncJob()
+      revalidateTag('products', 'max')
+    })
+  }
+
+  const { products, revision, lastUpstreamSyncAt } = await getCachedCatalog()
+
+  return (
+    <>
+      <div className=\"admin-toolbar\">
+        <div>
+          <h1>Product catalog</h1>
+          <p className=\"admin-meta\">
+            Revision {revision} · Last upstream sync {new Date(lastUpstreamSyncAt).toLocaleString()}
+          </p>
+        </div>
+        <form className=\"sync-form\" action={syncLatestCatalog}>
+          <SyncCatalogSubmit />
+        </form>
+      </div>
+
+      <div className=\"catalog-table-wrap\">
+        <table className=\"catalog-table\">
+          <thead>
+            <tr>
+              <th scope=\"col\">SKU</th>
+              <th scope=\"col\">Name</th>
+              <th scope=\"col\" className=\"num\">
+                Price
+              </th>
+              <th scope=\"col\" className=\"num\">
+                Inventory
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.sku}>
+                <td>{p.sku}</td>
+                <td>{p.name}</td>
+                <td className=\"num\">{formatUsd(p.priceCents)}</td>
+                <td className=\"num\">{p.inventory}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SyncCatalogSubmit() {
+  const { pending } = useFormStatus()
+
+  return (
+    <>
+      <button type=\"submit\" disabled={pending}>
+        {pending ? 'Sync queued…' : 'Sync latest catalog'}
+      </button>
+      <p className=\"sync-hint\">
+        Runs upstream sync in the background. You can keep working; the list may be briefly stale
+        until the job finishes and cache tag <code>products</code> is invalidated.
+      </p>
+    </>
+  )
+}
+
+import type { Metadata } from 'next'
+import { AdminNav } from './admin-nav'
+import './admin.css'
+
+export const metadata: Metadata = {
+  title: 'Admin — Catalog',
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className=\"admin-shell\">
+      <AdminNav />
+      <main className=\"admin-main\">{children}</main>
+    </div>
+  )
+}
+
+import { getCachedCatalog } from '@/lib/catalog'
+
+export default async function AdminOverviewPage() {
+  const { products, revision, lastUpstreamSyncAt } = await getCachedCatalog()
+  const totalInventory = products.reduce((sum, p) => sum + p.inventory, 0)
+  const skus = products.length
+
+  return (
+    <>
+      <div className=\"admin-toolbar\">
+        <div>
+          <h1>Catalog overview</h1>
+          <p className=\"admin-meta\">
+            Same cached snapshot as the catalog page (tag <code>products</code>). Revision{' '}
+            {revision} · Last upstream sync {new Date(lastUpstreamSyncAt).toLocaleString()}
+          </p>
+        </div>
+      </div>
+
+      <div className=\"overview-cards\">
+        <div className=\"overview-card\">
+          <h2>SKUs</h2>
+          <p>{skus.toLocaleString()}</p>
+        </div>
+        <div className=\"overview-card\">
+          <h2>Total units</h2>
+          <p>{totalInventory.toLocaleString()}</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div style={{ fontFamily: 'system-ui', padding: '2rem' }}>
+      <h1>Home</h1>
+      <p>
+        <Link href=\"/admin/catalog\">Admin product catalog</Link>
+      </p>
+    </div>
+  )
+}
+
+export type CatalogProduct = {
+  sku: string
+  name: string
+  priceCents: number
+  inventory: number
+}
+
+type CatalogSnapshot = {
+  revision: number
+  lastUpstreamSyncAt: string
+  products: CatalogProduct[]
+}
+
+let revision = 0
+let lastUpstreamSyncAt = new Date().toISOString()
+
+const seedNames = [
+  'Laptop',
+  'Phone',
+  'Tablet',
+  'Headphones',
+  'Watch',
+  'Keyboard',
+  'Monitor',
+  'Webcam',
+  'Dock',
+  'Router',
+]
+
+function buildInitialProducts(): CatalogProduct[] {
+  const out: CatalogProduct[] = []
+  for (let i = 0; i < 48; i++) {
+    const name = seedNames[i % seedNames.length]
+    const variant = Math.floor(i / seedNames.length)
+    out.push({
+      sku: `SKU-${10000 + i}`,
+      name: variant > 0 ? `${name} (${variant + 1})` : name,
+      priceCents: 9999 + i * 137,
+      inventory: 12 + (i * 7) % 180,
+    })
+  }
+  return out
+}
+
+let products = buildInitialProducts()
+
+/** Snapshot read by the cached catalog loader (must stay pure aside from reading module state). */
+export function readCatalogSnapshot(): CatalogSnapshot {
+  return {
+    revision,
+    lastUpstreamSyncAt,
+    products: products.map((p) => ({ ...p })),
+  }
+}
+
+/**
+ * Simulates a long-running ERP/PIM pull (many SKUs). Call from `after()` so the admin
+ * request returns immediately; then invalidate the `products` tag so readers pick up fresh data.
+ */
+export async function runCatalogSyncJob(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 1400))
+  revision += 1
+  products = products.map((p) => ({
+    ...p,
+    inventory: Math.max(0, p.inventory + Math.floor(Math.random() * 9) - 2),
+    priceCents: p.priceCents + (Math.random() > 0.65 ? Math.floor(Math.random() * 5) * 100 : 0),
+  }))
+  lastUpstreamSyncAt = new Date().toISOString()
+}
+
+import { unstable_cache } from 'next/cache'
+import { readCatalogSnapshot } from '@/lib/catalog-store'
+
+const getCachedCatalogSnapshot = unstable_cache(
+  async () => readCatalogSnapshot(),
+  ['admin-catalog-snapshot'],
+  { tags: ['products'] }
+)
+
+/** Shared catalog read for any admin view; avoids recomputing on every request. */
+export function getCachedCatalog() {
+  return getCachedCatalogSnapshot()
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
