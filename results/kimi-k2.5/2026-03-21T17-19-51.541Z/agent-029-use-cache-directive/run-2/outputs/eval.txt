@@ -1,0 +1,551 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 8ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'export interface Product {\n  id: num…' to match /['"]use cache['"];?/
+   × Page fetches products via lib/db 1ms
+     → expected 'export interface Product {\n  id: num…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  17:23:11
+   Duration  235ms (transform 37ms, setup 0ms, collect 27ms, tests 8ms, environment 0ms, prepare 71ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'export interface Product {\n  id: num…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"export interface Product {
+  id: number
+  name: string
+  price: number
+  inventory: number
+  status: 'active' | 'inactive'
+  sku: string
+  lastUpdated: string
+}
+
+// Simulate fetching products from ERP/PIM
+export async function getAllProducts(): Promise<Product[]> {
+  // Simulate database/API delay
+  await new Promise((resolve) => setTimeout(resolve, 800))
+
+  // Return sample catalog data
+  return [
+    { id: 1, name: 'Laptop Pro', price: 1299, inventory: 45, status: 'active', sku: 'LAP-001', lastUpdated: new Date().toISOString() },
+    { id: 2, name: 'Wireless Phone', price: 699, inventory: 120, status: 'active', sku: 'PHN-002', lastUpdated: new Date().toISOString() },
+    { id: 3, name: 'Tablet Plus', price: 499, inventory: 0, status: 'inactive', sku: 'TAB-003', lastUpdated: new Date().toISOString() },
+    { id: 4, name: 'Noise-Cancel Headphones', price: 249, inventory: 85, status: 'active', sku: 'AUD-004', lastUpdated: new Date().toISOString() },
+    { id: 5, name: 'Smart Watch', price: 299, inventory: 200, status: 'active', sku: 'WCH-005', lastUpdated: new Date().toISOString() },
+    { id: 6, name: 'Mechanical Keyboard', price: 149, inventory: 30, status: 'active', sku: 'KBD-006', lastUpdated: new Date().toISOString() },
+    { id: 7, name: '4K Monitor', price: 599, inventory: 15, status: 'active', sku: 'MON-007', lastUpdated: new Date().toISOString() },
+    { id: 8, name: 'Webcam HD', price: 89, inventory: 60, status: 'active', sku: 'CAM-008', lastUpdated: new Date().toISOString() },
+  ]
+}
+
+// Simulate fetching from upstream ERP/PIM (slower, more data)
+export async function syncProductsFromERP(): Promise<Product[]> {
+  // Simulate slow ERP sync
+  await new Promise((resolve) => setTimeout(resolve, 3000))
+
+  // Return updated data with current timestamp
+  const now = new Date().toISOString()
+  return [
+    { id: 1, name: 'Laptop Pro', price: 1199, inventory: 50, status: 'active', sku: 'LAP-001', lastUpdated: now },
+    { id: 2, name: 'Wireless Phone', price: 649, inventory: 150, status: 'active', sku: 'PHN-002', lastUpdated: now },
+    { id: 3, name: 'Tablet Plus', price: 449, inventory: 25, status: 'active', sku: 'TAB-003', lastUpdated: now },
+    { id: 4, name: 'Noise-Cancel Headphones', price: 229, inventory: 100, status: 'active', sku: 'AUD-004', lastUpdated: now },
+    { id: 5, name: 'Smart Watch', price: 279, inventory: 180, status: 'active', sku: 'WCH-005', lastUpdated: now },
+    { id: 6, name: 'Mechanical Keyboard', price: 139, inventory: 45, status: 'active', sku: 'KBD-006', lastUpdated: now },
+    { id: 7, name: '4K Monitor', price: 549, inventory: 20, status: 'active', sku: 'MON-007', lastUpdated: now },
+    { id: 8, name: 'Webcam HD', price: 79, inventory: 75, status: 'active', sku: 'CAM-008', lastUpdated: now },
+    { id: 9, name: 'USB-C Hub', price: 59, inventory: 100, status: 'active', sku: 'HUB-009', lastUpdated: now },
+  ]
+}
+
+import { revalidateTag, unstable_cache } from 'next/cache'
+import { getAllProducts, syncProductsFromERP, type Product } from './db'
+
+// Cached data fetcher with 'products' tag
+const getCachedProducts = unstable_cache(
+  async (): Promise<Product[]> => {
+    return getAllProducts()
+  },
+  ['catalog-products'],
+  {
+    tags: ['products'],
+  }
+)
+
+export default async function AdminCatalogPage() {
+  // Fetch products from cache (fast, doesn't re-query on every request)
+  const products = await getCachedProducts()
+
+  // Inline Server Action for syncing catalog
+  async function syncCatalog() {
+    'use server'
+
+    // Trigger background sync from ERP/PIM
+    // This runs asynchronously - admin can continue working immediately
+    syncProductsFromERP()
+      .then(() => {
+        // After sync completes, invalidate the cache
+        // This makes new data available across all views using the 'products' tag
+        revalidateTag('products', {})
+      })
+      .catch((error) => {
+        console.error('Sync failed:', error)
+      })
+
+    // Form submission will naturally refresh the page
+    // User continues immediately while sync happens in background
+  }
+
+  const lastSync = products[0]?.lastUpdated
+    ? new Date(products[0].lastUpdated).toLocaleString()
+    : 'Unknown'
+
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
+      <header style={{ marginBottom: '2rem' }}>
+        <h1>Product Catalog</h1>
+        <p style={{ color: '#666' }}>Last synced: {lastSync}</p>
+      </header>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#0066cc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            Sync Latest Catalog
+          </button>
+          <p style={{ fontSize: '0.875rem', color: '#666', marginTop: '0.5rem' }}>
+            Triggers background sync from ERP/PIM. Page will refresh immediately while data updates in the background.
+          </p>
+        </form>
+      </section>
+
+      <section>
+        <h2>Products ({products.length} items)</h2>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #ddd' }}>
+              <th style={{ textAlign: 'left', padding: '0.75rem' }}>SKU</th>
+              <th style={{ textAlign: 'left', padding: '0.75rem' }}>Name</th>
+              <th style={{ textAlign: 'right', padding: '0.75rem' }}>Price</th>
+              <th style={{ textAlign: 'right', padding: '0.75rem' }}>Inventory</th>
+              <th style={{ textAlign: 'center', padding: '0.75rem' }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
+                <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                  {product.sku}
+                </td>
+                <td style={{ padding: '0.75rem' }}>{product.name}</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                  ${product.price.toFixed(2)}
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                  {product.inventory}
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      backgroundColor: product.status === 'active' ? '#dcfce7' : '#fee2e2',
+                      color: product.status === 'active' ? '#166534' : '#991b1b',
+                    }}
+                  >
+                    {product.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <footer style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '1px solid #eee', fontSize: '0.875rem', color: '#666' }}>
+        <p>Cache tag: \"products\" | Data is cached and shared across all views using this tag.</p>
+      </footer>
+    </div>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db'
+
+export const getCachedProducts = unstable_cache(
+  async () => {
+    return getAllProducts()
+  },
+  ['products-list'],
+  {
+    tags: ['products'],
+    revalidate: 3600, // Cache for 1 hour by default
+  }
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'export interface Product {\n  id: num…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"export interface Product {
+  id: number
+  name: string
+  price: number
+  inventory: number
+  status: 'active' | 'inactive'
+  sku: string
+  lastUpdated: string
+}
+
+// Simulate fetching products from ERP/PIM
+export async function getAllProducts(): Promise<Product[]> {
+  // Simulate database/API delay
+  await new Promise((resolve) => setTimeout(resolve, 800))
+
+  // Return sample catalog data
+  return [
+    { id: 1, name: 'Laptop Pro', price: 1299, inventory: 45, status: 'active', sku: 'LAP-001', lastUpdated: new Date().toISOString() },
+    { id: 2, name: 'Wireless Phone', price: 699, inventory: 120, status: 'active', sku: 'PHN-002', lastUpdated: new Date().toISOString() },
+    { id: 3, name: 'Tablet Plus', price: 499, inventory: 0, status: 'inactive', sku: 'TAB-003', lastUpdated: new Date().toISOString() },
+    { id: 4, name: 'Noise-Cancel Headphones', price: 249, inventory: 85, status: 'active', sku: 'AUD-004', lastUpdated: new Date().toISOString() },
+    { id: 5, name: 'Smart Watch', price: 299, inventory: 200, status: 'active', sku: 'WCH-005', lastUpdated: new Date().toISOString() },
+    { id: 6, name: 'Mechanical Keyboard', price: 149, inventory: 30, status: 'active', sku: 'KBD-006', lastUpdated: new Date().toISOString() },
+    { id: 7, name: '4K Monitor', price: 599, inventory: 15, status: 'active', sku: 'MON-007', lastUpdated: new Date().toISOString() },
+    { id: 8, name: 'Webcam HD', price: 89, inventory: 60, status: 'active', sku: 'CAM-008', lastUpdated: new Date().toISOString() },
+  ]
+}
+
+// Simulate fetching from upstream ERP/PIM (slower, more data)
+export async function syncProductsFromERP(): Promise<Product[]> {
+  // Simulate slow ERP sync
+  await new Promise((resolve) => setTimeout(resolve, 3000))
+
+  // Return updated data with current timestamp
+  const now = new Date().toISOString()
+  return [
+    { id: 1, name: 'Laptop Pro', price: 1199, inventory: 50, status: 'active', sku: 'LAP-001', lastUpdated: now },
+    { id: 2, name: 'Wireless Phone', price: 649, inventory: 150, status: 'active', sku: 'PHN-002', lastUpdated: now },
+    { id: 3, name: 'Tablet Plus', price: 449, inventory: 25, status: 'active', sku: 'TAB-003', lastUpdated: now },
+    { id: 4, name: 'Noise-Cancel Headphones', price: 229, inventory: 100, status: 'active', sku: 'AUD-004', lastUpdated: now },
+    { id: 5, name: 'Smart Watch', price: 279, inventory: 180, status: 'active', sku: 'WCH-005', lastUpdated: now },
+    { id: 6, name: 'Mechanical Keyboard', price: 139, inventory: 45, status: 'active', sku: 'KBD-006', lastUpdated: now },
+    { id: 7, name: '4K Monitor', price: 549, inventory: 20, status: 'active', sku: 'MON-007', lastUpdated: now },
+    { id: 8, name: 'Webcam HD', price: 79, inventory: 75, status: 'active', sku: 'CAM-008', lastUpdated: now },
+    { id: 9, name: 'USB-C Hub', price: 59, inventory: 100, status: 'active', sku: 'HUB-009', lastUpdated: now },
+  ]
+}
+
+import { revalidateTag, unstable_cache } from 'next/cache'
+import { getAllProducts, syncProductsFromERP, type Product } from './db'
+
+// Cached data fetcher with 'products' tag
+const getCachedProducts = unstable_cache(
+  async (): Promise<Product[]> => {
+    return getAllProducts()
+  },
+  ['catalog-products'],
+  {
+    tags: ['products'],
+  }
+)
+
+export default async function AdminCatalogPage() {
+  // Fetch products from cache (fast, doesn't re-query on every request)
+  const products = await getCachedProducts()
+
+  // Inline Server Action for syncing catalog
+  async function syncCatalog() {
+    'use server'
+
+    // Trigger background sync from ERP/PIM
+    // This runs asynchronously - admin can continue working immediately
+    syncProductsFromERP()
+      .then(() => {
+        // After sync completes, invalidate the cache
+        // This makes new data available across all views using the 'products' tag
+        revalidateTag('products', {})
+      })
+      .catch((error) => {
+        console.error('Sync failed:', error)
+      })
+
+    // Form submission will naturally refresh the page
+    // User continues immediately while sync happens in background
+  }
+
+  const lastSync = products[0]?.lastUpdated
+    ? new Date(products[0].lastUpdated).toLocaleString()
+    : 'Unknown'
+
+  return (
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}>
+      <header style={{ marginBottom: '2rem' }}>
+        <h1>Product Catalog</h1>
+        <p style={{ color: '#666' }}>Last synced: {lastSync}</p>
+      </header>
+
+      <section style={{ marginBottom: '2rem' }}>
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: '#0066cc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+            }}
+          >
+            Sync Latest Catalog
+          </button>
+          <p style={{ fontSize: '0.875rem', color: '#666', marginTop: '0.5rem' }}>
+            Triggers background sync from ERP/PIM. Page will refresh immediately while data updates in the background.
+          </p>
+        </form>
+      </section>
+
+      <section>
+        <h2>Products ({products.length} items)</h2>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #ddd' }}>
+              <th style={{ textAlign: 'left', padding: '0.75rem' }}>SKU</th>
+              <th style={{ textAlign: 'left', padding: '0.75rem' }}>Name</th>
+              <th style={{ textAlign: 'right', padding: '0.75rem' }}>Price</th>
+              <th style={{ textAlign: 'right', padding: '0.75rem' }}>Inventory</th>
+              <th style={{ textAlign: 'center', padding: '0.75rem' }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
+                <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                  {product.sku}
+                </td>
+                <td style={{ padding: '0.75rem' }}>{product.name}</td>
+                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                  ${product.price.toFixed(2)}
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                  {product.inventory}
+                </td>
+                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      backgroundColor: product.status === 'active' ? '#dcfce7' : '#fee2e2',
+                      color: product.status === 'active' ? '#166534' : '#991b1b',
+                    }}
+                  >
+                    {product.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <footer style={{ marginTop: '3rem', paddingTop: '1rem', borderTop: '1px solid #eee', fontSize: '0.875rem', color: '#666' }}>
+        <p>Cache tag: \"products\" | Data is cached and shared across all views using this tag.</p>
+      </footer>
+    </div>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db'
+
+export const getCachedProducts = unstable_cache(
+  async () => {
+    return getAllProducts()
+  },
+  ['products-list'],
+  {
+    tags: ['products'],
+    revalidate: 3600, // Cache for 1 hour by default
+  }
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
