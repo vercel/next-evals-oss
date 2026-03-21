@@ -246,25 +246,7 @@ async function main(): Promise<void> {
     const baseResults = exportedData.results[baseName];
     const variantResults = exportedData.results[variantName];
 
-    if (!variantExp || !variantResults) continue;
-
-    // If only the variant exists (no base results), rename it and set docsImpact with only docsSuccessRate
-    if (!baseExp || !baseResults) {
-      const docsSuccessRate =
-        (variantResults.filter((r) => r.result.success).length / variantResults.length) * 100;
-      variantExp.name = baseName;
-      variantExp.modelName = MODEL_NAMES[baseName] || baseName;
-      variantExp.docsImpact = {
-        baseSuccessRate: Math.round(docsSuccessRate),
-        docsSuccessRate: Math.round(docsSuccessRate),
-        delta: 0,
-        newlyPassed: [],
-        newlyFailed: [],
-      };
-      exportedData.results[baseName] = variantResults;
-      delete exportedData.results[variantName];
-      continue;
-    }
+    if (!baseExp || !variantExp || !baseResults || !variantResults) continue;
 
     // Compute success rates
     const baseSuccessRate =
