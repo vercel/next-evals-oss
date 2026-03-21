@@ -246,7 +246,16 @@ async function main(): Promise<void> {
     const baseResults = exportedData.results[baseName];
     const variantResults = exportedData.results[variantName];
 
-    if (!baseExp || !variantExp || !baseResults || !variantResults) continue;
+    if (!variantExp || !variantResults) continue;
+
+    // If only the variant exists (no base results), just rename it to the base
+    if (!baseExp || !baseResults) {
+      variantExp.name = baseName;
+      variantExp.modelName = MODEL_NAMES[baseName] || baseName;
+      exportedData.results[baseName] = variantResults;
+      delete exportedData.results[variantName];
+      continue;
+    }
 
     // Compute success rates
     const baseSuccessRate =
