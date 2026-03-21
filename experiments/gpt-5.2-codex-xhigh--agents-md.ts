@@ -10,7 +10,7 @@ const config: ExperimentConfig = {
   sandbox: 'vercel',
   setup: async (sandbox) => {
     // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@16.2.0-canary.41']);
+    await sandbox.runCommand('npm', ['install', 'next@canary']);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({
