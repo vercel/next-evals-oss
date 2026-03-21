@@ -255,7 +255,7 @@ async function main(): Promise<void> {
       variantExp.name = baseName;
       variantExp.modelName = MODEL_NAMES[baseName] || baseName;
       variantExp.docsImpact = {
-        baseSuccessRate: null as unknown as number,
+        baseSuccessRate: Math.round(docsSuccessRate),
         docsSuccessRate: Math.round(docsSuccessRate),
         delta: 0,
         newlyPassed: [],
