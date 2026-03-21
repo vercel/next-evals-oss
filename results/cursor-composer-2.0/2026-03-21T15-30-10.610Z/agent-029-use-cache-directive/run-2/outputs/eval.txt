@@ -1,0 +1,724 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 3 failed) 9ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { revalidateTag } from \'next/…' to match /['"]use cache['"];?/
+   × Page fetches products via lib/db 1ms
+     → expected 'import { revalidateTag } from \'next/…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { revalidateTag } from \'next/…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  15:32:15
+   Duration  219ms (transform 37ms, setup 0ms, collect 28ms, tests 9ms, environment 0ms, prepare 69ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import Link from 'next/link'
+import {
+  PRODUCTS_CACHE_TAG,
+  getCachedProductCatalog,
+  syncCatalogFromUpstream,
+} from '@/lib/catalog'
+
+export default async function AdminCatalogPage() {
+  const { products, generation, lastSyncCompletedAt } = await getCachedProductCatalog()
+
+  async function requestCatalogSync() {
+    'use server'
+    after(async () => {
+      await syncCatalogFromUpstream()
+      revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+    })
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '1rem' }}>Product catalog</h2>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '1.25rem',
+        }}
+      >
+        <form action={requestCatalogSync}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              border: '1px solid #222',
+              background: '#111',
+              color: '#fff',
+              borderRadius: 6,
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: '#444', maxWidth: 420 }}>
+          Queues a background pull from ERP/PIM. You can keep working; the shared{' '}
+          <code style={{ fontSize: '0.8em' }}>{PRODUCTS_CACHE_TAG}</code> cache updates shortly after sync
+          finishes.
+        </p>
+      </div>
+
+      <dl
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          gap: '0.25rem 1rem',
+          fontSize: '0.875rem',
+          marginBottom: '1rem',
+          color: '#333',
+        }}
+      >
+        <dt style={{ color: '#666' }}>Catalog generation</dt>
+        <dd style={{ margin: 0 }}>{generation}</dd>
+        <dt style={{ color: '#666' }}>Last completed sync</dt>
+        <dd style={{ margin: 0 }}>{lastSyncCompletedAt ?? '—'}</dd>
+      </dl>
+
+      <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+        <Link href=\"/admin/catalog/summary\" style={{ color: '#0366d6' }}>
+          Open summary view
+        </Link>{' '}
+        (same cached catalog data)
+      </p>
+
+      <div style={{ overflowX: 'auto', border: '1px solid #e5e5e5', borderRadius: 8 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ background: '#fafafa', textAlign: 'left' }}>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>SKU</th>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>Name</th>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id}>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>{p.sku}</td>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>{p.name}</td>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>
+                  ${p.price.toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+import Link from 'next/link'
+import { getCachedProductCatalog } from '@/lib/catalog'
+
+/**
+ * Secondary admin surface that reuses the same tagged cache as the main catalog grid.
+ */
+export default async function CatalogSummaryPage() {
+  const { products, generation, lastSyncCompletedAt } = await getCachedProductCatalog()
+  const avgPrice = products.reduce((s, p) => s + p.price, 0) / products.length
+
+  return (
+    <div>
+      <p style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+        <Link href=\"/admin/catalog\" style={{ color: '#0366d6' }}>
+          ← Back to catalog
+        </Link>
+      </p>
+      <h2 style={{ fontSize: '1.05rem', marginTop: 0 }}>Summary</h2>
+      <ul style={{ fontSize: '0.875rem', lineHeight: 1.6, color: '#333' }}>
+        <li>SKU count: {products.length}</li>
+        <li>Average price: ${avgPrice.toFixed(2)}</li>
+        <li>Generation: {generation}</li>
+        <li>Last sync: {lastSyncCompletedAt ?? '—'}</li>
+      </ul>
+    </div>
+  )
+}
+
+import type { ReactNode } from 'react'
+
+/** Admin surfaces must read through the Data Cache, not static HTML from build time. */
+export const dynamic = 'force-dynamic'
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 960, margin: '0 auto', padding: '1.5rem' }}>
+      <header style={{ marginBottom: '1.5rem', borderBottom: '1px solid #e5e5e5', paddingBottom: '1rem' }}>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>E-commerce admin</p>
+        <h1 style={{ margin: '0.25rem 0 0', fontSize: '1.25rem' }}>Operations</h1>
+      </header>
+      {children}
+    </div>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+/** Cache tag for all catalog reads; use with `revalidateTag` after upstream changes. */
+export const PRODUCTS_CACHE_TAG = 'products' as const
+
+export type Product = {
+  id: number
+  sku: string
+  name: string
+  price: number
+}
+
+type CatalogPayload = {
+  products: Product[]
+  /** Monotonic generation bumped after each simulated ERP/PIM sync completes. */
+  generation: number
+  lastSyncCompletedAt: string | null
+}
+
+const BASE_PRODUCTS: Product[] = [
+  { id: 1, sku: 'ELEC-LAP-01', name: 'Laptop', price: 999 },
+  { id: 2, sku: 'ELEC-PHN-02', name: 'Phone', price: 699 },
+  { id: 3, sku: 'ELEC-TAB-03', name: 'Tablet', price: 499 },
+  { id: 4, sku: 'ACC-HDP-04', name: 'Headphones', price: 199 },
+  { id: 5, sku: 'ACC-WCH-05', name: 'Watch', price: 299 },
+]
+
+let catalogGeneration = 0
+let lastSyncCompletedAt: string | null = null
+
+/**
+ * Simulated ERP/PIM pull — in production this would batch thousands of SKUs
+ * and write through to your database or search index.
+ */
+export async function syncCatalogFromUpstream(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 1200))
+  catalogGeneration += 1
+  lastSyncCompletedAt = new Date().toISOString()
+}
+
+async function loadCatalogFromSource(): Promise<CatalogPayload> {
+  await new Promise((r) => setTimeout(r, 100))
+  return {
+    products: BASE_PRODUCTS.map((p) => ({
+      ...p,
+      price: p.price + catalogGeneration,
+    })),
+    generation: catalogGeneration,
+    lastSyncCompletedAt,
+  }
+}
+
+/**
+ * Shared catalog read for admin surfaces. Tagged so `revalidateTag(PRODUCTS_CACHE_TAG, …)`
+ * can refresh all dependent routes without re-querying on every navigation.
+ */
+export const getCachedProductCatalog = unstable_cache(
+  async () => loadCatalogFromSource(),
+  ['admin-product-catalog'],
+  { tags: [PRODUCTS_CACHE_TAG] }
+)
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import Link from 'next/link'
+import {
+  PRODUCTS_CACHE_TAG,
+  getCachedProductCatalog,
+  syncCatalogFromUpstream,
+} from '@/lib/catalog'
+
+export default async function AdminCatalogPage() {
+  const { products, generation, lastSyncCompletedAt } = await getCachedProductCatalog()
+
+  async function requestCatalogSync() {
+    'use server'
+    after(async () => {
+      await syncCatalogFromUpstream()
+      revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+    })
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '1rem' }}>Product catalog</h2>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '1.25rem',
+        }}
+      >
+        <form action={requestCatalogSync}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              border: '1px solid #222',
+              background: '#111',
+              color: '#fff',
+              borderRadius: 6,
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: '#444', maxWidth: 420 }}>
+          Queues a background pull from ERP/PIM. You can keep working; the shared{' '}
+          <code style={{ fontSize: '0.8em' }}>{PRODUCTS_CACHE_TAG}</code> cache updates shortly after sync
+          finishes.
+        </p>
+      </div>
+
+      <dl
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          gap: '0.25rem 1rem',
+          fontSize: '0.875rem',
+          marginBottom: '1rem',
+          color: '#333',
+        }}
+      >
+        <dt style={{ color: '#666' }}>Catalog generation</dt>
+        <dd style={{ margin: 0 }}>{generation}</dd>
+        <dt style={{ color: '#666' }}>Last completed sync</dt>
+        <dd style={{ margin: 0 }}>{lastSyncCompletedAt ?? '—'}</dd>
+      </dl>
+
+      <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+        <Link href=\"/admin/catalog/summary\" style={{ color: '#0366d6' }}>
+          Open summary view
+        </Link>{' '}
+        (same cached catalog data)
+      </p>
+
+      <div style={{ overflowX: 'auto', border: '1px solid #e5e5e5', borderRadius: 8 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ background: '#fafafa', textAlign: 'left' }}>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>SKU</th>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>Name</th>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id}>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>{p.sku}</td>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>{p.name}</td>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>
+                  ${p.price.toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+import Link from 'next/link'
+import { getCachedProductCatalog } from '@/lib/catalog'
+
+/**
+ * Secondary admin surface that reuses the same tagged cache as the main catalog grid.
+ */
+export default async function CatalogSummaryPage() {
+  const { products, generation, lastSyncCompletedAt } = await getCachedProductCatalog()
+  const avgPrice = products.reduce((s, p) => s + p.price, 0) / products.length
+
+  return (
+    <div>
+      <p style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
+        <Link href=\"/admin/catalog\" style={{ color: '#0366d6' }}>
+          ← Back to catalog
+        </Link>
+      </p>
+      <h2 style={{ fontSize: '1.05rem', marginTop: 0 }}>Summary</h2>
+      <ul style={{ fontSize: '0.875rem', lineHeight: 1.6, color: '#333' }}>
+        <li>SKU count: {products.length}</li>
+        <li>Average price: ${avgPrice.toFixed(2)}</li>
+        <li>Generation: {generation}</li>
+        <li>Last sync: {lastSyncCompletedAt ?? '—'}</li>
+      </ul>
+    </div>
+  )
+}
+
+import type { ReactNode } from 'react'
+
+/** Admin surfaces must read through the Data Cache, not static HTML from build time. */
+export const dynamic = 'force-dynamic'
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 960, margin: '0 auto', padding: '1.5rem' }}>
+      <header style={{ marginBottom: '1.5rem', borderBottom: '1px solid #e5e5e5', paddingBottom: '1rem' }}>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>E-commerce admin</p>
+        <h1 style={{ margin: '0.25rem 0 0', fontSize: '1.25rem' }}>Operations</h1>
+      </header>
+      {children}
+    </div>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+/** Cache tag for all catalog reads; use with `revalidateTag` after upstream changes. */
+export const PRODUCTS_CACHE_TAG = 'products' as const
+
+export type Product = {
+  id: number
+  sku: string
+  name: string
+  price: number
+}
+
+type CatalogPayload = {
+  products: Product[]
+  /** Monotonic generation bumped after each simulated ERP/PIM sync completes. */
+  generation: number
+  lastSyncCompletedAt: string | null
+}
+
+const BASE_PRODUCTS: Product[] = [
+  { id: 1, sku: 'ELEC-LAP-01', name: 'Laptop', price: 999 },
+  { id: 2, sku: 'ELEC-PHN-02', name: 'Phone', price: 699 },
+  { id: 3, sku: 'ELEC-TAB-03', name: 'Tablet', price: 499 },
+  { id: 4, sku: 'ACC-HDP-04', name: 'Headphones', price: 199 },
+  { id: 5, sku: 'ACC-WCH-05', name: 'Watch', price: 299 },
+]
+
+let catalogGeneration = 0
+let lastSyncCompletedAt: string | null = null
+
+/**
+ * Simulated ERP/PIM pull — in production this would batch thousands of SKUs
+ * and write through to your database or search index.
+ */
+export async function syncCatalogFromUpstream(): Promise<void> {
+  await new Promise((r) => setTimeout(r, 1200))
+  catalogGeneration += 1
+  lastSyncCompletedAt = new Date().toISOString()
+}
+
+async function loadCatalogFromSource(): Promise<CatalogPayload> {
+  await new Promise((r) => setTimeout(r, 100))
+  return {
+    products: BASE_PRODUCTS.map((p) => ({
+      ...p,
+      price: p.price + catalogGeneration,
+    })),
+    generation: catalogGeneration,
+    lastSyncCompletedAt,
+  }
+}
+
+/**
+ * Shared catalog read for admin surfaces. Tagged so `revalidateTag(PRODUCTS_CACHE_TAG, …)`
+ * can refresh all dependent routes without re-querying on every navigation.
+ */
+export const getCachedProductCatalog = unstable_cache(
+  async () => loadCatalogFromSource(),
+  ['admin-product-catalog'],
+  { tags: [PRODUCTS_CACHE_TAG] }
+)
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import Link from 'next/link'
+import {
+  PRODUCTS_CACHE_TAG,
+  getCachedProductCatalog,
+  syncCatalogFromUpstream,
+} from '@/lib/catalog'
+
+export default async function AdminCatalogPage() {
+  const { products, generation, lastSyncCompletedAt } = await getCachedProductCatalog()
+
+  async function requestCatalogSync() {
+    'use server'
+    after(async () => {
+      await syncCatalogFromUpstream()
+      revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+    })
+  }
+
+  return (
+    <div>
+      <h2 style={{ fontSize: '1.1rem', marginTop: 0, marginBottom: '1rem' }}>Product catalog</h2>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: '1rem',
+          marginBottom: '1.25rem',
+        }}
+      >
+        <form action={requestCatalogSync}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              border: '1px solid #222',
+              background: '#111',
+              color: '#fff',
+              borderRadius: 6,
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+        <p style={{ margin: 0, fontSize: '0.875rem', color: '#444', maxWidth: 420 }}>
+          Queues a background pull from ERP/PIM. You can keep working; the shared{' '}
+          <code style={{ fontSize: '0.8em' }}>{PRODUCTS_CACHE_TAG}</code> cache updates shortly after sync
+          finishes.
+        </p>
+      </div>
+
+      <dl
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          gap: '0.25rem 1rem',
+          fontSize: '0.875rem',
+          marginBottom: '1rem',
+          color: '#333',
+        }}
+      >
+        <dt style={{ color: '#666' }}>Catalog generation</dt>
+        <dd style={{ margin: 0 }}>{generation}</dd>
+        <dt style={{ color: '#666' }}>Last completed sync</dt>
+        <dd style={{ margin: 0 }}>{lastSyncCompletedAt ?? '—'}</dd>
+      </dl>
+
+      <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
+        <Link href=\"/admin/catalog/summary\" style={{ color: '#0366d6' }}>
+          Open summary view
+        </Link>{' '}
+        (same cached catalog data)
+      </p>
+
+      <div style={{ overflowX: 'auto', border: '1px solid #e5e5e5', borderRadius: 8 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ background: '#fafafa', textAlign: 'left' }}>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>SKU</th>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>Name</th>
+              <th style={{ padding: '0.65rem 0.75rem', borderBottom: '1px solid #e5e5e5' }}>Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id}>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>{p.sku}</td>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>{p.name}</td>
+                <td style={{ padding: '0.55rem 0.75rem', borderBottom: '1px solid #f0f0f0' }}>
+                  ${p.price.toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:105:41
+    103| 
+    104|   // Require the same explicit products tag and a profile/second argum…
+    105|   expect(revalidateFile?.content ?? '').toMatch(
+       |                                         ^
+    106|     /revalidateTag\s*\(\s*['"]products['"]\s*,/
+    107|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
