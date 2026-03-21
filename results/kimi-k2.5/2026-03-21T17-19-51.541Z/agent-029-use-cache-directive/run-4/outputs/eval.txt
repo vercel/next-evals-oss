@@ -1,0 +1,589 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 9ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { revalidateTag } from "next/c…' to match /['"]use cache['"];?/
+   × Page fetches products via lib/db 1ms
+     → expected 'import { revalidateTag } from "next/c…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  17:22:45
+   Duration  221ms (transform 37ms, setup 0ms, collect 28ms, tests 9ms, environment 0ms, prepare 69ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { revalidateTag } from "next/c…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from \"next/cache\";
+import { unstable_cache } from \"next/cache\";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  inventory: number;
+  available: boolean;
+  sku: string;
+}
+
+async function fetchProductsFromERP(): Promise<Product[]> {
+  // Simulate ERP/PIM data fetch - in production this would call your ERP API
+  return [
+    { id: \"1\", name: \"Wireless Headphones\", price: 99.99, inventory: 150, available: true, sku: \"WH-001\" },
+    { id: \"2\", name: \"Smart Watch\", price: 249.99, inventory: 75, available: true, sku: \"SW-002\" },
+    { id: \"3\", name: \"USB-C Cable\", price: 19.99, inventory: 500, available: true, sku: \"UC-003\" },
+    { id: \"4\", name: \"Mechanical Keyboard\", price: 149.99, inventory: 0, available: false, sku: \"MK-004\" },
+    { id: \"5\", name: \"Webcam 4K\", price: 129.99, inventory: 45, available: true, sku: \"WC-005\" },
+  ];
+}
+
+const getCachedProducts = unstable_cache(
+  fetchProductsFromERP,
+  [\"products\"],
+  {
+    tags: [\"products\"],
+    revalidate: false, // Cache indefinitely until manually invalidated
+  }
+);
+
+export default async function AdminCatalogPage() {
+  const products = await getCachedProducts();
+
+  async function syncCatalog() {
+    \"use server\";
+    
+    // Trigger background cache invalidation
+    // This returns immediately - operators can continue working
+    revalidateTag(\"products\", {});
+  }
+
+  return (
+    <div style={{ padding: \"2rem\", maxWidth: \"1200px\", margin: \"0 auto\" }}>
+      <div style={{ 
+        display: \"flex\", 
+        justifyContent: \"space-between\", 
+        alignItems: \"center\",
+        marginBottom: \"2rem\",
+        paddingBottom: \"1rem\",
+        borderBottom: \"1px solid #e5e7eb\"
+      }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: \"1.875rem\", fontWeight: 600 }}>
+            Product Catalog
+          </h1>
+          <p style={{ margin: \"0.5rem 0 0 0\", color: \"#6b7280\" }}>
+            Manage your product inventory and pricing
+          </p>
+        </div>
+        
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: \"0.625rem 1.25rem\",
+              backgroundColor: \"#3b82f6\",
+              color: \"white\",
+              border: \"none\",
+              borderRadius: \"0.375rem\",
+              fontSize: \"0.875rem\",
+              fontWeight: 500,
+              cursor: \"pointer\",
+              display: \"flex\",
+              alignItems: \"center\",
+              gap: \"0.5rem\",
+            }}
+          >
+            <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\">
+              <path d=\"M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" />
+              <path d=\"M3 3v5h5\" />
+              <path d=\"M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16\" />
+              <path d=\"M16 21h5v-5\" />
+            </svg>
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <div style={{
+        backgroundColor: \"white\",
+        borderRadius: \"0.5rem\",
+        boxShadow: \"0 1px 3px 0 rgba(0, 0, 0, 0.1)\",
+        overflow: \"hidden\",
+      }}>
+        <table style={{ width: \"100%\", borderCollapse: \"collapse\" }}>
+          <thead>
+            <tr style={{ backgroundColor: \"#f9fafb\" }}>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"left\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                SKU
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"left\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Product
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"right\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Price
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"center\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Inventory
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"center\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product, index) => (
+              <tr 
+                key={product.id}
+                style={{ 
+                  borderTop: \"1px solid #e5e7eb\",
+                  backgroundColor: index % 2 === 0 ? \"white\" : \"#f9fafb\"
+                }}
+              >
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", fontWeight: 500, color: \"#111827\" }}>
+                  {product.sku}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", color: \"#111827\" }}>
+                  {product.name}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", color: \"#111827\", textAlign: \"right\" }}>
+                  ${product.price.toFixed(2)}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", color: \"#111827\", textAlign: \"center\" }}>
+                  {product.inventory}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", textAlign: \"center\" }}>
+                  <span style={{
+                    display: \"inline-flex\",
+                    padding: \"0.25rem 0.75rem\",
+                    fontSize: \"0.75rem\",
+                    fontWeight: 600,
+                    borderRadius: \"9999px\",
+                    backgroundColor: product.available ? \"#d1fae5\" : \"#fee2e2\",
+                    color: product.available ? \"#065f46\" : \"#991b1b\",
+                  }}>
+                    {product.available ? \"Active\" : \"Inactive\"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: \"1rem\", display: \"flex\", gap: \"1rem\", fontSize: \"0.875rem\", color: \"#6b7280\" }}>
+        <span>{products.length} products</span>
+        <span>•</span>
+        <span>Cache tag: \"products\"</span>
+      </div>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { revalidateTag } from "next/c…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from \"next/cache\";
+import { unstable_cache } from \"next/cache\";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  inventory: number;
+  available: boolean;
+  sku: string;
+}
+
+async function fetchProductsFromERP(): Promise<Product[]> {
+  // Simulate ERP/PIM data fetch - in production this would call your ERP API
+  return [
+    { id: \"1\", name: \"Wireless Headphones\", price: 99.99, inventory: 150, available: true, sku: \"WH-001\" },
+    { id: \"2\", name: \"Smart Watch\", price: 249.99, inventory: 75, available: true, sku: \"SW-002\" },
+    { id: \"3\", name: \"USB-C Cable\", price: 19.99, inventory: 500, available: true, sku: \"UC-003\" },
+    { id: \"4\", name: \"Mechanical Keyboard\", price: 149.99, inventory: 0, available: false, sku: \"MK-004\" },
+    { id: \"5\", name: \"Webcam 4K\", price: 129.99, inventory: 45, available: true, sku: \"WC-005\" },
+  ];
+}
+
+const getCachedProducts = unstable_cache(
+  fetchProductsFromERP,
+  [\"products\"],
+  {
+    tags: [\"products\"],
+    revalidate: false, // Cache indefinitely until manually invalidated
+  }
+);
+
+export default async function AdminCatalogPage() {
+  const products = await getCachedProducts();
+
+  async function syncCatalog() {
+    \"use server\";
+    
+    // Trigger background cache invalidation
+    // This returns immediately - operators can continue working
+    revalidateTag(\"products\", {});
+  }
+
+  return (
+    <div style={{ padding: \"2rem\", maxWidth: \"1200px\", margin: \"0 auto\" }}>
+      <div style={{ 
+        display: \"flex\", 
+        justifyContent: \"space-between\", 
+        alignItems: \"center\",
+        marginBottom: \"2rem\",
+        paddingBottom: \"1rem\",
+        borderBottom: \"1px solid #e5e7eb\"
+      }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: \"1.875rem\", fontWeight: 600 }}>
+            Product Catalog
+          </h1>
+          <p style={{ margin: \"0.5rem 0 0 0\", color: \"#6b7280\" }}>
+            Manage your product inventory and pricing
+          </p>
+        </div>
+        
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: \"0.625rem 1.25rem\",
+              backgroundColor: \"#3b82f6\",
+              color: \"white\",
+              border: \"none\",
+              borderRadius: \"0.375rem\",
+              fontSize: \"0.875rem\",
+              fontWeight: 500,
+              cursor: \"pointer\",
+              display: \"flex\",
+              alignItems: \"center\",
+              gap: \"0.5rem\",
+            }}
+          >
+            <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\">
+              <path d=\"M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" />
+              <path d=\"M3 3v5h5\" />
+              <path d=\"M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16\" />
+              <path d=\"M16 21h5v-5\" />
+            </svg>
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <div style={{
+        backgroundColor: \"white\",
+        borderRadius: \"0.5rem\",
+        boxShadow: \"0 1px 3px 0 rgba(0, 0, 0, 0.1)\",
+        overflow: \"hidden\",
+      }}>
+        <table style={{ width: \"100%\", borderCollapse: \"collapse\" }}>
+          <thead>
+            <tr style={{ backgroundColor: \"#f9fafb\" }}>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"left\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                SKU
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"left\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Product
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"right\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Price
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"center\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Inventory
+              </th>
+              <th style={{ 
+                padding: \"0.75rem 1.5rem\", 
+                textAlign: \"center\", 
+                fontSize: \"0.75rem\",
+                fontWeight: 600,
+                color: \"#6b7280\",
+                textTransform: \"uppercase\",
+                letterSpacing: \"0.05em\"
+              }}>
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product, index) => (
+              <tr 
+                key={product.id}
+                style={{ 
+                  borderTop: \"1px solid #e5e7eb\",
+                  backgroundColor: index % 2 === 0 ? \"white\" : \"#f9fafb\"
+                }}
+              >
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", fontWeight: 500, color: \"#111827\" }}>
+                  {product.sku}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", color: \"#111827\" }}>
+                  {product.name}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", color: \"#111827\", textAlign: \"right\" }}>
+                  ${product.price.toFixed(2)}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", fontSize: \"0.875rem\", color: \"#111827\", textAlign: \"center\" }}>
+                  {product.inventory}
+                </td>
+                <td style={{ padding: \"1rem 1.5rem\", textAlign: \"center\" }}>
+                  <span style={{
+                    display: \"inline-flex\",
+                    padding: \"0.25rem 0.75rem\",
+                    fontSize: \"0.75rem\",
+                    fontWeight: 600,
+                    borderRadius: \"9999px\",
+                    backgroundColor: product.available ? \"#d1fae5\" : \"#fee2e2\",
+                    color: product.available ? \"#065f46\" : \"#991b1b\",
+                  }}>
+                    {product.available ? \"Active\" : \"Inactive\"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: \"1rem\", display: \"flex\", gap: \"1rem\", fontSize: \"0.875rem\", color: \"#6b7280\" }}>
+        <span>{products.length} products</span>
+        <span>•</span>
+        <span>Cache tag: \"products\"</span>
+      </div>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

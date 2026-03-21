@@ -1,0 +1,256 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 8ms
+   ✓ Catalog reads use use-cache directive and products cache tag 1ms
+   × Page fetches products via lib/db 5ms
+     → expected 'import { unstable_cacheTag as cacheTa…' to match /import.*getAllProducts.*…/db|from.*lib\
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → Expected source to call revalidateTag: expected undefined to be defined
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  17:23:05
+   Duration  208ms (transform 31ms, setup 0ms, collect 27ms, tests 8ms, environment 0ms, prepare 64ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page fetches products via lib/db
+AssertionError: expected 'import { unstable_cacheTag as cacheTa…' to match /import.*getAllProducts.*…/db|from.*lib\
+
+[32m- Expected:[39m 
+/import.*getAllProducts.*lib\/db|from.*lib\/db/
+
+[31m+ Received:[39m 
+"import { unstable_cacheTag as cacheTag } from \"next/cache\";
+import { updateTag } from \"next/cache\";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  inventory: number;
+  available: boolean;
+  sku: string;
+}
+
+async function getProducts(): Promise<Product[]> {
+  \"use cache\";
+  cacheTag(\"products\");
+
+  // Simulated product fetch - in production this queries your ERP/PIM
+  // This data is cached and won't re-query on every request
+  const products: Product[] = [
+    {
+      id: \"1\",
+      name: \"Wireless Headphones\",
+      price: 99.99,
+      inventory: 150,
+      available: true,
+      sku: \"WH-001\",
+    },
+    {
+      id: \"2\",
+      name: \"Smart Watch\",
+      price: 249.99,
+      inventory: 75,
+      available: true,
+      sku: \"SW-002\",
+    },
+    {
+      id: \"3\",
+      name: \"USB-C Cable\",
+      price: 19.99,
+      inventory: 500,
+      available: true,
+      sku: \"CB-003\",
+    },
+    {
+      id: \"4\",
+      name: \"Laptop Stand\",
+      price: 59.99,
+      inventory: 0,
+      available: false,
+      sku: \"LS-004\",
+    },
+  ];
+
+  return products;
+}
+
+export default async function AdminCatalogPage() {
+  const products = await getProducts();
+
+  async function syncCatalog() {
+    \"use server\";
+
+    // Trigger background revalidation - doesn't block the user
+    // The admin can continue working immediately while data refreshes
+    updateTag(\"products\");
+  }
+
+  return (
+    <div className=\"container mx-auto px-4 py-8\">
+      <div className=\"flex items-center justify-between mb-8\">
+        <h1 className=\"text-3xl font-bold\">Product Catalog</h1>
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            className=\"bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors\"
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </div>
+
+      <div className=\"bg-white rounded-lg shadow overflow-hidden\">
+        <table className=\"min-w-full\">
+          <thead className=\"bg-gray-50\">
+            <tr>
+              <th className=\"px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider\">
+                SKU
+              </th>
+              <th className=\"px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider\">
+                Name
+              </th>
+              <th className=\"px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider\">
+                Price
+              </th>
+              <th className=\"px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider\">
+                Inventory
+              </th>
+              <th className=\"px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider\">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody className=\"bg-white divide-y divide-gray-200\">
+            {products.map((product) => (
+              <tr key={product.id}>
+                <td className=\"px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900\">
+                  {product.sku}
+                </td>
+                <td className=\"px-6 py-4 whitespace-nowrap text-sm text-gray-900\">
+                  {product.name}
+                </td>
+                <td className=\"px-6 py-4 whitespace-nowrap text-sm text-gray-900\">
+                  ${product.price.toFixed(2)}
+                </td>
+                <td className=\"px-6 py-4 whitespace-nowrap text-sm text-gray-900\">
+                  {product.inventory}
+                </td>
+                <td className=\"px-6 py-4 whitespace-nowrap\">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      product.available
+                        ? \"bg-green-100 text-green-800\"
+                        : \"bg-red-100 text-red-800\"
+                    }`}
+                  >
+                    {product.available ? \"Available\" : \"Out of Stock\"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className=\"mt-4 text-sm text-gray-500\">
+        Data is cached for fast browsing. Click &ldquo;Sync latest catalog&rdquo; to refresh when ERP/PIM data changes.
+      </p>
+    </div>
+  );
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    cacheComponents: true,
+  },
+}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:74:18
+     72| test('Page fetches products via lib/db', () => {
+     73|   // Keep data source expectation explicit without location assumption…
+     74|   expect(source).toMatch(/import.*getAllProducts.*lib\/db|from.*lib\/d…
+       |                  ^
+     75|   expect(source).toMatch(/await\s+getAllProducts\s*\(|getAllProducts\s…
+     76| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: Expected source to call revalidateTag: expected undefined to be defined
+ ❯ EVAL.ts:96:67
+     94| test('Server Action revalidates products using revalidateTag profile',…
+     95|   const revalidateFile = fileWith(/revalidateTag\s*\(/)
+     96|   expect(revalidateFile, 'Expected source to call revalidateTag').toBe…
+       |                                                                   ^
+     97| 
+     98|   // The chosen API should be revalidateTag in this workflow.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
