@@ -76,6 +76,8 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.4-xhigh--agents-md': 'GPT 5.4 (xhigh) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
+  'minimax-m2.7': 'MiniMax M2.7',
+  'minimax-m2.7--agents-md': 'MiniMax M2.7 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
@@ -245,6 +247,7 @@ async function main(): Promise<void> {
     'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
     'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
     'kimi-k2.5--agents-md': 'kimi-k2.5',
+    'minimax-m2.7--agents-md': 'minimax-m2.7',
   };
 
   for (const [variantName, baseName] of Object.entries(AGENTS_MD_PAIRS)) {
