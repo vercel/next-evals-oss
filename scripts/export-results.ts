@@ -72,6 +72,8 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
   'gpt-5.3-codex-xhigh--agents-md': 'GPT 5.3 Codex (xhigh) + AGENTS.md',
+  'gpt-5.4-xhigh': 'GPT 5.4 (xhigh)',
+  'gpt-5.4-xhigh--agents-md': 'GPT 5.4 (xhigh) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
 };
@@ -79,6 +81,7 @@ const MODEL_NAMES: Record<string, string> = {
 const HARNESS_NAMES: Record<string, string> = {
   'claude-code': 'Claude Code',
   'codex': 'Codex',
+  'vercel-ai-gateway/codex': 'Codex',
   'vercel-ai-gateway/opencode': 'OpenCode',
   'cursor': 'Cursor',
   'gemini': 'Gemini CLI',
@@ -240,6 +243,7 @@ async function main(): Promise<void> {
     'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
     'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
     'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
+    'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
     'kimi-k2.5--agents-md': 'kimi-k2.5',
   };
 
