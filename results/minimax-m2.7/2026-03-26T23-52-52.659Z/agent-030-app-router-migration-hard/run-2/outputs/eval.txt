@@ -1,0 +1,206 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (8 tests | 2 failed) 10ms
+   ✓ Root layout exists and replaces _app/_document 1ms
+   ✓ Home page migrated to Server Component with async data fetching 1ms
+   ✓ Blog index migrated with ISR equivalent 0ms
+   × Dynamic blog route migrated to generateStaticParams 5ms
+     → expected 'import type { Metadata } from \'next\…' to match /export.*generateStaticParams|generate…/
+   ✓ API routes migrated to Route Handlers 0ms
+   × Metadata API replaces next/head 1ms
+     → expected 'import type { Metadata } from \'next\…' to match /export.*metadata|metadata.*Metadata/
+   ✓ Error handling migrated to error.js and not-found.js 0ms
+   ✓ Client components use next/navigation hooks 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+   Start at  23:56:42
+   Duration  210ms (transform 31ms, setup 0ms, collect 29ms, tests 10ms, environment 0ms, prepare 60ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dynamic blog route migrated to generateStaticParams
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /export.*generateStaticParams|generate…/
+
+[32m- Expected:[39m 
+/export.*generateStaticParams|generateStaticParams.*export/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+
+interface Comment {
+  id: number
+  name: string
+  body: string
+  email: string
+}
+
+interface Post {
+  id: number
+  title: string
+  body: string
+}
+
+interface BlogPostProps {
+  params: Promise<{ id: string }>
+}
+
+export async function generateMetadata({ params }: BlogPostProps): Promise<Metadata> {
+  const { id } = await params
+  try {
+    const res = await fetch(`https://jsonplaceholder.typicode.com/posts/${id}`, {
+      next: { revalidate: 300 },
+    })
+    if (!res.ok) return { title: 'Post Not Found' }
+    const post: Post = await res.json()
+    return {
+      title: `${post.title} - My Blog`,
+      description: post.body.substring(0, 160),
+      openGraph: {
+        title: post.title,
+        description: post.body.substring(0, 160),
+      },
+    }
+  } catch {
+    return { title: 'Post Not Found' }
+  }
+}
+
+async function getPost(id: string): Promise<Post | null> {
+  const res = await fetch(`https://jsonplaceholder.typicode.com/posts/${id}`, {
+    next: { revalidate: 300 },
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
+async function getComments(id: string): Promise<Comment[]> {
+  const res = await fetch(
+    `https://jsonplaceholder.typicode.com/posts/${id}/comments`,
+    { next: { revalidate: 300 } }
+  )
+  return res.json()
+}
+
+export default async function BlogPost({ params }: BlogPostProps) {
+  const { id } = await params
+  const post = await getPost(id)
+
+  if (!post) {
+    notFound()
+  }
+
+  const comments = await getComments(id)
+
+  return (
+    <article>
+      <Link href=\"/blog\">← Back</Link>
+
+      <h1>{post.title}</h1>
+      <p>{post.body}</p>
+
+      <h2>Comments ({comments.length})</h2>
+      <div className=\"comments\">
+        {comments.map((comment) => (
+          <div key={comment.id} className=\"comment\">
+            <h3>{comment.name}</h3>
+            <p>{comment.body}</p>
+            <small>By: {comment.email}</small>
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+"
+
+ ❯ EVAL.ts:87:26
+     85| 
+     86|   // Should export generateStaticParams
+     87|   expect(dynamicContent).toMatch(
+       |                          ^
+     88|     /export.*generateStaticParams|generateStaticParams.*export/
+     89|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Metadata API replaces next/head
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /export.*metadata|metadata.*Metadata/
+
+[32m- Expected:[39m 
+/export.*metadata|metadata.*Metadata/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
+interface Post {
+  id: number
+  title: string
+  body: string
+}
+
+interface HomePageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: 'Home - My Blog',
+    description: 'Welcome to my blog homepage',
+    openGraph: {
+      title: 'Home - My Blog',
+    },
+  }
+}
+
+async function getPosts(): Promise<Post[]> {
+  const res = await fetch('https://jsonplaceholder.typicode.com/posts?_limit=5', {
+    cache: 'no-store',
+  })
+  return res.json()
+}
+
+async function getUserAgent(): Promise<string> {
+  return 'Server-side rendered'
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const [posts, userAgent] = await Promise.all([getPosts(), getUserAgent()])
+  const params = await searchParams
+  const timestamp = new Date().toISOString()
+
+  return (
+    <div>
+      <h1>Welcome to My Blog</h1>
+      <p>Server-side rendered at: {timestamp}</p>
+      <p>Your user agent: {userAgent}</p>
+
+      <h2>Recent Posts</h2>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            <Link href={`/blog/${post.id}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:137:23
+    135| 
+    136|   // Should use Metadata export instead of Head component
+    137|   expect(pageContent).toMatch(/export.*metadata|metadata.*Metadata/)
+       |                       ^
+    138| 
+    139|   // Should not import or use next/head
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

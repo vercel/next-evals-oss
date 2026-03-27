@@ -1,0 +1,1408 @@
+{
+  "agent": "vercel-ai-gateway/opencode",
+  "model": "vercel/minimax/minimax-m2.7",
+  "events": [
+    {
+      "timestamp": "2026-03-26T23:54:51.547Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "unknown",
+        "originalName": "task",
+        "args": {
+          "description": "Explore posts codebase structure",
+          "prompt": "I need to understand the codebase structure for posts. Please find:\n1. Where posts are defined (types/models)\n2. Where existing Server Actions exist (especially for posts or similar entities)\n3. Where posts are fetched/cached (look for cache tags usage like 'posts')\n4. How cache invalidation is done in existing code\n\nSearch for patterns like:\n- \"cacheTag\", \"revalidateTag\", \"revalidatePath\"\n- \"use server\" directives\n- posts-related files\n\nReturn the relevant file paths and code snippets showing how cache tags and invalidation work in this codebase.",
+          "subagent_type": "explore"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569291547,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c916fa1001gn4xF89wqNf0jR",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c9165f7001YZ8MPGgLO0DOn8",
+          "type": "tool",
+          "callID": "call_function_xmb32prgdcn3_1",
+          "tool": "task",
+          "state": {
+            "status": "completed",
+            "input": {
+              "description": "Explore posts codebase structure",
+              "prompt": "I need to understand the codebase structure for posts. Please find:\n1. Where posts are defined (types/models)\n2. Where existing Server Actions exist (especially for posts or similar entities)\n3. Where posts are fetched/cached (look for cache tags usage like 'posts')\n4. How cache invalidation is done in existing code\n\nSearch for patterns like:\n- \"cacheTag\", \"revalidateTag\", \"revalidatePath\"\n- \"use server\" directives\n- posts-related files\n\nReturn the relevant file paths and code snippets showing how cache tags and invalidation work in this codebase.",
+              "subagent_type": "explore"
+            },
+            "output": "task_id: ses_2d36e84fbffeJAMkrdIVgWK55s (for resuming to continue this task if needed)\n\n<task_result>\nNow I have a complete picture. Let me provide you with a comprehensive summary of the codebase structure and the patterns you should use.\n\n---\n\n## Summary: Posts Codebase Structure\n\n### Current State\n\nThis is a **minimal Next.js project** with no existing implementation for posts. Current files:\n\n| File | Purpose |\n|------|---------|\n| `/vercel/sandbox/app/page.tsx` | Placeholder page with message: \"Please implement a Server Action for creating posts with cache invalidation\" |\n| `/vercel/sandbox/app/layout.tsx` | Root layout with metadata |\n| `/vercel/sandbox/next.config.ts` | Empty config (needs `cacheComponents: true`) |\n\n**No existing:**\n- Post types/models\n- Server Actions\n- Cache tag patterns\n- Data fetching/caching\n\n---\n\n### How Cache Tags & Invalidation Work (Next.js Patterns)\n\nBased on the Next.js documentation, here are the patterns:\n\n#### 1. **Enable Cache Components** (next.config.ts)\n```ts\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n}\n\nexport default nextConfig\n```\n\n#### 2. **Tag Cached Data** - Two ways:\n\n**Option A: Using `'use cache'` directive + `cacheTag`**\n```tsx\nimport { cacheTag } from 'next/cache'\n\nexport async function getPosts() {\n  'use cache'\n  cacheTag('posts')\n  // fetch posts data...\n  return posts\n}\n```\n\n**Option B: Using `fetch` with `next.tags`**\n```tsx\nconst posts = await fetch('https://api.example.com/posts', {\n  next: { tags: ['posts'] }\n})\n```\n\n#### 3. **Invalidate Cache** - Three functions:\n\n| Function | Where to Use | Behavior |\n|----------|--------------|----------|\n| `updateTag('posts')` | **Server Actions only** | Immediate invalidation (read-your-own-writes) |\n| `revalidateTag('posts', 'max')` | Server Actions + Route Handlers | Stale-while-revalidate (recommended) |\n| `revalidatePath('/posts')` | Server Actions + Route Handlers | Invalidates specific page/layout path |\n\n#### 4. **Server Action Example** (create-post.ts)\n```tsx\n'use server'\n\nimport { updateTag, revalidatePath } from 'next/cache'\nimport { redirect } from 'next/navigation'\n\nexport async function createPost(formData: FormData) {\n  const title = formData.get('title')\n  const content = formData.get('content')\n\n  // Create post in database\n  const post = await db.post.create({ data: { title, content } })\n\n  // Invalidate cache for immediate consistency\n  updateTag('posts')                    // List page - immediate\n  updateTag(`post-${post.id}`)          // Detail page - immediate\n  \n  // Or use revalidateTag for stale-while-revalidate:\n  // revalidateTag('posts', 'max')\n  \n  // Refresh the list page\n  revalidatePath('/posts')\n\n  redirect(`/posts/${post.id}`)\n}\n```\n\n#### 5. **\"use server\" Directive**\n- Placed at **top of file** to mark all exports as Server Functions\n- Or at **top of a function** to mark just that function\n```tsx\n'use server'  // Top of file - all exports are Server Functions\n\nimport { revalidateTag } from 'next/cache'\n\nexport async function createPost(formData: FormData) {\n  // This is a Server Action\n}\n```\n\n---\n\n### Key Files to Create\n\nFor a posts feature, you'll need:\n\n| File | Purpose |\n|------|---------|\n| `/vercel/sandbox/app/lib/types.ts` | Post type definitions |\n| `/vercel/sandbox/app/actions.ts` | Server Actions (createPost, updatePost, deletePost) |\n| `/vercel/sandbox/app/lib/posts.ts` | Data fetching with cacheTag |\n| `/vercel/sandbox/app/posts/page.tsx` | Posts list page |\n| `/vercel/sandbox/app/posts/[id]/page.tsx` | Individual post page |\n\n---\n\n### Relevant Documentation Files\n\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-server.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/04-glossary.md` (comprehensive glossary)\n</task_result>",
+            "title": "Explore posts codebase structure",
+            "metadata": {
+              "sessionId": "ses_2d36e84fbffeJAMkrdIVgWK55s",
+              "model": {
+                "modelID": "minimax/minimax-m2.7",
+                "providerID": "vercel"
+              },
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569224961,
+              "end": 1774569291546
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:51.547Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "unknown",
+        "originalName": "task",
+        "result": "task_id: ses_2d36e84fbffeJAMkrdIVgWK55s (for resuming to continue this task if needed)\n\n<task_result>\nNow I have a complete picture. Let me provide you with a comprehensive summary of the codebase structure and the patterns you should use.\n\n---\n\n## Summary: Posts Codebase Structure\n\n### Current State\n\nThis is a **minimal Next.js project** with no existing implementation for posts. Current files:\n\n| File | Purpose |\n|------|---------|\n| `/vercel/sandbox/app/page.tsx` | Placeholder page with message: \"Please implement a Server Action for creating posts with cache invalidation\" |\n| `/vercel/sandbox/app/layout.tsx` | Root layout with metadata |\n| `/vercel/sandbox/next.config.ts` | Empty config (needs `cacheComponents: true`) |\n\n**No existing:**\n- Post types/models\n- Server Actions\n- Cache tag patterns\n- Data fetching/caching\n\n---\n\n### How Cache Tags & Invalidation Work (Next.js Patterns)\n\nBased on the Next.js documentation, here are the patterns:\n\n#### 1. **Enable Cache Components** (next.config.ts)\n```ts\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n}\n\nexport default nextConfig\n```\n\n#### 2. **Tag Cached Data** - Two ways:\n\n**Option A: Using `'use cache'` directive + `cacheTag`**\n```tsx\nimport { cacheTag } from 'next/cache'\n\nexport async function getPosts() {\n  'use cache'\n  cacheTag('posts')\n  // fetch posts data...\n  return posts\n}\n```\n\n**Option B: Using `fetch` with `next.tags`**\n```tsx\nconst posts = await fetch('https://api.example.com/posts', {\n  next: { tags: ['posts'] }\n})\n```\n\n#### 3. **Invalidate Cache** - Three functions:\n\n| Function | Where to Use | Behavior |\n|----------|--------------|----------|\n| `updateTag('posts')` | **Server Actions only** | Immediate invalidation (read-your-own-writes) |\n| `revalidateTag('posts', 'max')` | Server Actions + Route Handlers | Stale-while-revalidate (recommended) |\n| `revalidatePath('/posts')` | Server Actions + Route Handlers | Invalidates specific page/layout path |\n\n#### 4. **Server Action Example** (create-post.ts)\n```tsx\n'use server'\n\nimport { updateTag, revalidatePath } from 'next/cache'\nimport { redirect } from 'next/navigation'\n\nexport async function createPost(formData: FormData) {\n  const title = formData.get('title')\n  const content = formData.get('content')\n\n  // Create post in database\n  const post = await db.post.create({ data: { title, content } })\n\n  // Invalidate cache for immediate consistency\n  updateTag('posts')                    // List page - immediate\n  updateTag(`post-${post.id}`)          // Detail page - immediate\n  \n  // Or use revalidateTag for stale-while-revalidate:\n  // revalidateTag('posts', 'max')\n  \n  // Refresh the list page\n  revalidatePath('/posts')\n\n  redirect(`/posts/${post.id}`)\n}\n```\n\n#### 5. **\"use server\" Directive**\n- Placed at **top of file** to mark all exports as Server Functions\n- Or at **top of a function** to mark just that function\n```tsx\n'use server'  // Top of file - all exports are Server Functions\n\nimport { revalidateTag } from 'next/cache'\n\nexport async function createPost(formData: FormData) {\n  // This is a Server Action\n}\n```\n\n---\n\n### Key Files to Create\n\nFor a posts feature, you'll need:\n\n| File | Purpose |\n|------|---------|\n| `/vercel/sandbox/app/lib/types.ts` | Post type definitions |\n| `/vercel/sandbox/app/actions.ts` | Server Actions (createPost, updatePost, deletePost) |\n| `/vercel/sandbox/app/lib/posts.ts` | Data fetching with cacheTag |\n| `/vercel/sandbox/app/posts/page.tsx` | Posts list page |\n| `/vercel/sandbox/app/posts/[id]/page.tsx` | Individual post page |\n\n---\n\n### Relevant Documentation Files\n\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-server.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/04-glossary.md` (comprehensive glossary)\n</task_result>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "description": "Explore posts codebase structure",
+          "prompt": "I need to understand the codebase structure for posts. Please find:\n1. Where posts are defined (types/models)\n2. Where existing Server Actions exist (especially for posts or similar entities)\n3. Where posts are fetched/cached (look for cache tags usage like 'posts')\n4. How cache invalidation is done in existing code\n\nSearch for patterns like:\n- \"cacheTag\", \"revalidateTag\", \"revalidatePath\"\n- \"use server\" directives\n- posts-related files\n\nReturn the relevant file paths and code snippets showing how cache tags and invalidation work in this codebase.",
+          "subagent_type": "explore"
+        },
+        "output": "task_id: ses_2d36e84fbffeJAMkrdIVgWK55s (for resuming to continue this task if needed)\n\n<task_result>\nNow I have a complete picture. Let me provide you with a comprehensive summary of the codebase structure and the patterns you should use.\n\n---\n\n## Summary: Posts Codebase Structure\n\n### Current State\n\nThis is a **minimal Next.js project** with no existing implementation for posts. Current files:\n\n| File | Purpose |\n|------|---------|\n| `/vercel/sandbox/app/page.tsx` | Placeholder page with message: \"Please implement a Server Action for creating posts with cache invalidation\" |\n| `/vercel/sandbox/app/layout.tsx` | Root layout with metadata |\n| `/vercel/sandbox/next.config.ts` | Empty config (needs `cacheComponents: true`) |\n\n**No existing:**\n- Post types/models\n- Server Actions\n- Cache tag patterns\n- Data fetching/caching\n\n---\n\n### How Cache Tags & Invalidation Work (Next.js Patterns)\n\nBased on the Next.js documentation, here are the patterns:\n\n#### 1. **Enable Cache Components** (next.config.ts)\n```ts\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n}\n\nexport default nextConfig\n```\n\n#### 2. **Tag Cached Data** - Two ways:\n\n**Option A: Using `'use cache'` directive + `cacheTag`**\n```tsx\nimport { cacheTag } from 'next/cache'\n\nexport async function getPosts() {\n  'use cache'\n  cacheTag('posts')\n  // fetch posts data...\n  return posts\n}\n```\n\n**Option B: Using `fetch` with `next.tags`**\n```tsx\nconst posts = await fetch('https://api.example.com/posts', {\n  next: { tags: ['posts'] }\n})\n```\n\n#### 3. **Invalidate Cache** - Three functions:\n\n| Function | Where to Use | Behavior |\n|----------|--------------|----------|\n| `updateTag('posts')` | **Server Actions only** | Immediate invalidation (read-your-own-writes) |\n| `revalidateTag('posts', 'max')` | Server Actions + Route Handlers | Stale-while-revalidate (recommended) |\n| `revalidatePath('/posts')` | Server Actions + Route Handlers | Invalidates specific page/layout path |\n\n#### 4. **Server Action Example** (create-post.ts)\n```tsx\n'use server'\n\nimport { updateTag, revalidatePath } from 'next/cache'\nimport { redirect } from 'next/navigation'\n\nexport async function createPost(formData: FormData) {\n  const title = formData.get('title')\n  const content = formData.get('content')\n\n  // Create post in database\n  const post = await db.post.create({ data: { title, content } })\n\n  // Invalidate cache for immediate consistency\n  updateTag('posts')                    // List page - immediate\n  updateTag(`post-${post.id}`)          // Detail page - immediate\n  \n  // Or use revalidateTag for stale-while-revalidate:\n  // revalidateTag('posts', 'max')\n  \n  // Refresh the list page\n  revalidatePath('/posts')\n\n  redirect(`/posts/${post.id}`)\n}\n```\n\n#### 5. **\"use server\" Directive**\n- Placed at **top of file** to mark all exports as Server Functions\n- Or at **top of a function** to mark just that function\n```tsx\n'use server'  // Top of file - all exports are Server Functions\n\nimport { revalidateTag } from 'next/cache'\n\nexport async function createPost(formData: FormData) {\n  // This is a Server Action\n}\n```\n\n---\n\n### Key Files to Create\n\nFor a posts feature, you'll need:\n\n| File | Purpose |\n|------|---------|\n| `/vercel/sandbox/app/lib/types.ts` | Post type definitions |\n| `/vercel/sandbox/app/actions.ts` | Server Actions (createPost, updatePost, deletePost) |\n| `/vercel/sandbox/app/lib/posts.ts` | Data fetching with cacheTag |\n| `/vercel/sandbox/app/posts/page.tsx` | Posts list page |\n| `/vercel/sandbox/app/posts/[id]/page.tsx` | Individual post page |\n\n---\n\n### Relevant Documentation Files\n\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-server.md`\n- `/vercel/sandbox/node_modules/next/dist/docs/01-app/04-glossary.md` (comprehensive glossary)\n</task_result>",
+        "title": "Explore posts codebase structure",
+        "metadata": {
+          "sessionId": "ses_2d36e84fbffeJAMkrdIVgWK55s",
+          "model": {
+            "modelID": "minimax/minimax-m2.7",
+            "providerID": "vercel"
+          },
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569224961,
+          "end": 1774569291546
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:56.258Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/vercel/sandbox/app/page.tsx",
+          "_extractedPath": "/vercel/sandbox/app/page.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569296258,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c929166001cSfHG433Ji9b2R",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c927f39001jBwgP3MAjx68M2",
+          "type": "tool",
+          "callID": "call_function_al2eukb5rlu4_1",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/vercel/sandbox/app/page.tsx"
+            },
+            "output": "<path>/vercel/sandbox/app/page.tsx</path>\n<type>file</type>\n<content>1: export default function Home() {\n2:   return (\n3:     <main>\n4:       <h1>Posts</h1>\n5:       <p>\n6:         Please implement a Server Action for creating posts with cache\n7:         invalidation.\n8:       </p>\n9:     </main>\n10:   )\n11: }\n\n(End of file - total 11 lines)\n</content>",
+            "title": "app/page.tsx",
+            "metadata": {
+              "preview": "export default function Home() {\n  return (\n    <main>\n      <h1>Posts</h1>\n      <p>\n        Please implement a Server Action for creating posts with cache\n        invalidation.\n      </p>\n    </main>\n  )\n}",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1774569296253,
+              "end": 1774569296257
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:56.258Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<path>/vercel/sandbox/app/page.tsx</path>\n<type>file</type>\n<content>1: export default function Home() {\n2:   return (\n3:     <main>\n4:       <h1>Posts</h1>\n5:       <p>\n6:         Please implement a Server Action for creating posts with cache\n7:         invalidation.\n8:       </p>\n9:     </main>\n10:   )\n11: }\n\n(End of file - total 11 lines)\n</content>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/vercel/sandbox/app/page.tsx"
+        },
+        "output": "<path>/vercel/sandbox/app/page.tsx</path>\n<type>file</type>\n<content>1: export default function Home() {\n2:   return (\n3:     <main>\n4:       <h1>Posts</h1>\n5:       <p>\n6:         Please implement a Server Action for creating posts with cache\n7:         invalidation.\n8:       </p>\n9:     </main>\n10:   )\n11: }\n\n(End of file - total 11 lines)\n</content>",
+        "title": "app/page.tsx",
+        "metadata": {
+          "preview": "export default function Home() {\n  return (\n    <main>\n      <h1>Posts</h1>\n      <p>\n        Please implement a Server Action for creating posts with cache\n        invalidation.\n      </p>\n    </main>\n  )\n}",
+          "truncated": false,
+          "loaded": []
+        },
+        "time": {
+          "start": 1774569296253,
+          "end": 1774569296257
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:56.678Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/vercel/sandbox/app/layout.tsx",
+          "_extractedPath": "/vercel/sandbox/app/layout.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569296678,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92917e0012iTsRJ7cdKY7R6",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c927f39001jBwgP3MAjx68M2",
+          "type": "tool",
+          "callID": "call_function_al2eukb5rlu4_2",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/vercel/sandbox/app/layout.tsx"
+            },
+            "output": "<path>/vercel/sandbox/app/layout.tsx</path>\n<type>file</type>\n<content>1: import type { Metadata } from 'next'\n2: \n3: export const metadata: Metadata = {\n4:   title: 'Posts',\n5:   description: 'Create and view posts',\n6: }\n7: \n8: export default function RootLayout({\n9:   children,\n10: }: Readonly<{\n11:   children: React.ReactNode\n12: }>) {\n13:   return (\n14:     <html lang=\"en\">\n15:       <body>{children}</body>\n16:     </html>\n17:   )\n18: }\n\n(End of file - total 18 lines)\n</content>",
+            "title": "app/layout.tsx",
+            "metadata": {
+              "preview": "import type { Metadata } from 'next'\n\nexport const metadata: Metadata = {\n  title: 'Posts',\n  description: 'Create and view posts',\n}\n\nexport default function RootLayout({\n  children,\n}: Readonly<{\n  children: React.ReactNode\n}>) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  )\n}",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1774569296673,
+              "end": 1774569296677
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:56.678Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<path>/vercel/sandbox/app/layout.tsx</path>\n<type>file</type>\n<content>1: import type { Metadata } from 'next'\n2: \n3: export const metadata: Metadata = {\n4:   title: 'Posts',\n5:   description: 'Create and view posts',\n6: }\n7: \n8: export default function RootLayout({\n9:   children,\n10: }: Readonly<{\n11:   children: React.ReactNode\n12: }>) {\n13:   return (\n14:     <html lang=\"en\">\n15:       <body>{children}</body>\n16:     </html>\n17:   )\n18: }\n\n(End of file - total 18 lines)\n</content>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/vercel/sandbox/app/layout.tsx"
+        },
+        "output": "<path>/vercel/sandbox/app/layout.tsx</path>\n<type>file</type>\n<content>1: import type { Metadata } from 'next'\n2: \n3: export const metadata: Metadata = {\n4:   title: 'Posts',\n5:   description: 'Create and view posts',\n6: }\n7: \n8: export default function RootLayout({\n9:   children,\n10: }: Readonly<{\n11:   children: React.ReactNode\n12: }>) {\n13:   return (\n14:     <html lang=\"en\">\n15:       <body>{children}</body>\n16:     </html>\n17:   )\n18: }\n\n(End of file - total 18 lines)\n</content>",
+        "title": "app/layout.tsx",
+        "metadata": {
+          "preview": "import type { Metadata } from 'next'\n\nexport const metadata: Metadata = {\n  title: 'Posts',\n  description: 'Create and view posts',\n}\n\nexport default function RootLayout({\n  children,\n}: Readonly<{\n  children: React.ReactNode\n}>) {\n  return (\n    <html lang=\"en\">\n      <body>{children}</body>\n    </html>\n  )\n}",
+          "truncated": false,
+          "loaded": []
+        },
+        "time": {
+          "start": 1774569296673,
+          "end": 1774569296677
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:56.948Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/vercel/sandbox/next.config.ts",
+          "_extractedPath": "/vercel/sandbox/next.config.ts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569296948,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c9293220019gCcRnUUs1ogTH",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c927f39001jBwgP3MAjx68M2",
+          "type": "tool",
+          "callID": "call_function_al2eukb5rlu4_3",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/vercel/sandbox/next.config.ts"
+            },
+            "output": "<path>/vercel/sandbox/next.config.ts</path>\n<type>file</type>\n<content>1: import type { NextConfig } from 'next'\n2: \n3: const nextConfig: NextConfig = {}\n4: \n5: export default nextConfig\n\n(End of file - total 5 lines)\n</content>",
+            "title": "next.config.ts",
+            "metadata": {
+              "preview": "import type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {}\n\nexport default nextConfig",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1774569296944,
+              "end": 1774569296947
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:56.948Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<path>/vercel/sandbox/next.config.ts</path>\n<type>file</type>\n<content>1: import type { NextConfig } from 'next'\n2: \n3: const nextConfig: NextConfig = {}\n4: \n5: export default nextConfig\n\n(End of file - total 5 lines)\n</content>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/vercel/sandbox/next.config.ts"
+        },
+        "output": "<path>/vercel/sandbox/next.config.ts</path>\n<type>file</type>\n<content>1: import type { NextConfig } from 'next'\n2: \n3: const nextConfig: NextConfig = {}\n4: \n5: export default nextConfig\n\n(End of file - total 5 lines)\n</content>",
+        "title": "next.config.ts",
+        "metadata": {
+          "preview": "import type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {}\n\nexport default nextConfig",
+          "truncated": false,
+          "loaded": []
+        },
+        "time": {
+          "start": 1774569296944,
+          "end": 1774569296947
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:59.280Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "glob",
+        "originalName": "glob",
+        "args": {
+          "pattern": "**/*",
+          "path": "/vercel/sandbox"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569299280,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c929b9b001jElIh3hjvx3oEy",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92944c001VSSdBo2oeC6ZWi",
+          "type": "tool",
+          "callID": "call_function_t5ks3kkz4c7p_1",
+          "tool": "glob",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "**/*",
+              "path": "/vercel/sandbox"
+            },
+            "output": "/vercel/sandbox/opencode.json\n/vercel/sandbox/node_modules/.package-lock.json\n/vercel/sandbox/package-lock.json\n/vercel/sandbox/GEMINI.md\n/vercel/sandbox/CLAUDE.md\n/vercel/sandbox/AGENTS.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/README.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/package.json\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/valid.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/valid.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/to-comparators.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/subset.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/sort.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/simplify.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/semver.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/bin/semver.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/satisfies.js\n/vercel/sandbox/node_modules/sharp/lib/index.d.ts\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/rsort.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/re.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/rcompare.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/range.js\n/vercel/sandbox/node_modules/sharp/README.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/prerelease.js\n/vercel/sandbox/node_modules/sharp/package.json\n/vercel/sandbox/node_modules/sharp/lib/utility.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/preload.js\n/vercel/sandbox/node_modules/sharp/lib/sharp.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/patch.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/parse-options.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/parse.js\n/vercel/sandbox/node_modules/sharp/lib/resize.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/outside.js\n/vercel/sandbox/node_modules/sharp/lib/output.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/neq.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/min-version.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/minor.js\n/vercel/sandbox/node_modules/sharp/lib/operation.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/min-satisfying.js\n/vercel/sandbox/node_modules/sharp/lib/libvips.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/max-satisfying.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/major.js\n/vercel/sandbox/node_modules/sharp/lib/is.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/ltr.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/lte.js\n/vercel/sandbox/node_modules/sharp/lib/input.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/lt.js\n/vercel/sandbox/node_modules/sharp/lib/index.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/lrucache.js\n/vercel/sandbox/node_modules/sharp/lib/constructor.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/intersects.js\n/vercel/sandbox/node_modules/sharp/lib/composite.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/index.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/index.js\n/vercel/sandbox/node_modules/sharp/lib/colour.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/inc.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/identifiers.js\n/vercel/sandbox/node_modules/sharp/install/check.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/gtr.js\n/vercel/sandbox/node_modules/sharp/lib/channel.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/gte.js\n/vercel/sandbox/node_modules/sharp/install/build.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/gt.js\n/vercel/sandbox/node_modules/sharp/src/utilities.h\n/vercel/sandbox/node_modules/sharp/src/stats.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/eq.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/diff.js\n/vercel/sandbox/node_modules/sharp/src/pipeline.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/debug.js\n/vercel/sandbox/node_modules/sharp/src/operations.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/constants.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare.js\n/vercel/sandbox/node_modules/sharp/src/metadata.h\n/vercel/sandbox/node_modules/sharp/src/common.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare-loose.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare-build.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/comparator.js\n/vercel/sandbox/node_modules/sharp/src/binding.gyp\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/coerce.js\n/vercel/sandbox/node_modules/sharp/src/utilities.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/index.d.ts\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/README.md\n/vercel/sandbox/node_modules/sharp/src/stats.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/package.json\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/index.js\n/vercel/sandbox/node_modules/sharp/src/sharp.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/LICENSE\n/vercel/sandbox/node_modules/sharp/src/pipeline.cc\n/vercel/sandbox/node_modules/sharp/src/operations.cc\n/vercel/sandbox/node_modules/sharp/src/metadata.cc\n/vercel/sandbox/node_modules/sharp/src/common.cc\n/vercel/sandbox/node_modules/sharp/LICENSE\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.ts\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.mts\n/vercel/sandbox/node_modules/strip-literal/README.md\n/vercel/sandbox/node_modules/strip-literal/package.json\n/vercel/sandbox/node_modules/strip-literal/dist/index.mjs\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.cts\n/vercel/sandbox/node_modules/strip-literal/dist/index.cjs\n/vercel/sandbox/node_modules/strip-literal/LICENSE\n\n(Results are truncated: showing first 100 results. Consider using a more specific path or pattern.)",
+            "title": "",
+            "metadata": {
+              "count": 100,
+              "truncated": true
+            },
+            "time": {
+              "start": 1774569299273,
+              "end": 1774569299279
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:54:59.280Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "glob",
+        "originalName": "glob",
+        "result": "/vercel/sandbox/opencode.json\n/vercel/sandbox/node_modules/.package-lock.json\n/vercel/sandbox/package-lock.json\n/vercel/sandbox/GEMINI.md\n/vercel/sandbox/CLAUDE.md\n/vercel/sandbox/AGENTS.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/README.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/package.json\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/valid.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/valid.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/to-comparators.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/subset.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/sort.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/simplify.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/semver.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/bin/semver.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/satisfies.js\n/vercel/sandbox/node_modules/sharp/lib/index.d.ts\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/rsort.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/re.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/rcompare.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/range.js\n/vercel/sandbox/node_modules/sharp/README.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/prerelease.js\n/vercel/sandbox/node_modules/sharp/package.json\n/vercel/sandbox/node_modules/sharp/lib/utility.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/preload.js\n/vercel/sandbox/node_modules/sharp/lib/sharp.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/patch.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/parse-options.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/parse.js\n/vercel/sandbox/node_modules/sharp/lib/resize.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/outside.js\n/vercel/sandbox/node_modules/sharp/lib/output.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/neq.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/min-version.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/minor.js\n/vercel/sandbox/node_modules/sharp/lib/operation.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/min-satisfying.js\n/vercel/sandbox/node_modules/sharp/lib/libvips.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/max-satisfying.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/major.js\n/vercel/sandbox/node_modules/sharp/lib/is.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/ltr.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/lte.js\n/vercel/sandbox/node_modules/sharp/lib/input.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/lt.js\n/vercel/sandbox/node_modules/sharp/lib/index.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/lrucache.js\n/vercel/sandbox/node_modules/sharp/lib/constructor.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/intersects.js\n/vercel/sandbox/node_modules/sharp/lib/composite.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/index.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/index.js\n/vercel/sandbox/node_modules/sharp/lib/colour.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/inc.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/identifiers.js\n/vercel/sandbox/node_modules/sharp/install/check.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/gtr.js\n/vercel/sandbox/node_modules/sharp/lib/channel.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/gte.js\n/vercel/sandbox/node_modules/sharp/install/build.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/gt.js\n/vercel/sandbox/node_modules/sharp/src/utilities.h\n/vercel/sandbox/node_modules/sharp/src/stats.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/eq.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/diff.js\n/vercel/sandbox/node_modules/sharp/src/pipeline.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/debug.js\n/vercel/sandbox/node_modules/sharp/src/operations.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/constants.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare.js\n/vercel/sandbox/node_modules/sharp/src/metadata.h\n/vercel/sandbox/node_modules/sharp/src/common.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare-loose.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare-build.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/comparator.js\n/vercel/sandbox/node_modules/sharp/src/binding.gyp\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/coerce.js\n/vercel/sandbox/node_modules/sharp/src/utilities.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/index.d.ts\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/README.md\n/vercel/sandbox/node_modules/sharp/src/stats.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/package.json\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/index.js\n/vercel/sandbox/node_modules/sharp/src/sharp.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/LICENSE\n/vercel/sandbox/node_modules/sharp/src/pipeline.cc\n/vercel/sandbox/node_modules/sharp/src/operations.cc\n/vercel/sandbox/node_modules/sharp/src/metadata.cc\n/vercel/sandbox/node_modules/sharp/src/common.cc\n/vercel/sandbox/node_modules/sharp/LICENSE\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.ts\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.mts\n/vercel/sandbox/node_modules/strip-literal/README.md\n/vercel/sandbox/node_modules/strip-literal/package.json\n/vercel/sandbox/node_modules/strip-literal/dist/index.mjs\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.cts\n/vercel/sandbox/node_modules/strip-literal/dist/index.cjs\n/vercel/sandbox/node_modules/strip-literal/LICENSE\n\n(Results are truncated: showing first 100 results. Consider using a more specific path or pattern.)",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "pattern": "**/*",
+          "path": "/vercel/sandbox"
+        },
+        "output": "/vercel/sandbox/opencode.json\n/vercel/sandbox/node_modules/.package-lock.json\n/vercel/sandbox/package-lock.json\n/vercel/sandbox/GEMINI.md\n/vercel/sandbox/CLAUDE.md\n/vercel/sandbox/AGENTS.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/README.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/package.json\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/valid.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/valid.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/to-comparators.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/subset.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/sort.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/simplify.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/semver.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/bin/semver.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/satisfies.js\n/vercel/sandbox/node_modules/sharp/lib/index.d.ts\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/rsort.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/re.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/rcompare.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/range.js\n/vercel/sandbox/node_modules/sharp/README.md\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/prerelease.js\n/vercel/sandbox/node_modules/sharp/package.json\n/vercel/sandbox/node_modules/sharp/lib/utility.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/preload.js\n/vercel/sandbox/node_modules/sharp/lib/sharp.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/patch.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/parse-options.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/parse.js\n/vercel/sandbox/node_modules/sharp/lib/resize.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/outside.js\n/vercel/sandbox/node_modules/sharp/lib/output.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/neq.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/min-version.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/minor.js\n/vercel/sandbox/node_modules/sharp/lib/operation.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/min-satisfying.js\n/vercel/sandbox/node_modules/sharp/lib/libvips.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/max-satisfying.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/major.js\n/vercel/sandbox/node_modules/sharp/lib/is.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/ltr.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/lte.js\n/vercel/sandbox/node_modules/sharp/lib/input.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/lt.js\n/vercel/sandbox/node_modules/sharp/lib/index.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/lrucache.js\n/vercel/sandbox/node_modules/sharp/lib/constructor.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/intersects.js\n/vercel/sandbox/node_modules/sharp/lib/composite.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/index.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/index.js\n/vercel/sandbox/node_modules/sharp/lib/colour.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/inc.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/identifiers.js\n/vercel/sandbox/node_modules/sharp/install/check.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/ranges/gtr.js\n/vercel/sandbox/node_modules/sharp/lib/channel.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/gte.js\n/vercel/sandbox/node_modules/sharp/install/build.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/gt.js\n/vercel/sandbox/node_modules/sharp/src/utilities.h\n/vercel/sandbox/node_modules/sharp/src/stats.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/eq.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/diff.js\n/vercel/sandbox/node_modules/sharp/src/pipeline.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/debug.js\n/vercel/sandbox/node_modules/sharp/src/operations.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/internal/constants.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare.js\n/vercel/sandbox/node_modules/sharp/src/metadata.h\n/vercel/sandbox/node_modules/sharp/src/common.h\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare-loose.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/compare-build.js\n/vercel/sandbox/node_modules/sharp/node_modules/semver/classes/comparator.js\n/vercel/sandbox/node_modules/sharp/src/binding.gyp\n/vercel/sandbox/node_modules/sharp/node_modules/semver/functions/coerce.js\n/vercel/sandbox/node_modules/sharp/src/utilities.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/index.d.ts\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/README.md\n/vercel/sandbox/node_modules/sharp/src/stats.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/package.json\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/index.js\n/vercel/sandbox/node_modules/sharp/src/sharp.cc\n/vercel/sandbox/node_modules/strip-literal/node_modules/js-tokens/LICENSE\n/vercel/sandbox/node_modules/sharp/src/pipeline.cc\n/vercel/sandbox/node_modules/sharp/src/operations.cc\n/vercel/sandbox/node_modules/sharp/src/metadata.cc\n/vercel/sandbox/node_modules/sharp/src/common.cc\n/vercel/sandbox/node_modules/sharp/LICENSE\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.ts\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.mts\n/vercel/sandbox/node_modules/strip-literal/README.md\n/vercel/sandbox/node_modules/strip-literal/package.json\n/vercel/sandbox/node_modules/strip-literal/dist/index.mjs\n/vercel/sandbox/node_modules/strip-literal/dist/index.d.cts\n/vercel/sandbox/node_modules/strip-literal/dist/index.cjs\n/vercel/sandbox/node_modules/strip-literal/LICENSE\n\n(Results are truncated: showing first 100 results. Consider using a more specific path or pattern.)",
+        "title": "",
+        "metadata": {
+          "count": 100,
+          "truncated": true
+        },
+        "time": {
+          "start": 1774569299273,
+          "end": 1774569299279
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:03.696Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md",
+          "_extractedPath": "/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569303696,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92aca9001mEB7dEEi1SUQEp",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c929d65001NjI6kt8gJUPW3x",
+          "type": "tool",
+          "callID": "call_function_vfleml0k6sqz_1",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md"
+            },
+            "output": "<path>/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md</path>\n<type>file</type>\n<content>1: ---\n2: title: updateTag\n3: description: API Reference for the updateTag function.\n4: ---\n5: \n6: `updateTag` allows you to update cached data on-demand for a specific cache tag from within [Server Actions](/docs/app/getting-started/mutating-data).\n7: \n8: This function is designed for **read-your-own-writes** scenarios, where a user makes a change (like creating a post), and the UI immediately shows the change, rather than stale data.\n9: \n10: ## Usage\n11: \n12: `updateTag` can **only** be called from within [Server Actions](/docs/app/getting-started/mutating-data). It cannot be used in Route Handlers, Client Components, or any other context.\n13: \n14: If you need to invalidate cache tags in Route Handlers or other contexts, use [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) instead.\n15: \n16: > **Good to know**: `updateTag` immediately expires the cached data for the specified tag. The next request will wait to fetch fresh data rather than serving stale content from the cache, ensuring users see their changes immediately.\n17: \n18: ## Parameters\n19: \n20: ```tsx\n21: updateTag(tag: string): void;\n22: ```\n23: \n24: - `tag`: A string representing the cache tag associated with the data you want to update. Must not exceed 256 characters. This value is case-sensitive.\n25: \n26: Tags must first be assigned to cached data. You can do this in two ways:\n27: \n28: - Using the [`next.tags`](/docs/app/api-reference/functions/fetch) option with `fetch` for caching external API requests:\n29: \n30: ```tsx\n31: fetch(url, { next: { tags: ['posts'] } })\n32: ```\n33: \n34: - Using [`cacheTag`](/docs/app/api-reference/functions/cacheTag) inside cached functions or components with the `'use cache'` directive:\n35: \n36: ```tsx\n37: import { cacheTag } from 'next/cache'\n38: \n39: async function getData() {\n40:   'use cache'\n41:   cacheTag('posts')\n42:   // ...\n43: }\n44: ```\n45: \n46: ## Returns\n47: \n48: `updateTag` does not return a value.\n49: \n50: ## Differences from revalidateTag\n51: \n52: While both `updateTag` and `revalidateTag` invalidate cached data, they serve different purposes:\n53: \n54: - **`updateTag`**:\n55:   - Can only be used in Server Actions\n56:   - Next request waits for fresh data (no stale content served)\n57:   - Designed for read-your-own-writes scenarios\n58: \n59: - **`revalidateTag`**:\n60:   - Can be used in Server Actions and Route Handlers\n61:   - With `profile=\"max\"` (recommended): Serves cached data while fetching fresh data in the background (stale-while-revalidate)\n62:   - With custom profile: Can be configured to any cache life profile for advanced usage\n63:   - Without profile: legacy behavior which is equivalent to `updateTag`\n64: \n65: ## Examples\n66: \n67: ### Server Action with Read-Your-Own-Writes\n68: \n69: ```ts filename=\"app/actions.ts\" switcher\n70: 'use server'\n71: \n72: import { updateTag } from 'next/cache'\n73: import { redirect } from 'next/navigation'\n74: \n75: export async function createPost(formData: FormData) {\n76:   const title = formData.get('title')\n77:   const content = formData.get('content')\n78: \n79:   // Create the post in your database\n80:   const post = await db.post.create({\n81:     data: { title, content },\n82:   })\n83: \n84:   // Invalidate cache tags so the new post is immediately visible\n85:   // 'posts' tag: affects any page that displays a list of posts\n86:   updateTag('posts')\n87:   // 'post-{id}' tag: affects the individual post detail page\n88:   updateTag(`post-${post.id}`)\n89: \n90:   // Redirect to the new post - user will see fresh data, not cached\n91:   redirect(`/posts/${post.id}`)\n92: }\n93: ```\n94: \n95: ```js filename=\"app/actions.js\" switcher\n96: 'use server'\n97: \n98: import { updateTag } from 'next/cache'\n99: import { redirect } from 'next/navigation'\n100: \n101: export async function createPost(formData) {\n102:   const title = formData.get('title')\n103:   const content = formData.get('content')\n104: \n105:   // Create the post in your database\n106:   const post = await db.post.create({\n107:     data: { title, content },\n108:   })\n109: \n110:   // Invalidate cache tags so the new post is immediately visible\n111:   // 'posts' tag: affects any page that displays a list of posts\n112:   updateTag('posts')\n113:   // 'post-{id}' tag: affects the individual post detail page\n114:   updateTag(`post-${post.id}`)\n115: \n116:   // Redirect to the new post - user will see fresh data, not cached\n117:   redirect(`/posts/${post.id}`)\n118: }\n119: ```\n120: \n121: ### Error when used outside Server Actions\n122: \n123: ```ts filename=\"app/api/posts/route.ts\" switcher\n124: import { updateTag } from 'next/cache'\n125: \n126: export async function POST() {\n127:   // This will throw an error\n128:   updateTag('posts')\n129:   // Error: updateTag can only be called from within a Server Action\n130: \n131:   // Use revalidateTag instead in Route Handlers\n132:   revalidateTag('posts', 'max')\n133: }\n134: ```\n135: \n136: ## When to use updateTag\n137: \n138: Use `updateTag` when:\n139: \n140: - You're in a Server Action\n141: - You need immediate cache invalidation for read-your-own-writes\n142: - You want to ensure the next request sees updated data\n143: \n144: Use `revalidateTag` instead when:\n145: \n146: - You're in a Route Handler or other non-action context\n147: - You want stale-while-revalidate semantics\n148: - You're building a webhook or API endpoint for cache invalidation\n149: \n150: ## Related\n151: \n152: - [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) - For invalidating tags in Route Handlers\n153: - [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) - For invalidating specific paths\n\n(End of file - total 153 lines)\n</content>",
+            "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md",
+            "metadata": {
+              "preview": "---\ntitle: updateTag\ndescription: API Reference for the updateTag function.\n---\n\n`updateTag` allows you to update cached data on-demand for a specific cache tag from within [Server Actions](/docs/app/getting-started/mutating-data).\n\nThis function is designed for **read-your-own-writes** scenarios, where a user makes a change (like creating a post), and the UI immediately shows the change, rather than stale data.\n\n## Usage\n\n`updateTag` can **only** be called from within [Server Actions](/docs/app/getting-started/mutating-data). It cannot be used in Route Handlers, Client Components, or any other context.\n\nIf you need to invalidate cache tags in Route Handlers or other contexts, use [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) instead.\n\n> **Good to know**: `updateTag` immediately expires the cached data for the specified tag. The next request will wait to fetch fresh data rather than serving stale content from the cache, ensuring users see their changes immediately.\n\n## Parameters\n\n```tsx",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1774569303692,
+              "end": 1774569303695
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:03.696Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<path>/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md</path>\n<type>file</type>\n<content>1: ---\n2: title: updateTag\n3: description: API Reference for the updateTag function.\n4: ---\n5: \n6: `updateTag` allows you to update cached data on-demand for a specific cache tag from within [Server Actions](/docs/app/getting-started/mutating-data).\n7: \n8: This function is designed for **read-your-own-writes** scenarios, where a user makes a change (like creating a post), and the UI immediately shows the change, rather than stale data.\n9: \n10: ## Usage\n11: \n12: `updateTag` can **only** be called from within [Server Actions](/docs/app/getting-started/mutating-data). It cannot be used in Route Handlers, Client Components, or any other context.\n13: \n14: If you need to invalidate cache tags in Route Handlers or other contexts, use [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) instead.\n15: \n16: > **Good to know**: `updateTag` immediately expires the cached data for the specified tag. The next request will wait to fetch fresh data rather than serving stale content from the cache, ensuring users see their changes immediately.\n17: \n18: ## Parameters\n19: \n20: ```tsx\n21: updateTag(tag: string): void;\n22: ```\n23: \n24: - `tag`: A string representing the cache tag associated with the data you want to update. Must not exceed 256 characters. This value is case-sensitive.\n25: \n26: Tags must first be assigned to cached data. You can do this in two ways:\n27: \n28: - Using the [`next.tags`](/docs/app/api-reference/functions/fetch) option with `fetch` for caching external API requests:\n29: \n30: ```tsx\n31: fetch(url, { next: { tags: ['posts'] } })\n32: ```\n33: \n34: - Using [`cacheTag`](/docs/app/api-reference/functions/cacheTag) inside cached functions or components with the `'use cache'` directive:\n35: \n36: ```tsx\n37: import { cacheTag } from 'next/cache'\n38: \n39: async function getData() {\n40:   'use cache'\n41:   cacheTag('posts')\n42:   // ...\n43: }\n44: ```\n45: \n46: ## Returns\n47: \n48: `updateTag` does not return a value.\n49: \n50: ## Differences from revalidateTag\n51: \n52: While both `updateTag` and `revalidateTag` invalidate cached data, they serve different purposes:\n53: \n54: - **`updateTag`**:\n55:   - Can only be used in Server Actions\n56:   - Next request waits for fresh data (no stale content served)\n57:   - Designed for read-your-own-writes scenarios\n58: \n59: - **`revalidateTag`**:\n60:   - Can be used in Server Actions and Route Handlers\n61:   - With `profile=\"max\"` (recommended): Serves cached data while fetching fresh data in the background (stale-while-revalidate)\n62:   - With custom profile: Can be configured to any cache life profile for advanced usage\n63:   - Without profile: legacy behavior which is equivalent to `updateTag`\n64: \n65: ## Examples\n66: \n67: ### Server Action with Read-Your-Own-Writes\n68: \n69: ```ts filename=\"app/actions.ts\" switcher\n70: 'use server'\n71: \n72: import { updateTag } from 'next/cache'\n73: import { redirect } from 'next/navigation'\n74: \n75: export async function createPost(formData: FormData) {\n76:   const title = formData.get('title')\n77:   const content = formData.get('content')\n78: \n79:   // Create the post in your database\n80:   const post = await db.post.create({\n81:     data: { title, content },\n82:   })\n83: \n84:   // Invalidate cache tags so the new post is immediately visible\n85:   // 'posts' tag: affects any page that displays a list of posts\n86:   updateTag('posts')\n87:   // 'post-{id}' tag: affects the individual post detail page\n88:   updateTag(`post-${post.id}`)\n89: \n90:   // Redirect to the new post - user will see fresh data, not cached\n91:   redirect(`/posts/${post.id}`)\n92: }\n93: ```\n94: \n95: ```js filename=\"app/actions.js\" switcher\n96: 'use server'\n97: \n98: import { updateTag } from 'next/cache'\n99: import { redirect } from 'next/navigation'\n100: \n101: export async function createPost(formData) {\n102:   const title = formData.get('title')\n103:   const content = formData.get('content')\n104: \n105:   // Create the post in your database\n106:   const post = await db.post.create({\n107:     data: { title, content },\n108:   })\n109: \n110:   // Invalidate cache tags so the new post is immediately visible\n111:   // 'posts' tag: affects any page that displays a list of posts\n112:   updateTag('posts')\n113:   // 'post-{id}' tag: affects the individual post detail page\n114:   updateTag(`post-${post.id}`)\n115: \n116:   // Redirect to the new post - user will see fresh data, not cached\n117:   redirect(`/posts/${post.id}`)\n118: }\n119: ```\n120: \n121: ### Error when used outside Server Actions\n122: \n123: ```ts filename=\"app/api/posts/route.ts\" switcher\n124: import { updateTag } from 'next/cache'\n125: \n126: export async function POST() {\n127:   // This will throw an error\n128:   updateTag('posts')\n129:   // Error: updateTag can only be called from within a Server Action\n130: \n131:   // Use revalidateTag instead in Route Handlers\n132:   revalidateTag('posts', 'max')\n133: }\n134: ```\n135: \n136: ## When to use updateTag\n137: \n138: Use `updateTag` when:\n139: \n140: - You're in a Server Action\n141: - You need immediate cache invalidation for read-your-own-writes\n142: - You want to ensure the next request sees updated data\n143: \n144: Use `revalidateTag` instead when:\n145: \n146: - You're in a Route Handler or other non-action context\n147: - You want stale-while-revalidate semantics\n148: - You're building a webhook or API endpoint for cache invalidation\n149: \n150: ## Related\n151: \n152: - [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) - For invalidating tags in Route Handlers\n153: - [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) - For invalidating specific paths\n\n(End of file - total 153 lines)\n</content>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md"
+        },
+        "output": "<path>/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md</path>\n<type>file</type>\n<content>1: ---\n2: title: updateTag\n3: description: API Reference for the updateTag function.\n4: ---\n5: \n6: `updateTag` allows you to update cached data on-demand for a specific cache tag from within [Server Actions](/docs/app/getting-started/mutating-data).\n7: \n8: This function is designed for **read-your-own-writes** scenarios, where a user makes a change (like creating a post), and the UI immediately shows the change, rather than stale data.\n9: \n10: ## Usage\n11: \n12: `updateTag` can **only** be called from within [Server Actions](/docs/app/getting-started/mutating-data). It cannot be used in Route Handlers, Client Components, or any other context.\n13: \n14: If you need to invalidate cache tags in Route Handlers or other contexts, use [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) instead.\n15: \n16: > **Good to know**: `updateTag` immediately expires the cached data for the specified tag. The next request will wait to fetch fresh data rather than serving stale content from the cache, ensuring users see their changes immediately.\n17: \n18: ## Parameters\n19: \n20: ```tsx\n21: updateTag(tag: string): void;\n22: ```\n23: \n24: - `tag`: A string representing the cache tag associated with the data you want to update. Must not exceed 256 characters. This value is case-sensitive.\n25: \n26: Tags must first be assigned to cached data. You can do this in two ways:\n27: \n28: - Using the [`next.tags`](/docs/app/api-reference/functions/fetch) option with `fetch` for caching external API requests:\n29: \n30: ```tsx\n31: fetch(url, { next: { tags: ['posts'] } })\n32: ```\n33: \n34: - Using [`cacheTag`](/docs/app/api-reference/functions/cacheTag) inside cached functions or components with the `'use cache'` directive:\n35: \n36: ```tsx\n37: import { cacheTag } from 'next/cache'\n38: \n39: async function getData() {\n40:   'use cache'\n41:   cacheTag('posts')\n42:   // ...\n43: }\n44: ```\n45: \n46: ## Returns\n47: \n48: `updateTag` does not return a value.\n49: \n50: ## Differences from revalidateTag\n51: \n52: While both `updateTag` and `revalidateTag` invalidate cached data, they serve different purposes:\n53: \n54: - **`updateTag`**:\n55:   - Can only be used in Server Actions\n56:   - Next request waits for fresh data (no stale content served)\n57:   - Designed for read-your-own-writes scenarios\n58: \n59: - **`revalidateTag`**:\n60:   - Can be used in Server Actions and Route Handlers\n61:   - With `profile=\"max\"` (recommended): Serves cached data while fetching fresh data in the background (stale-while-revalidate)\n62:   - With custom profile: Can be configured to any cache life profile for advanced usage\n63:   - Without profile: legacy behavior which is equivalent to `updateTag`\n64: \n65: ## Examples\n66: \n67: ### Server Action with Read-Your-Own-Writes\n68: \n69: ```ts filename=\"app/actions.ts\" switcher\n70: 'use server'\n71: \n72: import { updateTag } from 'next/cache'\n73: import { redirect } from 'next/navigation'\n74: \n75: export async function createPost(formData: FormData) {\n76:   const title = formData.get('title')\n77:   const content = formData.get('content')\n78: \n79:   // Create the post in your database\n80:   const post = await db.post.create({\n81:     data: { title, content },\n82:   })\n83: \n84:   // Invalidate cache tags so the new post is immediately visible\n85:   // 'posts' tag: affects any page that displays a list of posts\n86:   updateTag('posts')\n87:   // 'post-{id}' tag: affects the individual post detail page\n88:   updateTag(`post-${post.id}`)\n89: \n90:   // Redirect to the new post - user will see fresh data, not cached\n91:   redirect(`/posts/${post.id}`)\n92: }\n93: ```\n94: \n95: ```js filename=\"app/actions.js\" switcher\n96: 'use server'\n97: \n98: import { updateTag } from 'next/cache'\n99: import { redirect } from 'next/navigation'\n100: \n101: export async function createPost(formData) {\n102:   const title = formData.get('title')\n103:   const content = formData.get('content')\n104: \n105:   // Create the post in your database\n106:   const post = await db.post.create({\n107:     data: { title, content },\n108:   })\n109: \n110:   // Invalidate cache tags so the new post is immediately visible\n111:   // 'posts' tag: affects any page that displays a list of posts\n112:   updateTag('posts')\n113:   // 'post-{id}' tag: affects the individual post detail page\n114:   updateTag(`post-${post.id}`)\n115: \n116:   // Redirect to the new post - user will see fresh data, not cached\n117:   redirect(`/posts/${post.id}`)\n118: }\n119: ```\n120: \n121: ### Error when used outside Server Actions\n122: \n123: ```ts filename=\"app/api/posts/route.ts\" switcher\n124: import { updateTag } from 'next/cache'\n125: \n126: export async function POST() {\n127:   // This will throw an error\n128:   updateTag('posts')\n129:   // Error: updateTag can only be called from within a Server Action\n130: \n131:   // Use revalidateTag instead in Route Handlers\n132:   revalidateTag('posts', 'max')\n133: }\n134: ```\n135: \n136: ## When to use updateTag\n137: \n138: Use `updateTag` when:\n139: \n140: - You're in a Server Action\n141: - You need immediate cache invalidation for read-your-own-writes\n142: - You want to ensure the next request sees updated data\n143: \n144: Use `revalidateTag` instead when:\n145: \n146: - You're in a Route Handler or other non-action context\n147: - You want stale-while-revalidate semantics\n148: - You're building a webhook or API endpoint for cache invalidation\n149: \n150: ## Related\n151: \n152: - [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) - For invalidating tags in Route Handlers\n153: - [`revalidatePath`](/docs/app/api-reference/functions/revalidatePath) - For invalidating specific paths\n\n(End of file - total 153 lines)\n</content>",
+        "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md",
+        "metadata": {
+          "preview": "---\ntitle: updateTag\ndescription: API Reference for the updateTag function.\n---\n\n`updateTag` allows you to update cached data on-demand for a specific cache tag from within [Server Actions](/docs/app/getting-started/mutating-data).\n\nThis function is designed for **read-your-own-writes** scenarios, where a user makes a change (like creating a post), and the UI immediately shows the change, rather than stale data.\n\n## Usage\n\n`updateTag` can **only** be called from within [Server Actions](/docs/app/getting-started/mutating-data). It cannot be used in Route Handlers, Client Components, or any other context.\n\nIf you need to invalidate cache tags in Route Handlers or other contexts, use [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) instead.\n\n> **Good to know**: `updateTag` immediately expires the cached data for the specified tag. The next request will wait to fetch fresh data rather than serving stale content from the cache, ensuring users see their changes immediately.\n\n## Parameters\n\n```tsx",
+          "truncated": false,
+          "loaded": []
+        },
+        "time": {
+          "start": 1774569303692,
+          "end": 1774569303695
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:10.600Z",
+      "type": "message",
+      "role": "assistant",
+      "content": "Based on the docs, `updateTag` is the correct choice - it guarantees the next request waits for fresh data (no stale content). Let me create the Server Action.",
+      "raw": {
+        "type": "text",
+        "timestamp": 1774569310600,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92c55c001BWDgp7WplGvWDL",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92aeae001rHwaieWhvEYVuH",
+          "type": "text",
+          "text": "Based on the docs, `updateTag` is the correct choice - it guarantees the next request waits for fresh data (no stale content). Let me create the Server Action.",
+          "time": {
+            "start": 1774569310598,
+            "end": 1774569310598
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:14.652Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "content": "export interface Post {\n  id: string\n  title: string\n  content: string\n  createdAt: Date\n}\n\nexport interface CreatePostInput {\n  title: string\n  content: string\n}",
+          "filePath": "/vercel/sandbox/app/lib/types.ts",
+          "_extractedPath": "/vercel/sandbox/app/lib/types.ts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569314652,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92c990001j324SMmDiyZvjZ",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92aeae001rHwaieWhvEYVuH",
+          "type": "tool",
+          "callID": "call_function_blwfd2y21lmp_1",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "export interface Post {\n  id: string\n  title: string\n  content: string\n  createdAt: Date\n}\n\nexport interface CreatePostInput {\n  title: string\n  content: string\n}",
+              "filePath": "/vercel/sandbox/app/lib/types.ts"
+            },
+            "output": "Wrote file successfully.",
+            "title": "app/lib/types.ts",
+            "metadata": {
+              "diagnostics": {
+                "/vercel/sandbox/app/layout.tsx": [],
+                "/vercel/sandbox/next.config.ts": [],
+                "/vercel/sandbox/app/page.tsx": [],
+                "/vercel/sandbox/app/lib/types.ts": [],
+                "/vercel/sandbox/app/lib/posts.ts": []
+              },
+              "filepath": "/vercel/sandbox/app/lib/types.ts",
+              "exists": false,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569311641,
+              "end": 1774569314650
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:14.652Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "Wrote file successfully.",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "content": "export interface Post {\n  id: string\n  title: string\n  content: string\n  createdAt: Date\n}\n\nexport interface CreatePostInput {\n  title: string\n  content: string\n}",
+          "filePath": "/vercel/sandbox/app/lib/types.ts"
+        },
+        "output": "Wrote file successfully.",
+        "title": "app/lib/types.ts",
+        "metadata": {
+          "diagnostics": {
+            "/vercel/sandbox/app/layout.tsx": [],
+            "/vercel/sandbox/next.config.ts": [],
+            "/vercel/sandbox/app/page.tsx": [],
+            "/vercel/sandbox/app/lib/types.ts": [],
+            "/vercel/sandbox/app/lib/posts.ts": []
+          },
+          "filepath": "/vercel/sandbox/app/lib/types.ts",
+          "exists": false,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569311641,
+          "end": 1774569314650
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:16.122Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "content": "import { Post } from './types'\n\nconst posts: Post[] = []\n\nexport async function getPosts(): Promise<Post[]> {\n  return posts\n}\n\nexport async function createPost(data: { title: string; content: string }): Promise<Post> {\n  const post: Post = {\n    id: crypto.randomUUID(),\n    title: data.title,\n    content: data.content,\n    createdAt: new Date(),\n  }\n  posts.push(post)\n  return post\n}",
+          "filePath": "/vercel/sandbox/app/lib/posts.ts",
+          "_extractedPath": "/vercel/sandbox/app/lib/posts.ts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569316122,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92cd9a0016VMY1cMTqPe2eW",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92aeae001rHwaieWhvEYVuH",
+          "type": "tool",
+          "callID": "call_function_blwfd2y21lmp_2",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "import { Post } from './types'\n\nconst posts: Post[] = []\n\nexport async function getPosts(): Promise<Post[]> {\n  return posts\n}\n\nexport async function createPost(data: { title: string; content: string }): Promise<Post> {\n  const post: Post = {\n    id: crypto.randomUUID(),\n    title: data.title,\n    content: data.content,\n    createdAt: new Date(),\n  }\n  posts.push(post)\n  return post\n}",
+              "filePath": "/vercel/sandbox/app/lib/posts.ts"
+            },
+            "output": "Wrote file successfully.",
+            "title": "app/lib/posts.ts",
+            "metadata": {
+              "diagnostics": {
+                "/vercel/sandbox/app/layout.tsx": [],
+                "/vercel/sandbox/next.config.ts": [],
+                "/vercel/sandbox/app/page.tsx": [],
+                "/vercel/sandbox/app/lib/types.ts": [],
+                "/vercel/sandbox/app/lib/posts.ts": [],
+                "/vercel/sandbox/app/actions.ts": []
+              },
+              "filepath": "/vercel/sandbox/app/lib/posts.ts",
+              "exists": false,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569313116,
+              "end": 1774569316121
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:16.122Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "Wrote file successfully.",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "content": "import { Post } from './types'\n\nconst posts: Post[] = []\n\nexport async function getPosts(): Promise<Post[]> {\n  return posts\n}\n\nexport async function createPost(data: { title: string; content: string }): Promise<Post> {\n  const post: Post = {\n    id: crypto.randomUUID(),\n    title: data.title,\n    content: data.content,\n    createdAt: new Date(),\n  }\n  posts.push(post)\n  return post\n}",
+          "filePath": "/vercel/sandbox/app/lib/posts.ts"
+        },
+        "output": "Wrote file successfully.",
+        "title": "app/lib/posts.ts",
+        "metadata": {
+          "diagnostics": {
+            "/vercel/sandbox/app/layout.tsx": [],
+            "/vercel/sandbox/next.config.ts": [],
+            "/vercel/sandbox/app/page.tsx": [],
+            "/vercel/sandbox/app/lib/types.ts": [],
+            "/vercel/sandbox/app/lib/posts.ts": [],
+            "/vercel/sandbox/app/actions.ts": []
+          },
+          "filepath": "/vercel/sandbox/app/lib/posts.ts",
+          "exists": false,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569313116,
+          "end": 1774569316121
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:18.134Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "content": "'use server'\n\nimport { updateTag } from 'next/cache'\nimport { redirect } from 'next/navigation'\nimport { createPost } from './lib/posts'\n\nexport async function createPostAction(formData: FormData) {\n  const title = formData.get('title') as string\n  const content = formData.get('content') as string\n\n  if (!title || !content) {\n    throw new Error('Title and content are required')\n  }\n\n  const post = await createPost({ title, content })\n\n  updateTag('posts')\n\n  redirect(`/posts/${post.id}`)\n}",
+          "filePath": "/vercel/sandbox/app/actions.ts",
+          "_extractedPath": "/vercel/sandbox/app/actions.ts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569318134,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92d35d001HMH8iqYMT2PYU5",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92aeae001rHwaieWhvEYVuH",
+          "type": "tool",
+          "callID": "call_function_blwfd2y21lmp_3",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "'use server'\n\nimport { updateTag } from 'next/cache'\nimport { redirect } from 'next/navigation'\nimport { createPost } from './lib/posts'\n\nexport async function createPostAction(formData: FormData) {\n  const title = formData.get('title') as string\n  const content = formData.get('content') as string\n\n  if (!title || !content) {\n    throw new Error('Title and content are required')\n  }\n\n  const post = await createPost({ title, content })\n\n  updateTag('posts')\n\n  redirect(`/posts/${post.id}`)\n}",
+              "filePath": "/vercel/sandbox/app/actions.ts"
+            },
+            "output": "Wrote file successfully.",
+            "title": "app/actions.ts",
+            "metadata": {
+              "diagnostics": {
+                "/vercel/sandbox/app/layout.tsx": [],
+                "/vercel/sandbox/next.config.ts": [],
+                "/vercel/sandbox/app/page.tsx": [],
+                "/vercel/sandbox/app/lib/types.ts": [],
+                "/vercel/sandbox/app/lib/posts.ts": [],
+                "/vercel/sandbox/app/actions.ts": []
+              },
+              "filepath": "/vercel/sandbox/app/actions.ts",
+              "exists": false,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569315126,
+              "end": 1774569318132
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:18.134Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "Wrote file successfully.",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "content": "'use server'\n\nimport { updateTag } from 'next/cache'\nimport { redirect } from 'next/navigation'\nimport { createPost } from './lib/posts'\n\nexport async function createPostAction(formData: FormData) {\n  const title = formData.get('title') as string\n  const content = formData.get('content') as string\n\n  if (!title || !content) {\n    throw new Error('Title and content are required')\n  }\n\n  const post = await createPost({ title, content })\n\n  updateTag('posts')\n\n  redirect(`/posts/${post.id}`)\n}",
+          "filePath": "/vercel/sandbox/app/actions.ts"
+        },
+        "output": "Wrote file successfully.",
+        "title": "app/actions.ts",
+        "metadata": {
+          "diagnostics": {
+            "/vercel/sandbox/app/layout.tsx": [],
+            "/vercel/sandbox/next.config.ts": [],
+            "/vercel/sandbox/app/page.tsx": [],
+            "/vercel/sandbox/app/lib/types.ts": [],
+            "/vercel/sandbox/app/lib/posts.ts": [],
+            "/vercel/sandbox/app/actions.ts": []
+          },
+          "filepath": "/vercel/sandbox/app/actions.ts",
+          "exists": false,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569315126,
+          "end": 1774569318132
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:20.635Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "glob",
+        "originalName": "glob",
+        "args": {
+          "pattern": "**/*.ts",
+          "path": "/vercel/sandbox/app"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569320635,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92f04d001LtUbF4gEGmroLM",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92e712001H9XBGjBNbbppQo",
+          "type": "tool",
+          "callID": "call_function_73pquymoa1jq_1",
+          "tool": "glob",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "**/*.ts",
+              "path": "/vercel/sandbox/app"
+            },
+            "output": "/vercel/sandbox/app/actions.ts\n/vercel/sandbox/app/lib/posts.ts\n/vercel/sandbox/app/lib/types.ts",
+            "title": "app",
+            "metadata": {
+              "count": 3,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569320627,
+              "end": 1774569320633
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:20.635Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "glob",
+        "originalName": "glob",
+        "result": "/vercel/sandbox/app/actions.ts\n/vercel/sandbox/app/lib/posts.ts\n/vercel/sandbox/app/lib/types.ts",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "pattern": "**/*.ts",
+          "path": "/vercel/sandbox/app"
+        },
+        "output": "/vercel/sandbox/app/actions.ts\n/vercel/sandbox/app/lib/posts.ts\n/vercel/sandbox/app/lib/types.ts",
+        "title": "app",
+        "metadata": {
+          "count": 3,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569320627,
+          "end": 1774569320633
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:24.877Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "shell",
+        "originalName": "bash",
+        "args": {
+          "command": "mkdir -p /vercel/sandbox/app/posts",
+          "description": "Create posts directory",
+          "_extractedCommand": "mkdir -p /vercel/sandbox/app/posts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569324877,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92ff64001O3nqvjbnExwgBW",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92f0cd0014GE1GI6f2uzAvF",
+          "type": "tool",
+          "callID": "call_function_dvj7yx84j5mf_2",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "mkdir -p /vercel/sandbox/app/posts",
+              "description": "Create posts directory"
+            },
+            "output": "",
+            "title": "Create posts directory",
+            "metadata": {
+              "output": "",
+              "exit": 0,
+              "description": "Create posts directory",
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569324867,
+              "end": 1774569324877
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:24.877Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "shell",
+        "originalName": "bash",
+        "result": "",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "command": "mkdir -p /vercel/sandbox/app/posts",
+          "description": "Create posts directory"
+        },
+        "output": "",
+        "title": "Create posts directory",
+        "metadata": {
+          "output": "",
+          "exit": 0,
+          "description": "Create posts directory",
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569324867,
+          "end": 1774569324877
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:27.398Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "content": "import { createPostAction } from './actions'\n\nexport default function Home() {\n  return (\n    <main>\n      <h1>Posts</h1>\n      <form action={createPostAction}>\n        <input type=\"text\" name=\"title\" placeholder=\"Title\" required />\n        <textarea name=\"content\" placeholder=\"Content\" required />\n        <button type=\"submit\">Create Post</button>\n      </form>\n    </main>\n  )\n}",
+          "filePath": "/vercel/sandbox/app/page.tsx",
+          "_extractedPath": "/vercel/sandbox/app/page.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569327398,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c92f9c9001o8JGHcKw3SW6CT",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c92f0cd0014GE1GI6f2uzAvF",
+          "type": "tool",
+          "callID": "call_function_dvj7yx84j5mf_1",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "import { createPostAction } from './actions'\n\nexport default function Home() {\n  return (\n    <main>\n      <h1>Posts</h1>\n      <form action={createPostAction}>\n        <input type=\"text\" name=\"title\" placeholder=\"Title\" required />\n        <textarea name=\"content\" placeholder=\"Content\" required />\n        <button type=\"submit\">Create Post</button>\n      </form>\n    </main>\n  )\n}",
+              "filePath": "/vercel/sandbox/app/page.tsx"
+            },
+            "output": "Wrote file successfully.",
+            "title": "app/page.tsx",
+            "metadata": {
+              "diagnostics": {
+                "/vercel/sandbox/app/layout.tsx": [],
+                "/vercel/sandbox/next.config.ts": [],
+                "/vercel/sandbox/app/page.tsx": [],
+                "/vercel/sandbox/app/lib/types.ts": [],
+                "/vercel/sandbox/app/lib/posts.ts": [],
+                "/vercel/sandbox/app/actions.ts": []
+              },
+              "filepath": "/vercel/sandbox/app/page.tsx",
+              "exists": true,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569324386,
+              "end": 1774569327395
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:27.398Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "Wrote file successfully.",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "content": "import { createPostAction } from './actions'\n\nexport default function Home() {\n  return (\n    <main>\n      <h1>Posts</h1>\n      <form action={createPostAction}>\n        <input type=\"text\" name=\"title\" placeholder=\"Title\" required />\n        <textarea name=\"content\" placeholder=\"Content\" required />\n        <button type=\"submit\">Create Post</button>\n      </form>\n    </main>\n  )\n}",
+          "filePath": "/vercel/sandbox/app/page.tsx"
+        },
+        "output": "Wrote file successfully.",
+        "title": "app/page.tsx",
+        "metadata": {
+          "diagnostics": {
+            "/vercel/sandbox/app/layout.tsx": [],
+            "/vercel/sandbox/next.config.ts": [],
+            "/vercel/sandbox/app/page.tsx": [],
+            "/vercel/sandbox/app/lib/types.ts": [],
+            "/vercel/sandbox/app/lib/posts.ts": [],
+            "/vercel/sandbox/app/actions.ts": []
+          },
+          "filepath": "/vercel/sandbox/app/page.tsx",
+          "exists": true,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569324386,
+          "end": 1774569327395
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:32.194Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "content": "import { getPosts } from '../lib/posts'\nimport { cacheTag } from 'next/cache'\n\nasync function getCachedPosts() {\n  'use cache'\n  cacheTag('posts')\n  return getPosts()\n}\n\nexport default async function PostsPage() {\n  const posts = await getCachedPosts()\n\n  return (\n    <main>\n      <h1>All Posts</h1>\n      <ul>\n        {posts.map((post) => (\n          <li key={post.id}>\n            <h2>{post.title}</h2>\n            <p>{post.content}</p>\n          </li>\n        ))}\n      </ul>\n    </main>\n  )\n}",
+          "filePath": "/vercel/sandbox/app/posts/page.tsx",
+          "_extractedPath": "/vercel/sandbox/app/posts/page.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569332194,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c93139c001sZMcxdNLc6BRno",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c930b42001A9ZZ1KmNziKLDs",
+          "type": "tool",
+          "callID": "call_function_y6stcrsgcwtz_1",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "import { getPosts } from '../lib/posts'\nimport { cacheTag } from 'next/cache'\n\nasync function getCachedPosts() {\n  'use cache'\n  cacheTag('posts')\n  return getPosts()\n}\n\nexport default async function PostsPage() {\n  const posts = await getCachedPosts()\n\n  return (\n    <main>\n      <h1>All Posts</h1>\n      <ul>\n        {posts.map((post) => (\n          <li key={post.id}>\n            <h2>{post.title}</h2>\n            <p>{post.content}</p>\n          </li>\n        ))}\n      </ul>\n    </main>\n  )\n}",
+              "filePath": "/vercel/sandbox/app/posts/page.tsx"
+            },
+            "output": "Wrote file successfully.",
+            "title": "app/posts/page.tsx",
+            "metadata": {
+              "diagnostics": {
+                "/vercel/sandbox/app/layout.tsx": [],
+                "/vercel/sandbox/next.config.ts": [],
+                "/vercel/sandbox/app/page.tsx": [],
+                "/vercel/sandbox/app/lib/types.ts": [],
+                "/vercel/sandbox/app/lib/posts.ts": [],
+                "/vercel/sandbox/app/actions.ts": [],
+                "/vercel/sandbox/app/posts/page.tsx": []
+              },
+              "filepath": "/vercel/sandbox/app/posts/page.tsx",
+              "exists": false,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569331593,
+              "end": 1774569332192
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:32.194Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "Wrote file successfully.",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "content": "import { getPosts } from '../lib/posts'\nimport { cacheTag } from 'next/cache'\n\nasync function getCachedPosts() {\n  'use cache'\n  cacheTag('posts')\n  return getPosts()\n}\n\nexport default async function PostsPage() {\n  const posts = await getCachedPosts()\n\n  return (\n    <main>\n      <h1>All Posts</h1>\n      <ul>\n        {posts.map((post) => (\n          <li key={post.id}>\n            <h2>{post.title}</h2>\n            <p>{post.content}</p>\n          </li>\n        ))}\n      </ul>\n    </main>\n  )\n}",
+          "filePath": "/vercel/sandbox/app/posts/page.tsx"
+        },
+        "output": "Wrote file successfully.",
+        "title": "app/posts/page.tsx",
+        "metadata": {
+          "diagnostics": {
+            "/vercel/sandbox/app/layout.tsx": [],
+            "/vercel/sandbox/next.config.ts": [],
+            "/vercel/sandbox/app/page.tsx": [],
+            "/vercel/sandbox/app/lib/types.ts": [],
+            "/vercel/sandbox/app/lib/posts.ts": [],
+            "/vercel/sandbox/app/actions.ts": [],
+            "/vercel/sandbox/app/posts/page.tsx": []
+          },
+          "filepath": "/vercel/sandbox/app/posts/page.tsx",
+          "exists": false,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569331593,
+          "end": 1774569332192
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:34.849Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "shell",
+        "originalName": "bash",
+        "args": {
+          "command": "mkdir -p /vercel/sandbox/app/posts/[id]",
+          "description": "Create post detail directory",
+          "_extractedCommand": "mkdir -p /vercel/sandbox/app/posts/[id]"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569334849,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c932792001NSRB9FuPlsqHPz",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c931dfd0010LZmoaGyUB797e",
+          "type": "tool",
+          "callID": "call_function_n8v76yu6k3vg_1",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "mkdir -p /vercel/sandbox/app/posts/[id]",
+              "description": "Create post detail directory"
+            },
+            "output": "",
+            "title": "Create post detail directory",
+            "metadata": {
+              "output": "",
+              "exit": 0,
+              "description": "Create post detail directory",
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569334836,
+              "end": 1774569334847
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:34.849Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "shell",
+        "originalName": "bash",
+        "result": "",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "command": "mkdir -p /vercel/sandbox/app/posts/[id]",
+          "description": "Create post detail directory"
+        },
+        "output": "",
+        "title": "Create post detail directory",
+        "metadata": {
+          "output": "",
+          "exit": 0,
+          "description": "Create post detail directory",
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569334836,
+          "end": 1774569334847
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:39.914Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "content": "import { getPosts } from '../../lib/posts'\nimport { cacheTag } from 'next/cache'\nimport { notFound } from 'next/navigation'\n\nasync function getCachedPost(id: string) {\n  'use cache'\n  cacheTag(`post-${id}`)\n  const posts = await getPosts()\n  return posts.find((post) => post.id === id)\n}\n\nexport default async function PostPage({ params }: { params: Promise<{ id: string }> }) {\n  const { id } = await params\n  const post = await getCachedPost(id)\n\n  if (!post) {\n    notFound()\n  }\n\n  return (\n    <main>\n      <h1>{post.title}</h1>\n      <p>{post.content}</p>\n      <small>Created at: {post.createdAt.toISOString()}</small>\n    </main>\n  )\n}",
+          "filePath": "/vercel/sandbox/app/posts/[id]/page.tsx",
+          "_extractedPath": "/vercel/sandbox/app/posts/[id]/page.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569339914,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c932fbe00105qsZqSPZ4PxKs",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c93285b001Z0h5cAmQ6JbsVn",
+          "type": "tool",
+          "callID": "call_function_ooykpz7fiepm_1",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "import { getPosts } from '../../lib/posts'\nimport { cacheTag } from 'next/cache'\nimport { notFound } from 'next/navigation'\n\nasync function getCachedPost(id: string) {\n  'use cache'\n  cacheTag(`post-${id}`)\n  const posts = await getPosts()\n  return posts.find((post) => post.id === id)\n}\n\nexport default async function PostPage({ params }: { params: Promise<{ id: string }> }) {\n  const { id } = await params\n  const post = await getCachedPost(id)\n\n  if (!post) {\n    notFound()\n  }\n\n  return (\n    <main>\n      <h1>{post.title}</h1>\n      <p>{post.content}</p>\n      <small>Created at: {post.createdAt.toISOString()}</small>\n    </main>\n  )\n}",
+              "filePath": "/vercel/sandbox/app/posts/[id]/page.tsx"
+            },
+            "output": "Wrote file successfully.",
+            "title": "app/posts/[id]/page.tsx",
+            "metadata": {
+              "diagnostics": {
+                "/vercel/sandbox/app/layout.tsx": [],
+                "/vercel/sandbox/next.config.ts": [],
+                "/vercel/sandbox/app/page.tsx": [],
+                "/vercel/sandbox/app/lib/types.ts": [],
+                "/vercel/sandbox/app/lib/posts.ts": [],
+                "/vercel/sandbox/app/actions.ts": [],
+                "/vercel/sandbox/app/posts/page.tsx": [],
+                "/vercel/sandbox/app/posts/[id]/page.tsx": []
+              },
+              "filepath": "/vercel/sandbox/app/posts/[id]/page.tsx",
+              "exists": false,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569339340,
+              "end": 1774569339911
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:39.914Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "Wrote file successfully.",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "content": "import { getPosts } from '../../lib/posts'\nimport { cacheTag } from 'next/cache'\nimport { notFound } from 'next/navigation'\n\nasync function getCachedPost(id: string) {\n  'use cache'\n  cacheTag(`post-${id}`)\n  const posts = await getPosts()\n  return posts.find((post) => post.id === id)\n}\n\nexport default async function PostPage({ params }: { params: Promise<{ id: string }> }) {\n  const { id } = await params\n  const post = await getCachedPost(id)\n\n  if (!post) {\n    notFound()\n  }\n\n  return (\n    <main>\n      <h1>{post.title}</h1>\n      <p>{post.content}</p>\n      <small>Created at: {post.createdAt.toISOString()}</small>\n    </main>\n  )\n}",
+          "filePath": "/vercel/sandbox/app/posts/[id]/page.tsx"
+        },
+        "output": "Wrote file successfully.",
+        "title": "app/posts/[id]/page.tsx",
+        "metadata": {
+          "diagnostics": {
+            "/vercel/sandbox/app/layout.tsx": [],
+            "/vercel/sandbox/next.config.ts": [],
+            "/vercel/sandbox/app/page.tsx": [],
+            "/vercel/sandbox/app/lib/types.ts": [],
+            "/vercel/sandbox/app/lib/posts.ts": [],
+            "/vercel/sandbox/app/actions.ts": [],
+            "/vercel/sandbox/app/posts/page.tsx": [],
+            "/vercel/sandbox/app/posts/[id]/page.tsx": []
+          },
+          "filepath": "/vercel/sandbox/app/posts/[id]/page.tsx",
+          "exists": false,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569339340,
+          "end": 1774569339911
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:42.271Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "glob",
+        "originalName": "glob",
+        "args": {
+          "pattern": "**/*",
+          "path": "/vercel/sandbox/app"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569342271,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c9344340011kA5Z6VcoYXdxZ",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c933c24001sxHgJRhS71l8lp",
+          "type": "tool",
+          "callID": "call_function_mvn9ccfgaufv_1",
+          "tool": "glob",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "**/*",
+              "path": "/vercel/sandbox/app"
+            },
+            "output": "/vercel/sandbox/app/posts/[id]/page.tsx\n/vercel/sandbox/app/posts/page.tsx\n/vercel/sandbox/app/page.tsx\n/vercel/sandbox/app/actions.ts\n/vercel/sandbox/app/lib/posts.ts\n/vercel/sandbox/app/lib/types.ts\n/vercel/sandbox/app/layout.tsx",
+            "title": "app",
+            "metadata": {
+              "count": 7,
+              "truncated": false
+            },
+            "time": {
+              "start": 1774569342257,
+              "end": 1774569342269
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:42.271Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "glob",
+        "originalName": "glob",
+        "result": "/vercel/sandbox/app/posts/[id]/page.tsx\n/vercel/sandbox/app/posts/page.tsx\n/vercel/sandbox/app/page.tsx\n/vercel/sandbox/app/actions.ts\n/vercel/sandbox/app/lib/posts.ts\n/vercel/sandbox/app/lib/types.ts\n/vercel/sandbox/app/layout.tsx",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "pattern": "**/*",
+          "path": "/vercel/sandbox/app"
+        },
+        "output": "/vercel/sandbox/app/posts/[id]/page.tsx\n/vercel/sandbox/app/posts/page.tsx\n/vercel/sandbox/app/page.tsx\n/vercel/sandbox/app/actions.ts\n/vercel/sandbox/app/lib/posts.ts\n/vercel/sandbox/app/lib/types.ts\n/vercel/sandbox/app/layout.tsx",
+        "title": "app",
+        "metadata": {
+          "count": 7,
+          "truncated": false
+        },
+        "time": {
+          "start": 1774569342257,
+          "end": 1774569342269
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:43.829Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/vercel/sandbox/package.json",
+          "_extractedPath": "/vercel/sandbox/package.json"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1774569343829,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c934a02001juwZjQ5032ssnr",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c934555001prucPyt1skWm7v",
+          "type": "tool",
+          "callID": "call_function_je0e8loz9vn7_1",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/vercel/sandbox/package.json"
+            },
+            "output": "<path>/vercel/sandbox/package.json</path>\n<type>file</type>\n<content>1: {\n2:   \"private\": true,\n3:   \"type\": \"module\",\n4:   \"scripts\": {\n5:     \"dev\": \"next dev\",\n6:     \"build\": \"next build\",\n7:     \"start\": \"next start\"\n8:   },\n9:   \"dependencies\": {\n10:     \"next\": \"^16.2.1-canary.10\",\n11:     \"react\": \"19.1.0\",\n12:     \"react-dom\": \"19.1.0\"\n13:   },\n14:   \"devDependencies\": {\n15:     \"@types/node\": \"^20\",\n16:     \"@types/react\": \"^19\",\n17:     \"@types/react-dom\": \"^19\",\n18:     \"@vitejs/plugin-react\": \"^4.4.1\",\n19:     \"typescript\": \"^5\",\n20:     \"vite-tsconfig-paths\": \"^5.1.4\",\n21:     \"vitest\": \"^3.1.3\"\n22:   }\n23: }\n\n(End of file - total 23 lines)\n</content>",
+            "title": "package.json",
+            "metadata": {
+              "preview": "{\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\",\n    \"start\": \"next start\"\n  },\n  \"dependencies\": {\n    \"next\": \"^16.2.1-canary.10\",\n    \"react\": \"19.1.0\",\n    \"react-dom\": \"19.1.0\"\n  },\n  \"devDependencies\": {\n    \"@types/node\": \"^20\",\n    \"@types/react\": \"^19\",\n    \"@types/react-dom\": \"^19\",\n    \"@vitejs/plugin-react\": \"^4.4.1\",\n    \"typescript\": \"^5\",\n    \"vite-tsconfig-paths\": \"^5.1.4\",",
+              "truncated": false,
+              "loaded": []
+            },
+            "time": {
+              "start": 1774569343823,
+              "end": 1774569343828
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:43.829Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<path>/vercel/sandbox/package.json</path>\n<type>file</type>\n<content>1: {\n2:   \"private\": true,\n3:   \"type\": \"module\",\n4:   \"scripts\": {\n5:     \"dev\": \"next dev\",\n6:     \"build\": \"next build\",\n7:     \"start\": \"next start\"\n8:   },\n9:   \"dependencies\": {\n10:     \"next\": \"^16.2.1-canary.10\",\n11:     \"react\": \"19.1.0\",\n12:     \"react-dom\": \"19.1.0\"\n13:   },\n14:   \"devDependencies\": {\n15:     \"@types/node\": \"^20\",\n16:     \"@types/react\": \"^19\",\n17:     \"@types/react-dom\": \"^19\",\n18:     \"@vitejs/plugin-react\": \"^4.4.1\",\n19:     \"typescript\": \"^5\",\n20:     \"vite-tsconfig-paths\": \"^5.1.4\",\n21:     \"vitest\": \"^3.1.3\"\n22:   }\n23: }\n\n(End of file - total 23 lines)\n</content>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/vercel/sandbox/package.json"
+        },
+        "output": "<path>/vercel/sandbox/package.json</path>\n<type>file</type>\n<content>1: {\n2:   \"private\": true,\n3:   \"type\": \"module\",\n4:   \"scripts\": {\n5:     \"dev\": \"next dev\",\n6:     \"build\": \"next build\",\n7:     \"start\": \"next start\"\n8:   },\n9:   \"dependencies\": {\n10:     \"next\": \"^16.2.1-canary.10\",\n11:     \"react\": \"19.1.0\",\n12:     \"react-dom\": \"19.1.0\"\n13:   },\n14:   \"devDependencies\": {\n15:     \"@types/node\": \"^20\",\n16:     \"@types/react\": \"^19\",\n17:     \"@types/react-dom\": \"^19\",\n18:     \"@vitejs/plugin-react\": \"^4.4.1\",\n19:     \"typescript\": \"^5\",\n20:     \"vite-tsconfig-paths\": \"^5.1.4\",\n21:     \"vitest\": \"^3.1.3\"\n22:   }\n23: }\n\n(End of file - total 23 lines)\n</content>",
+        "title": "package.json",
+        "metadata": {
+          "preview": "{\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\",\n    \"start\": \"next start\"\n  },\n  \"dependencies\": {\n    \"next\": \"^16.2.1-canary.10\",\n    \"react\": \"19.1.0\",\n    \"react-dom\": \"19.1.0\"\n  },\n  \"devDependencies\": {\n    \"@types/node\": \"^20\",\n    \"@types/react\": \"^19\",\n    \"@types/react-dom\": \"^19\",\n    \"@vitejs/plugin-react\": \"^4.4.1\",\n    \"typescript\": \"^5\",\n    \"vite-tsconfig-paths\": \"^5.1.4\",",
+          "truncated": false,
+          "loaded": []
+        },
+        "time": {
+          "start": 1774569343823,
+          "end": 1774569343828
+        }
+      }
+    },
+    {
+      "timestamp": "2026-03-26T23:55:52.296Z",
+      "type": "message",
+      "role": "assistant",
+      "content": "Created the Server Action with `updateTag` for immediate cache invalidation:\n\n**`app/actions.ts`**\n```tsx\n'use server'\n\nimport { updateTag } from 'next/cache'\nimport { redirect } from 'next/navigation'\nimport { createPost } from './lib/posts'\n\nexport async function createPostAction(formData: FormData) {\n  const title = formData.get('title') as string\n  const content = formData.get('content') as string\n\n  const post = await createPost({ title, content })\n  updateTag('posts')  // <-- Immediate invalidation, no stale content\n  redirect(`/posts/${post.id}`)\n}\n```\n\n**`app/posts/page.tsx`** uses `cacheTag('posts')` for cached data.\n\n**`app/lib/posts.ts`** and **`app/lib/types.ts`** - post types and data layer.\n\nThe `updateTag('posts')` call guarantees the next request waits for fresh data (read-your-own-writes), not stale cached content.",
+      "raw": {
+        "type": "text",
+        "timestamp": 1774569352296,
+        "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+        "part": {
+          "id": "prt_d2c936016001EuvEQG3A2L7EWz",
+          "sessionID": "ses_2d36e9a90ffemlTcB05MGwQyDJ",
+          "messageID": "msg_d2c934b70001mw4Q5tErOHt2A1",
+          "type": "text",
+          "text": "Created the Server Action with `updateTag` for immediate cache invalidation:\n\n**`app/actions.ts`**\n```tsx\n'use server'\n\nimport { updateTag } from 'next/cache'\nimport { redirect } from 'next/navigation'\nimport { createPost } from './lib/posts'\n\nexport async function createPostAction(formData: FormData) {\n  const title = formData.get('title') as string\n  const content = formData.get('content') as string\n\n  const post = await createPost({ title, content })\n  updateTag('posts')  // <-- Immediate invalidation, no stale content\n  redirect(`/posts/${post.id}`)\n}\n```\n\n**`app/posts/page.tsx`** uses `cacheTag('posts')` for cached data.\n\n**`app/lib/posts.ts`** and **`app/lib/types.ts`** - post types and data layer.\n\nThe `updateTag('posts')` call guarantees the next request waits for fresh data (read-your-own-writes), not stale cached content.",
+          "time": {
+            "start": 1774569352295,
+            "end": 1774569352295
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "totalTurns": 2,
+    "toolCalls": {
+      "file_read": 5,
+      "file_write": 6,
+      "file_edit": 0,
+      "shell": 2,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 3,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 1
+    },
+    "totalToolCalls": 17,
+    "webFetches": [],
+    "filesRead": [
+      "/vercel/sandbox/app/page.tsx",
+      "/vercel/sandbox/app/layout.tsx",
+      "/vercel/sandbox/next.config.ts",
+      "/vercel/sandbox/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md",
+      "/vercel/sandbox/package.json"
+    ],
+    "filesModified": [
+      "/vercel/sandbox/app/lib/types.ts",
+      "/vercel/sandbox/app/lib/posts.ts",
+      "/vercel/sandbox/app/actions.ts",
+      "/vercel/sandbox/app/page.tsx",
+      "/vercel/sandbox/app/posts/page.tsx",
+      "/vercel/sandbox/app/posts/[id]/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "mkdir -p /vercel/sandbox/app/posts",
+        "success": true
+      },
+      {
+        "command": "mkdir -p /vercel/sandbox/app/posts/[id]",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "parseSuccess": true
+}
