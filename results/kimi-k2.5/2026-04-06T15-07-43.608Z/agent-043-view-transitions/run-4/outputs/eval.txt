@@ -1,0 +1,842 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (8 tests | 5 failed) 12ms
+   ✓ next.config enables viewTransition 1ms
+   × ViewTransition is imported from react 6ms
+     → expected 'import Link from \'next/link\'\nimpor…' to match /import\s+\{[^}]*ViewTransition[^}]*\}…/
+   × Shared element transitions use named ViewTransition 1ms
+     → expected null not to be null
+   × Link uses transitionTypes for directional navigation 1ms
+     → expected 'import Link from \'next/link\'\nimpor…' to match /transitionTypes/
+   × Suspense content uses ViewTransition with enter or exit 1ms
+     → expected 'import Link from \'next/link\'\nimpor…' to match /<ViewTransition[^>]*\b(enter|exit)\s*=/
+   × default="none" prevents unintended animations 1ms
+     → expected 'import Link from \'next/link\'\nimpor…' to match /default\s*=\s*["']none["']/
+   ✓ CSS handles prefers-reduced-motion 0ms
+   ✓ CSS defines view transition animations 0ms
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 3 passed (8)
+   Start at  15:12:26
+   Duration  210ms (transform 35ms, setup 0ms, collect 30ms, tests 12ms, environment 0ms, prepare 57ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > ViewTransition is imported from react
+AssertionError: expected 'import Link from \'next/link\'\nimpor…' to match /import\s+\{[^}]*ViewTransition[^}]*\}…/
+
+[32m- Expected:[39m 
+/import\s+\{[^}]*ViewTransition[^}]*\}\s+from\s+['"]react['"]/
+
+[31m+ Received:[39m 
+"import Link from 'next/link'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <Link
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{ 
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid skeleton-container\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <ProductGrid />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <Link href=\"/\" className=\"back-link\">
+        ← Back to products
+      </Link>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{ 
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:90:21
+     88|   const allSource = readAllSourceFiles()
+     89| 
+     90|   expect(allSource).toMatch(
+       |                     ^
+     91|     /import\s+\{[^}]*ViewTransition[^}]*\}\s+from\s+['"]react['"]/
+     92|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  EVAL.ts > Shared element transitions use named ViewTransition
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:99:27
+     97| 
+     98|   const nameMatches = allSource.match(/<ViewTransition[^>]*\bname\s*=/…
+     99|   expect(nameMatches).not.toBeNull()
+       |                           ^
+    100|   expect(nameMatches!.length).toBeGreaterThanOrEqual(2)
+    101| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  EVAL.ts > Link uses transitionTypes for directional navigation
+AssertionError: expected 'import Link from \'next/link\'\nimpor…' to match /transitionTypes/
+
+[32m- Expected:[39m 
+/transitionTypes/
+
+[31m+ Received:[39m 
+"import Link from 'next/link'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <Link
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{ 
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid skeleton-container\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <ProductGrid />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <Link href=\"/\" className=\"back-link\">
+        ← Back to products
+      </Link>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{ 
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:106:21
+    104|   const allSource = readAllSourceFiles()
+    105| 
+    106|   expect(allSource).toMatch(/transitionTypes/)
+       |                     ^
+    107| })
+    108| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  EVAL.ts > Suspense content uses ViewTransition with enter or exit
+AssertionError: expected 'import Link from \'next/link\'\nimpor…' to match /<ViewTransition[^>]*\b(enter|exit)\s*=/
+
+[32m- Expected:[39m 
+/<ViewTransition[^>]*\b(enter|exit)\s*=/
+
+[31m+ Received:[39m 
+"import Link from 'next/link'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <Link
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{ 
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid skeleton-container\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <ProductGrid />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <Link href=\"/\" className=\"back-link\">
+        ← Back to products
+      </Link>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{ 
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:112:21
+    110|   const allSource = readAllSourceFiles()
+    111| 
+    112|   expect(allSource).toMatch(/<ViewTransition[^>]*\b(enter|exit)\s*=/)
+       |                     ^
+    113| })
+    114| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  EVAL.ts > default="none" prevents unintended animations
+AssertionError: expected 'import Link from \'next/link\'\nimpor…' to match /default\s*=\s*["']none["']/
+
+[32m- Expected:[39m 
+/default\s*=\s*["']none["']/
+
+[31m+ Received:[39m 
+"import Link from 'next/link'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <Link
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{ 
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid skeleton-container\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <ProductGrid />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <Link href=\"/\" className=\"back-link\">
+        ← Back to products
+      </Link>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{ 
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:118:21
+    116|   const allSource = readAllSourceFiles()
+    117| 
+    118|   expect(allSource).toMatch(/default\s*=\s*["']none["']/)
+       |                     ^
+    119| })
+    120| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+

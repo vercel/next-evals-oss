@@ -1,0 +1,105 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 3 failed) 9ms
+   × Page has at least 3 Suspense boundaries 5ms
+     → expected 1 to be greater than or equal to 3
+   × Each dashboard section has its own Suspense boundary in page.tsx 3ms
+     → CardStats should be inside its own <Suspense>: expected false to be true // Object.is equality
+   × Page does not await all data before rendering 1ms
+     → expected 'import { Suspense } from \'react\'\ni…' not to match /await\s+getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  17:18:53
+   Duration  203ms (transform 27ms, setup 0ms, collect 27ms, tests 9ms, environment 0ms, prepare 58ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has at least 3 Suspense boundaries
+AssertionError: expected 1 to be greater than or equal to 3
+ ❯ EVAL.ts:30:25
+     28| 
+     29|   const suspenseCount = (page.match(/<Suspense[\s>]/g) || []).length
+     30|   expect(suspenseCount).toBeGreaterThanOrEqual(3)
+       |                         ^
+     31| })
+     32| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > Each dashboard section has its own Suspense boundary in page.tsx
+AssertionError: CardStats should be inside its own <Suspense>: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:44:76
+     42|       (block) => block.includes(component) && block.includes('</Suspen…
+     43|     )
+     44|     expect(inOwnBlock, `${component} should be inside its own <Suspens…
+       |                                                                            ^
+     45|       true
+     46|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' not to match /await\s+getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/await\s+getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+import Loading from './loading'
+
+async function getDashboardData() {
+  const res = await fetch('https://api.example.com/dashboard')
+  return res.json()
+}
+
+async function DashboardWidgets() {
+  const data = await getDashboardData()
+
+  return (
+    <>
+      <CardStats
+        totalRevenue={data.totalRevenue}
+        totalInvoices={data.totalInvoices}
+      />
+      <RevenueChart revenue={data.revenue} />
+      <LatestInvoices invoices={data.invoices} />
+    </>
+  )
+}
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<Loading />}>
+        <DashboardWidgets />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:55:20
+     53|   // The page should not call getDashboardData() or fetch() at the top…
+     54|   // A simple check: the page shouldn't contain the original monolithi…
+     55|   expect(page).not.toMatch(/await\s+getDashboardData\s*\(/)
+       |                    ^
+     56| 
+     57|   // The page component itself should not be async (data fetching move…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

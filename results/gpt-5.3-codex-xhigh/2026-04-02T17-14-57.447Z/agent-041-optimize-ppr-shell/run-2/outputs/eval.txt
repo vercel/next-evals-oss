@@ -1,0 +1,113 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 1 failed) 7ms
+   ✓ Page has at least 3 Suspense boundaries 1ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 0ms
+   × Page does not await all data before rendering 5ms
+     → expected 'import { Suspense } from \'react\'\ni…' not to match /getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  17:18:49
+   Duration  201ms (transform 28ms, setup 0ms, collect 21ms, tests 7ms, environment 0ms, prepare 61ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' not to match /getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import {
+  CardStatsSkeleton,
+  LatestInvoicesSkeleton,
+  RevenueChartSkeleton,
+} from './DashboardShell'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+
+type DashboardData = {
+  totalRevenue: number
+  totalInvoices: number
+  revenue: { month: string; amount: number }[]
+  invoices: { id: string; name: string; amount: number }[]
+}
+
+async function getDashboardData(): Promise<DashboardData> {
+  const res = await fetch('https://api.example.com/dashboard')
+  if (!res.ok) {
+    throw new Error('Failed to fetch dashboard data')
+  }
+
+  return res.json() as Promise<DashboardData>
+}
+
+async function DashboardCardStats({
+  dataPromise,
+}: {
+  dataPromise: Promise<DashboardData>
+}) {
+  const data = await dataPromise
+
+  return (
+    <CardStats
+      totalRevenue={data.totalRevenue}
+      totalInvoices={data.totalInvoices}
+    />
+  )
+}
+
+async function DashboardRevenueChart({
+  dataPromise,
+}: {
+  dataPromise: Promise<DashboardData>
+}) {
+  const data = await dataPromise
+  return <RevenueChart revenue={data.revenue} />
+}
+
+async function DashboardLatestInvoices({
+  dataPromise,
+}: {
+  dataPromise: Promise<DashboardData>
+}) {
+  const data = await dataPromise
+  return <LatestInvoices invoices={data.invoices} />
+}
+
+export default function Page() {
+  const dashboardDataPromise = getDashboardData()
+
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<CardStatsSkeleton />}>
+        <DashboardCardStats dataPromise={dashboardDataPromise} />
+      </Suspense>
+      <Suspense fallback={<RevenueChartSkeleton />}>
+        <DashboardRevenueChart dataPromise={dashboardDataPromise} />
+      </Suspense>
+      <Suspense fallback={<LatestInvoicesSkeleton />}>
+        <DashboardLatestInvoices dataPromise={dashboardDataPromise} />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:60:20
+     58|   // OR if it is async, it should not await a data fetch before return…
+     59|   // We check the simpler signal: getDashboardData should not be calle…
+     60|   expect(page).not.toMatch(/getDashboardData\s*\(/)
+       |                    ^
+     61| })
+     62| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

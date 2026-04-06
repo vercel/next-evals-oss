@@ -1,0 +1,89 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 1 failed) 7ms
+   ✓ Page has at least 3 Suspense boundaries 1ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 0ms
+   × Page does not await all data before rendering 5ms
+     → expected 'export const unstable_instant = { pre…' not to match /await\s+getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  17:17:52
+   Duration  205ms (transform 28ms, setup 0ms, collect 28ms, tests 7ms, environment 0ms, prepare 62ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'export const unstable_instant = { pre…' not to match /await\s+getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/await\s+getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"export const unstable_instant = { prefetch: 'static' }
+
+import { Suspense } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+import {
+  CardStatsSkeleton,
+  RevenueChartSkeleton,
+  InvoicesSkeleton,
+} from './skeletons'
+
+async function getDashboardData() {
+  const res = await fetch('https://api.example.com/dashboard')
+  return res.json()
+}
+
+async function CardStatsData() {
+  const data = await getDashboardData()
+  return (
+    <CardStats
+      totalRevenue={data.totalRevenue}
+      totalInvoices={data.totalInvoices}
+    />
+  )
+}
+
+async function RevenueChartData() {
+  const data = await getDashboardData()
+  return <RevenueChart revenue={data.revenue} />
+}
+
+async function LatestInvoicesData() {
+  const data = await getDashboardData()
+  return <LatestInvoices invoices={data.invoices} />
+}
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<CardStatsSkeleton />}>
+        <CardStatsData />
+      </Suspense>
+      <Suspense fallback={<RevenueChartSkeleton />}>
+        <RevenueChartData />
+      </Suspense>
+      <Suspense fallback={<InvoicesSkeleton />}>
+        <LatestInvoicesData />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:55:20
+     53|   // The page should not call getDashboardData() or fetch() at the top…
+     54|   // A simple check: the page shouldn't contain the original monolithi…
+     55|   expect(page).not.toMatch(/await\s+getDashboardData\s*\(/)
+       |                    ^
+     56| 
+     57|   // The page component itself should not be async (data fetching move…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
