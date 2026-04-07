@@ -78,6 +78,9 @@ const MODEL_NAMES: Record<string, string> = {
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
   'minimax-m2.7': 'MiniMax M2.7',
   'minimax-m2.7--agents-md': 'MiniMax M2.7 + AGENTS.md',
+  'glm-5.1': 'GLM 5.1',
+  'glm-5.1-opencode': 'GLM 5.1',
+  'glm-5.1-opencode--agents-md': 'GLM 5.1 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
@@ -87,6 +90,7 @@ const HARNESS_NAMES: Record<string, string> = {
   'vercel-ai-gateway/opencode': 'OpenCode',
   'cursor': 'Cursor',
   'gemini': 'Gemini CLI',
+  'vercel-ai-gateway/claude-code': 'Claude Code',
 };
 
 function parseTimestamp(ts: string): string {
@@ -122,23 +126,23 @@ async function main(): Promise<void> {
     // Auto-discover all experiments with results
     const allDirs = (await readdir(resultsDir)).filter((d) => !d.startsWith('.'));
     const withResults: string[] = [];
-    for (const dir of allDirs) {
-      const expDir = join(resultsDir, dir);
-      const timestamps = (await readdir(expDir).catch(() => [] as string[])).filter(
-        (t) => !t.startsWith('.')
-      );
-      for (const ts of timestamps) {
-        const evalDirs = await readdir(join(expDir, ts)).catch(() => [] as string[]);
-        for (const evalDir of evalDirs) {
-          try {
-            await stat(join(expDir, ts, evalDir, 'summary.json'));
-            withResults.push(dir);
-            break;
-          } catch {
-            /* empty */
-          }
+    async function hasSummaryJson(dir: string): Promise<boolean> {
+      const entries = (await readdir(dir).catch(() => [] as string[])).filter((e) => !e.startsWith('.'));
+      for (const entry of entries) {
+        const full = join(dir, entry);
+        try {
+          await stat(join(full, 'summary.json'));
+          return true;
+        } catch {
+          const s = await stat(full).catch(() => null);
+          if (s?.isDirectory() && await hasSummaryJson(full)) return true;
         }
-        if (withResults.includes(dir)) break;
+      }
+      return false;
+    }
+    for (const dir of allDirs) {
+      if (await hasSummaryJson(join(resultsDir, dir))) {
+        withResults.push(dir);
       }
     }
     experiments = withResults;
@@ -164,21 +168,38 @@ async function main(): Promise<void> {
     }
 
     // Scan all timestamps and take the latest result per eval
-    const allTimestamps = (await readdir(expDir)).filter((ts) => !ts.startsWith('.'));
-    if (allTimestamps.length === 0) continue;
+    // Recursively find timestamp-like directories (handles model paths with slashes)
+    async function findTimestampDirs(dir: string): Promise<{ts: string, dir: string}[]> {
+      const entries = (await readdir(dir).catch(() => [] as string[])).filter((e) => !e.startsWith('.'));
+      const results: {ts: string, dir: string}[] = [];
+      for (const entry of entries) {
+        const full = join(dir, entry);
+        const isTimestamp = /^\d{4}-\d{2}-\d{2}T/.test(entry);
+        if (isTimestamp) {
+          results.push({ts: entry, dir: full});
+        } else {
+          const s = await stat(full).catch(() => null);
+          if (s?.isDirectory()) {
+            results.push(...await findTimestampDirs(full));
+          }
+        }
+      }
+      return results;
+    }
+    const timestampEntries = await findTimestampDirs(expDir);
+    if (timestampEntries.length === 0) continue;
 
-    const sortedTimestamps = allTimestamps.sort((a, b) => {
-      const da = new Date(parseTimestamp(a));
-      const db = new Date(parseTimestamp(b));
+    const sortedEntries = timestampEntries.sort((a, b) => {
+      const da = new Date(parseTimestamp(a.ts));
+      const db = new Date(parseTimestamp(b.ts));
       return db.getTime() - da.getTime();
     });
 
-    const latestTimestamp = sortedTimestamps[0];
+    const latestTimestamp = sortedEntries[0].ts;
     const agentResults: AgentResult[] = [];
     const seenEvals = new Set<string>();
 
-    for (const timestamp of sortedTimestamps) {
-      const runDir = join(expDir, timestamp);
+    for (const { ts: timestamp, dir: runDir } of sortedEntries) {
       let evalDirs: string[];
       try {
         evalDirs = await readdir(runDir);
@@ -248,6 +269,7 @@ async function main(): Promise<void> {
     'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
     'kimi-k2.5--agents-md': 'kimi-k2.5',
     'minimax-m2.7--agents-md': 'minimax-m2.7',
+    'glm-5.1-opencode--agents-md': 'glm-5.1-opencode',
   };
 
   for (const [variantName, baseName] of Object.entries(AGENTS_MD_PAIRS)) {
