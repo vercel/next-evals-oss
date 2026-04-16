@@ -1,0 +1,71 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 1 failed) 9ms
+   ✓ Page has at least 3 Suspense boundaries 2ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 0ms
+   × Page does not await all data before rendering 6ms
+     → expected 'import { Suspense } from \'react\'\ni…' not to match /getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  16:31:54
+   Duration  237ms (transform 29ms, setup 0ms, collect 35ms, tests 9ms, environment 0ms, prepare 68ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' not to match /getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import { RevenueChart, RevenueChartSkeleton } from './RevenueChart'
+import { LatestInvoices, LatestInvoicesSkeleton } from './LatestInvoices'
+import { CardStats, CardStatsSkeleton } from './CardStats'
+
+export type DashboardData = {
+  totalRevenue: number
+  totalInvoices: number
+  revenue: { month: string; amount: number }[]
+  invoices: { id: string; name: string; amount: number }[]
+}
+
+async function getDashboardData(): Promise<DashboardData> {
+  const res = await fetch('https://api.example.com/dashboard')
+  return res.json()
+}
+
+export default function Page() {
+  const dataPromise = getDashboardData()
+
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<CardStatsSkeleton />}>
+        <CardStats dataPromise={dataPromise} />
+      </Suspense>
+      <Suspense fallback={<RevenueChartSkeleton />}>
+        <RevenueChart dataPromise={dataPromise} />
+      </Suspense>
+      <Suspense fallback={<LatestInvoicesSkeleton />}>
+        <LatestInvoices dataPromise={dataPromise} />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:60:20
+     58|   // OR if it is async, it should not await a data fetch before return…
+     59|   // We check the simpler signal: getDashboardData should not be calle…
+     60|   expect(page).not.toMatch(/getDashboardData\s*\(/)
+       |                    ^
+     61| })
+     62| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

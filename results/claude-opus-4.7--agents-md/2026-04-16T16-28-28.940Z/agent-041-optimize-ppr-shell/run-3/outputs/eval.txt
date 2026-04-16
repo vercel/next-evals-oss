@@ -1,0 +1,82 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 1 failed) 9ms
+   ✓ Page has at least 3 Suspense boundaries 2ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 0ms
+   × Page does not await all data before rendering 6ms
+     → expected 'import { Suspense, cache } from \'rea…' not to match /await\s+getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  16:31:31
+   Duration  265ms (transform 38ms, setup 0ms, collect 37ms, tests 9ms, environment 0ms, prepare 78ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense, cache } from \'rea…' not to match /await\s+getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/await\s+getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense, cache } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+
+const getDashboardData = cache(async () => {
+  const res = await fetch('https://api.example.com/dashboard')
+  return res.json()
+})
+
+async function CardStatsSection() {
+  const data = await getDashboardData()
+  return (
+    <CardStats
+      totalRevenue={data.totalRevenue}
+      totalInvoices={data.totalInvoices}
+    />
+  )
+}
+
+async function RevenueChartSection() {
+  const data = await getDashboardData()
+  return <RevenueChart revenue={data.revenue} />
+}
+
+async function LatestInvoicesSection() {
+  const data = await getDashboardData()
+  return <LatestInvoices invoices={data.invoices} />
+}
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<p>Loading stats...</p>}>
+        <CardStatsSection />
+      </Suspense>
+      <Suspense fallback={<p>Loading chart...</p>}>
+        <RevenueChartSection />
+      </Suspense>
+      <Suspense fallback={<p>Loading invoices...</p>}>
+        <LatestInvoicesSection />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:55:20
+     53|   // The page should not call getDashboardData() or fetch() at the top…
+     54|   // A simple check: the page shouldn't contain the original monolithi…
+     55|   expect(page).not.toMatch(/await\s+getDashboardData\s*\(/)
+       |                    ^
+     56| 
+     57|   // The page component itself should not be async (data fetching move…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
