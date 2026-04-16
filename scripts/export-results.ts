@@ -47,6 +47,7 @@ interface ExportedData {
       timestamp: string;
       modelName: string;
       agentHarness: string;
+      avgDuration?: number;
       docsImpact?: DocsImpact;
     }>;
   };
@@ -56,6 +57,8 @@ interface ExportedData {
 const MODEL_NAMES: Record<string, string> = {
   'claude-opus-4.6': 'Claude Opus 4.6',
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
+  'claude-opus-4.7': 'Claude Opus 4.7 (max)',
+  'claude-opus-4.7--agents-md': 'Claude Opus 4.7 (max) + AGENTS.md',
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
   'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
   'claude-sonnet-4.6': 'Claude Sonnet 4.6',
@@ -258,6 +261,7 @@ async function main(): Promise<void> {
   // variant → base (must use the same agent harness)
   const AGENTS_MD_PAIRS: Record<string, string> = {
     'claude-opus-4.6--agents-md': 'claude-opus-4.6',
+    'claude-opus-4.7--agents-md': 'claude-opus-4.7',
     'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
     'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
     'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
@@ -309,8 +313,17 @@ async function main(): Promise<void> {
       newlyFailed,
     };
 
-    // Use the variant's timestamp if it's newer
-    baseExp.timestamp = variantExp.timestamp;
+    // Average duration across base + variant runs (seconds)
+    const allDurationsMs = [...baseResults, ...variantResults].map(
+      (r) => r.result.duration,
+    );
+    baseExp.avgDuration =
+      allDurationsMs.reduce((a, b) => a + b, 0) / allDurationsMs.length / 1000;
+
+    // Use the newer of base / variant timestamps
+    if (new Date(variantExp.timestamp) > new Date(baseExp.timestamp)) {
+      baseExp.timestamp = variantExp.timestamp;
+    }
 
     // Replace base results with the --agents-md results (better scores)
     exportedData.results[baseName] = variantResults.map((r) => ({
@@ -323,6 +336,16 @@ async function main(): Promise<void> {
       (e) => e.name !== variantName,
     );
     delete exportedData.results[variantName];
+  }
+
+  // Fill avgDuration for any experiments that didn't go through the merge
+  for (const exp of exportedData.metadata.experiments) {
+    if (exp.avgDuration !== undefined) continue;
+    const results = exportedData.results[exp.name];
+    if (!results || results.length === 0) continue;
+    const durations = results.map((r) => r.result.duration);
+    exp.avgDuration =
+      durations.reduce((a, b) => a + b, 0) / durations.length / 1000;
   }
 
   // Count stats
