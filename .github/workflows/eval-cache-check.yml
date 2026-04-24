@@ -1,0 +1,32 @@
+name: eval cache check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: pnpm eval --dry must show no evals to run
+        run: |
+          output=$(pnpm eval --dry 2>&1)
+          echo "$output"
+          if ! grep -qE 'Nothing to run\.' <<<"$output"; then
+            echo ""
+            echo "::error::pnpm eval --dry reported evals that would re-run. Every committed experiment must be fully cached on main."
+            exit 1
+          fi
