@@ -1,0 +1,440 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (4 tests | 2 failed) 10ms
+   × Catalog reads use use-cache directive and products cache tag 7ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   × Server Action revalidates products using revalidateTag profile 1ms
+     → expected 'import { revalidateTag } from \'next/…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  04:22:12
+   Duration  277ms (transform 44ms, setup 0ms, collect 40ms, tests 10ms, environment 0ms, prepare 81ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Admin Catalog',
+  description: 'Read-heavy product catalog administration',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+
+import { getProductCatalog, PRODUCTS_CACHE_TAG, type Product } from '@/lib/catalog'
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'UTC',
+})
+
+function formatDate(value: string) {
+  return dateTimeFormatter.format(new Date(value))
+}
+
+function getAvailabilityClass(product: Product) {
+  if (product.availability === 'Unavailable') {
+    return 'status statusUnavailable'
+  }
+
+  if (product.availability === 'Low stock') {
+    return 'status statusLow'
+  }
+
+  return 'status statusInStock'
+}
+
+export default async function Page() {
+  const catalog = await getProductCatalog()
+
+  async function syncLatestCatalog() {
+    'use server'
+
+    // Mark the shared catalog cache stale while letting admins keep browsing stale data.
+    revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+  }
+
+  return (
+    <main className=\"catalogShell\">
+      <section className=\"catalogHeader\" aria-labelledby=\"catalog-title\">
+        <div>
+          <p className=\"eyebrow\">Admin catalog</p>
+          <h1 id=\"catalog-title\">Product catalog</h1>
+          <p className=\"catalogSummary\">
+            Cached product data for browsing, pricing checks, inventory review, and availability
+            monitoring.
+          </p>
+        </div>
+
+        <form action={syncLatestCatalog} className=\"syncForm\">
+          <button type=\"submit\">Sync latest catalog</button>
+          <p>Refreshes cached product data in the background.</p>
+        </form>
+      </section>
+
+      <section className=\"metricsGrid\" aria-label=\"Catalog summary\">
+        <div className=\"metric\">
+          <span>Products</span>
+          <strong>{catalog.products.length}</strong>
+        </div>
+        <div className=\"metric\">
+          <span>Total inventory</span>
+          <strong>{catalog.totalInventory}</strong>
+        </div>
+        <div className=\"metric\">
+          <span>Unavailable</span>
+          <strong>{catalog.unavailableCount}</strong>
+        </div>
+        <div className=\"metric\">
+          <span>Cache snapshot</span>
+          <strong>{formatDate(catalog.refreshedAt)}</strong>
+        </div>
+      </section>
+
+      <section className=\"catalogTablePanel\" aria-labelledby=\"products-heading\">
+        <div className=\"tableHeader\">
+          <div>
+            <h2 id=\"products-heading\">Products</h2>
+            <p>Shared data source tagged as &quot;products&quot;.</p>
+          </div>
+        </div>
+
+        <div className=\"tableWrap\">
+          <table>
+            <thead>
+              <tr>
+                <th scope=\"col\">SKU</th>
+                <th scope=\"col\">Product</th>
+                <th scope=\"col\">Category</th>
+                <th scope=\"col\">Price</th>
+                <th scope=\"col\">Inventory</th>
+                <th scope=\"col\">Availability</th>
+                <th scope=\"col\">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catalog.products.map((product) => (
+                <tr key={product.id}>
+                  <td className=\"skuCell\">{product.sku}</td>
+                  <td className=\"nameCell\">{product.name}</td>
+                  <td>{product.category}</td>
+                  <td>{currencyFormatter.format(product.price)}</td>
+                  <td>{product.inventory}</td>
+                  <td>
+                    <span className={getAvailabilityClass(product)}>{product.availability}</span>
+                  </td>
+                  <td>{formatDate(product.updatedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+import { getAllProducts } from '@/lib/db'
+
+export const PRODUCTS_CACHE_TAG = 'products' as const
+
+export type Product = {
+  id: number
+  sku: string
+  name: string
+  category: string
+  price: number
+  inventory: number
+  availability: 'In stock' | 'Low stock' | 'Unavailable'
+  updatedAt: string
+}
+
+export type ProductCatalog = {
+  products: Product[]
+  refreshedAt: string
+  totalInventory: number
+  unavailableCount: number
+}
+
+async function loadProductCatalog(): Promise<ProductCatalog> {
+  const products = (await getAllProducts()) as Product[]
+
+  return {
+    products,
+    refreshedAt: new Date().toISOString(),
+    totalInventory: products.reduce((total, product) => total + product.inventory, 0),
+    unavailableCount: products.filter((product) => product.availability === 'Unavailable').length,
+  }
+}
+
+export const getProductCatalog = unstable_cache(loadProductCatalog, ['product-catalog'], {
+  revalidate: false,
+  tags: [PRODUCTS_CACHE_TAG],
+})
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    {
+      id: 1,
+      sku: 'LTP-13-PRO',
+      name: 'Laptop Pro 13',
+      category: 'Computers',
+      price: 999,
+      inventory: 42,
+      availability: 'In stock',
+      updatedAt: '2026-04-24T18:30:00.000Z',
+    },
+    {
+      id: 2,
+      sku: 'PHN-XL-256',
+      name: 'Phone XL 256GB',
+      category: 'Mobile',
+      price: 699,
+      inventory: 18,
+      availability: 'Low stock',
+      updatedAt: '2026-04-24T18:14:00.000Z',
+    },
+    {
+      id: 3,
+      sku: 'TAB-AIR-11',
+      name: 'Tablet Air 11',
+      category: 'Tablets',
+      price: 499,
+      inventory: 0,
+      availability: 'Unavailable',
+      updatedAt: '2026-04-24T17:52:00.000Z',
+    },
+    {
+      id: 4,
+      sku: 'AUD-NC-700',
+      name: 'Noise Canceling Headphones',
+      category: 'Audio',
+      price: 199,
+      inventory: 127,
+      availability: 'In stock',
+      updatedAt: '2026-04-24T17:33:00.000Z',
+    },
+    {
+      id: 5,
+      sku: 'WCH-FIT-2',
+      name: 'Fitness Watch 2',
+      category: 'Wearables',
+      price: 299,
+      inventory: 9,
+      availability: 'Low stock',
+      updatedAt: '2026-04-24T16:59:00.000Z',
+    },
+  ]
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/dev/types/routes.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Server Action revalidates products using revalidateTag profile
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /revalidateTag\s*\(\s*['"]products['"]…/
+
+[32m- Expected:[39m 
+/revalidateTag\s*\(\s*['"]products['"]\s*,/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache'
+
+import { getProductCatalog, PRODUCTS_CACHE_TAG, type Product } from '@/lib/catalog'
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'UTC',
+})
+
+function formatDate(value: string) {
+  return dateTimeFormatter.format(new Date(value))
+}
+
+function getAvailabilityClass(product: Product) {
+  if (product.availability === 'Unavailable') {
+    return 'status statusUnavailable'
+  }
+
+  if (product.availability === 'Low stock') {
+    return 'status statusLow'
+  }
+
+  return 'status statusInStock'
+}
+
+export default async function Page() {
+  const catalog = await getProductCatalog()
+
+  async function syncLatestCatalog() {
+    'use server'
+
+    // Mark the shared catalog cache stale while letting admins keep browsing stale data.
+    revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+  }
+
+  return (
+    <main className=\"catalogShell\">
+      <section className=\"catalogHeader\" aria-labelledby=\"catalog-title\">
+        <div>
+          <p className=\"eyebrow\">Admin catalog</p>
+          <h1 id=\"catalog-title\">Product catalog</h1>
+          <p className=\"catalogSummary\">
+            Cached product data for browsing, pricing checks, inventory review, and availability
+            monitoring.
+          </p>
+        </div>
+
+        <form action={syncLatestCatalog} className=\"syncForm\">
+          <button type=\"submit\">Sync latest catalog</button>
+          <p>Refreshes cached product data in the background.</p>
+        </form>
+      </section>
+
+      <section className=\"metricsGrid\" aria-label=\"Catalog summary\">
+        <div className=\"metric\">
+          <span>Products</span>
+          <strong>{catalog.products.length}</strong>
+        </div>
+        <div className=\"metric\">
+          <span>Total inventory</span>
+          <strong>{catalog.totalInventory}</strong>
+        </div>
+        <div className=\"metric\">
+          <span>Unavailable</span>
+          <strong>{catalog.unavailableCount}</strong>
+        </div>
+        <div className=\"metric\">
+          <span>Cache snapshot</span>
+          <strong>{formatDate(catalog.refreshedAt)}</strong>
+        </div>
+      </section>
+
+      <section className=\"catalogTablePanel\" aria-labelledby=\"products-heading\">
+        <div className=\"tableHeader\">
+          <div>
+            <h2 id=\"products-heading\">Products</h2>
+            <p>Shared data source tagged as &quot;products&quot;.</p>
+          </div>
+        </div>
+
+        <div className=\"tableWrap\">
+          <table>
+            <thead>
+              <tr>
+                <th scope=\"col\">SKU</th>
+                <th scope=\"col\">Product</th>
+                <th scope=\"col\">Category</th>
+                <th scope=\"col\">Price</th>
+                <th scope=\"col\">Inventory</th>
+                <th scope=\"col\">Availability</th>
+                <th scope=\"col\">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {catalog.products.map((product) => (
+                <tr key={product.id}>
+                  <td className=\"skuCell\">{product.sku}</td>
+                  <td className=\"nameCell\">{product.name}</td>
+                  <td>{product.category}</td>
+                  <td>{currencyFormatter.format(product.price)}</td>
+                  <td>{product.inventory}</td>
+                  <td>
+                    <span className={getAvailabilityClass(product)}>{product.availability}</span>
+                  </td>
+                  <td>{formatDate(product.updatedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:105:41
+    103| 
+    104|   // Require the same explicit products tag and a profile/second argum…
+    105|   expect(revalidateFile?.content ?? '').toMatch(
+       |                                         ^
+    106|     /revalidateTag\s*\(\s*['"]products['"]\s*,/
+    107|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

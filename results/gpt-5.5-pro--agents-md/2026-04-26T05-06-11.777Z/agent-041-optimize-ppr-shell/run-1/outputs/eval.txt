@@ -1,0 +1,149 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (3 tests | 2 failed) 8ms
+   × Page has at least 3 Suspense boundaries 5ms
+     → expected 1 to be greater than or equal to 3
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 1ms
+   × Page does not await all data before rendering 2ms
+     → expected 'import { Suspense } from \'react\'\ni…' not to match /await\s+getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  05:27:18
+   Duration  253ms (transform 43ms, setup 0ms, collect 27ms, tests 8ms, environment 0ms, prepare 90ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has at least 3 Suspense boundaries
+AssertionError: expected 1 to be greater than or equal to 3
+ ❯ EVAL.ts:30:25
+     28| 
+     29|   const suspenseCount = (page.match(/<Suspense[\s>]/g) || []).length
+     30|   expect(suspenseCount).toBeGreaterThanOrEqual(3)
+       |                         ^
+     31| })
+     32| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' not to match /await\s+getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/await\s+getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+
+export const unstable_instant = true
+
+type DashboardData = {
+  totalRevenue: number
+  totalInvoices: number
+  revenue: { month: string; amount: number }[]
+  invoices: { id: string; name: string; amount: number }[]
+}
+
+async function getDashboardData(): Promise<DashboardData> {
+  const res = await fetch('https://api.example.com/dashboard')
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch dashboard data: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<DashboardFallback />}>
+        <DashboardContent />
+      </Suspense>
+    </main>
+  )
+}
+
+async function DashboardContent() {
+  const data = await getDashboardData()
+
+  return (
+    <>
+      <CardStats
+        totalRevenue={data.totalRevenue}
+        totalInvoices={data.totalInvoices}
+      />
+      <RevenueChart revenue={data.revenue} />
+      <LatestInvoices invoices={data.invoices} />
+    </>
+  )
+}
+
+function DashboardFallback() {
+  return (
+    <>
+      <CardStatsFallback />
+      <RevenueChartFallback />
+      <LatestInvoicesFallback />
+    </>
+  )
+}
+
+function CardStatsFallback() {
+  return (
+    <div className=\"grid grid-cols-2 gap-4\" aria-label=\"Loading card stats\">
+      <div className=\"card\">
+        <h2>Total Revenue</h2>
+        <p>...</p>
+      </div>
+      <div className=\"card\">
+        <h2>Total Invoices</h2>
+        <p>...</p>
+      </div>
+    </div>
+  )
+}
+
+function RevenueChartFallback() {
+  return (
+    <div className=\"chart\" aria-label=\"Loading revenue chart\">
+      <h2>Revenue</h2>
+      <ul>
+        <li>...</li>
+        <li>...</li>
+        <li>...</li>
+      </ul>
+    </div>
+  )
+}
+
+function LatestInvoicesFallback() {
+  return (
+    <div className=\"invoices\" aria-label=\"Loading latest invoices\">
+      <h2>Latest Invoices</h2>
+      <ul>
+        <li>...</li>
+        <li>...</li>
+        <li>...</li>
+      </ul>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:55:20
+     53|   // The page should not call getDashboardData() or fetch() at the top…
+     54|   // A simple check: the page shouldn't contain the original monolithi…
+     55|   expect(page).not.toMatch(/await\s+getDashboardData\s*\(/)
+       |                    ^
+     56| 
+     57|   // The page component itself should not be async (data fetching move…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
