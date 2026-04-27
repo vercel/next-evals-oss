@@ -1,0 +1,83 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (8 tests | 1 failed) 12ms
+   ✓ Root layout exists and replaces _app/_document 2ms
+   × Home page migrated to Server Component with async data fetching 7ms
+     → expected 'import type { Metadata } from \'next\…' to match /await\s+fetch|fetch\(/
+   ✓ Blog index migrated with ISR equivalent 1ms
+   ✓ Dynamic blog route migrated to generateStaticParams 0ms
+   ✓ API routes migrated to Route Handlers 1ms
+   ✓ Metadata API replaces next/head 0ms
+   ✓ Error handling migrated to error.js and not-found.js 0ms
+   ✓ Client components use next/navigation hooks 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  06:47:15
+   Duration  285ms (transform 40ms, setup 0ms, collect 47ms, tests 12ms, environment 0ms, prepare 78ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Home page migrated to Server Component with async data fetching
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /await\s+fetch|fetch\(/
+
+[32m- Expected:[39m 
+/await\s+fetch|fetch\(/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import { headers } from 'next/headers'
+import Link from 'next/link'
+import { getRecentPosts } from '../lib/json-placeholder'
+
+export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Home',
+  description: 'Welcome to my blog homepage',
+  openGraph: {
+    title: 'Home - My Blog',
+  },
+}
+
+export default async function HomePage() {
+  const headersList = await headers()
+  const userAgent = headersList.get('user-agent') ?? ''
+  const posts = await getRecentPosts()
+  const timestamp = new Date().toISOString()
+
+  return (
+    <div>
+      <h1>Welcome to My Blog</h1>
+      <p>Server-side rendered at: {timestamp}</p>
+      <p>Your user agent: {userAgent}</p>
+
+      <h2>Recent Posts</h2>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            <Link href={`/blog/${post.id}`}>{post.title}</Link>
+          </li>
+        ))}
+      </ul>
+
+      <Link className=\"button-link\" href=\"/blog\">
+        View All Posts
+      </Link>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:54:23
+     52| 
+     53|   // Should use fetch instead of getServerSideProps
+     54|   expect(pageContent).toMatch(/await\s+fetch|fetch\(/)
+       |                       ^
+     55| 
+     56|   // Should not have getServerSideProps in actual code (comments OK)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
