@@ -1,0 +1,246 @@
+
+ RUN  v3.2.4 /workspace
+
+ ❯ EVAL.ts (4 tests | 1 failed) 8ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { revalidateTag } from \'next/…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  23:33:18
+   Duration  218ms (transform 30ms, setup 0ms, collect 26ms, tests 8ms, environment 0ms, prepare 63ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import { syncCatalogFromERP } from '@/lib/db'
+import { getCatalog } from '@/lib/products'
+
+export const metadata = {
+  title: 'Product catalog',
+}
+
+function formatSyncedAt(timestamp: number) {
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(timestamp))
+}
+
+export default async function AdminCatalogPage() {
+  async function syncCatalog() {
+    'use server'
+
+    after(async () => {
+      await syncCatalogFromERP()
+      revalidateTag('products', 'max')
+    })
+  }
+
+  const { products, syncedAt } = await getCatalog()
+
+  return (
+    <main style={{ maxWidth: 960, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <header
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Product catalog</h1>
+          <p style={{ margin: '0.5rem 0 0', color: '#555' }}>
+            Browse the cached catalog. Use sync when ERP/PIM data changes;
+            updates apply in the background.
+          </p>
+          <p style={{ margin: '0.35rem 0 0', fontSize: '0.875rem', color: '#666' }}>
+            Last upstream sync: {formatSyncedAt(syncedAt)}
+          </p>
+        </div>
+
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.6rem 1rem',
+              fontSize: '0.9375rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: '1px solid #1a1a1a',
+              borderRadius: 6,
+              background: '#1a1a1a',
+              color: '#fff',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </header>
+
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: '0.9375rem',
+        }}
+      >
+        <thead>
+          <tr style={{ borderBottom: '2px solid #e5e5e5', textAlign: 'left' }}>
+            <th style={{ padding: '0.75rem 0.5rem' }}>SKU</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Name</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Price</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Inventory</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Available</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
+              <td style={{ padding: '0.65rem 0.5rem' }}>{product.id}</td>
+              <td style={{ padding: '0.65rem 0.5rem' }}>{product.name}</td>
+              <td style={{ padding: '0.65rem 0.5rem' }}>
+                ${product.price.toLocaleString()}
+              </td>
+              <td style={{ padding: '0.65rem 0.5rem' }}>{product.inventory}</td>
+              <td style={{ padding: '0.65rem 0.5rem' }}>
+                {product.available ? 'Yes' : 'No'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'E-commerce Admin',
+  description: 'Admin tools for catalog and operations',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <div style={{ padding: '2rem 1.5rem' }}>
+      <h1>Home</h1>
+      <p>
+        <Link href=\"/admin/catalog\">Admin product catalog</Link>
+      </p>
+    </div>
+  )
+}
+
+const initialProducts = [
+  { id: 1, name: 'Laptop', price: 999, inventory: 42, available: true },
+  { id: 2, name: 'Phone', price: 699, inventory: 128, available: true },
+  { id: 3, name: 'Tablet', price: 499, inventory: 0, available: false },
+  { id: 4, name: 'Headphones', price: 199, inventory: 310, available: true },
+  { id: 5, name: 'Watch', price: 299, inventory: 17, available: true },
+]
+
+let catalog = initialProducts.map((product) => ({ ...product }))
+let catalogSyncedAt = Date.now()
+
+/** Simulates a read from the operational product store. */
+export async function getAllProducts() {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  return catalog.map((product) => ({ ...product }))
+}
+
+/** Simulates pulling the latest catalog from upstream ERP/PIM systems. */
+export async function syncCatalogFromERP() {
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+
+  catalog = catalog.map((product) => ({
+    ...product,
+    price: Math.round(product.price * (0.98 + Math.random() * 0.06)),
+    inventory: Math.max(
+      0,
+      product.inventory + Math.floor(Math.random() * 21) - 10,
+    ),
+    available: product.inventory + Math.floor(Math.random() * 21) - 10 > 0,
+  }))
+  catalogSyncedAt = Date.now()
+}
+
+export function getCatalogSyncedAt() {
+  return catalogSyncedAt
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts, getCatalogSyncedAt } from '@/lib/db'
+
+export const getCatalog = unstable_cache(
+  async () => ({
+    products: await getAllProducts(),
+    syncedAt: getCatalogSyncedAt(),
+  }),
+  ['admin-catalog-products'],
+  { tags: ['products'] },
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

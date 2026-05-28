@@ -1,0 +1,267 @@
+
+ RUN  v3.2.4 /workspace
+
+ ❯ EVAL.ts (4 tests | 1 failed) 8ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import { revalidateTag } from \'next/…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  23:33:20
+   Duration  257ms (transform 35ms, setup 0ms, collect 23ms, tests 8ms, environment 0ms, prepare 83ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import { revalidateTag } from \'next/…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import Link from 'next/link'
+import { syncCatalogFromERP } from '@/lib/db'
+import { getCachedProducts } from '@/lib/products'
+
+export default async function AdminCatalogPage() {
+  const products = await getCachedProducts()
+
+  async function syncCatalog() {
+    'use server'
+
+    after(async () => {
+      await syncCatalogFromERP()
+      revalidateTag('products', 'max')
+    })
+  }
+
+  return (
+    <main style={{ maxWidth: 960, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <header
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          marginBottom: '1.5rem',
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Product catalog</h1>
+          <p style={{ margin: '0.5rem 0 0', color: '#555' }}>
+            Cached catalog for fast browsing. Sync when ERP/PIM data changes.
+          </p>
+        </div>
+
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '0.6rem 1rem',
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: '1px solid #1a56db',
+              borderRadius: 6,
+              background: '#1a56db',
+              color: '#fff',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </header>
+
+      <p style={{ margin: '0 0 1.25rem', fontSize: '0.9rem', color: '#666' }}>
+        <Link href=\"/admin/inventory\">Inventory summary</Link> uses the same
+        cached catalog data.
+      </p>
+
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: '0.95rem',
+        }}
+      >
+        <thead>
+          <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
+            <th style={{ padding: '0.75rem 0.5rem' }}>SKU</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Name</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Price</th>
+            <th style={{ padding: '0.75rem 0.5rem' }}>Inventory</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <td style={{ padding: '0.75rem 0.5rem' }}>{product.id}</td>
+              <td style={{ padding: '0.75rem 0.5rem' }}>{product.name}</td>
+              <td style={{ padding: '0.75rem 0.5rem' }}>
+                ${product.price.toLocaleString()}
+              </td>
+              <td style={{ padding: '0.75rem 0.5rem' }}>{product.inventory}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  )
+}
+
+import Link from 'next/link'
+import { getCachedProducts } from '@/lib/products'
+
+export default async function AdminInventoryPage() {
+  const products = await getCachedProducts()
+  const totalUnits = products.reduce(
+    (sum, product) => sum + product.inventory,
+    0,
+  )
+  const totalValue = products.reduce(
+    (sum, product) => sum + product.price * product.inventory,
+    0,
+  )
+
+  return (
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <p style={{ margin: '0 0 1rem' }}>
+        <Link href=\"/admin/catalog\">← Back to catalog</Link>
+      </p>
+      <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.75rem' }}>
+        Inventory summary
+      </h1>
+      <p style={{ margin: '0 0 1.5rem', color: '#555' }}>
+        Shares the same <code>products</code> cache tag as the catalog.
+      </p>
+      <dl
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr',
+          gap: '0.75rem 1.5rem',
+          margin: 0,
+        }}
+      >
+        <dt style={{ fontWeight: 600 }}>SKUs</dt>
+        <dd style={{ margin: 0 }}>{products.length}</dd>
+        <dt style={{ fontWeight: 600 }}>Total units</dt>
+        <dd style={{ margin: 0 }}>{totalUnits.toLocaleString()}</dd>
+        <dt style={{ fontWeight: 600 }}>Stock value</dt>
+        <dd style={{ margin: 0 }}>${totalValue.toLocaleString()}</dd>
+      </dl>
+    </main>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import Link from 'next/link'
+
+export default function Page() {
+  return (
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <h1 style={{ margin: 0 }}>Admin</h1>
+      <p style={{ margin: '1rem 0 0' }}>
+        <Link href=\"/admin/catalog\">Product catalog</Link>
+      </p>
+    </main>
+  )
+}
+
+/** @typedef {{ id: number; name: string; price: number; inventory: number }} Product */
+
+/** @type {Product[]} */
+let products = [
+  { id: 1, name: 'Laptop', price: 999, inventory: 42 },
+  { id: 2, name: 'Phone', price: 699, inventory: 128 },
+  { id: 3, name: 'Tablet', price: 499, inventory: 67 },
+  { id: 4, name: 'Headphones', price: 199, inventory: 240 },
+  { id: 5, name: 'Watch', price: 299, inventory: 91 },
+]
+
+export async function getAllProducts() {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  return products.map((product) => ({ ...product }))
+}
+
+/** Simulates a long-running ERP/PIM catalog sync. */
+export async function syncCatalogFromERP() {
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+
+  products = products.map((product) => ({
+    ...product,
+    price: Math.round(product.price * (0.97 + Math.random() * 0.06)),
+    inventory: Math.max(
+      0,
+      product.inventory + Math.floor(Math.random() * 21) - 10,
+    ),
+  }))
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db'
+
+export const getCachedProducts = unstable_cache(
+  async () => getAllProducts(),
+  ['products-list'],
+  { tags: ['products'] },
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
