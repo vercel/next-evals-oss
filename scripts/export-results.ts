@@ -59,6 +59,8 @@ const MODEL_NAMES: Record<string, string> = {
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-opus-4.7': 'Claude Opus 4.7 (max)',
   'claude-opus-4.7--agents-md': 'Claude Opus 4.7 (max) + AGENTS.md',
+  'claude-opus-4.8': 'Claude Opus 4.8',
+  'claude-opus-4.8--agents-md': 'Claude Opus 4.8 + AGENTS.md',
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
   'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
   'claude-sonnet-4.6': 'Claude Sonnet 4.6',
@@ -264,6 +266,7 @@ async function main(): Promise<void> {
   const AGENTS_MD_PAIRS: Record<string, string> = {
     'claude-opus-4.6--agents-md': 'claude-opus-4.6',
     'claude-opus-4.7--agents-md': 'claude-opus-4.7',
+    'claude-opus-4.8--agents-md': 'claude-opus-4.8',
     'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
     'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
     'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
