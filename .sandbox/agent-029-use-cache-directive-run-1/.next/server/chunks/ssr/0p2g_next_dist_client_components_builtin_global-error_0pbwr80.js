@@ -1,0 +1,3 @@
+module.exports=[12135,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(94676);a.n(d("[project]/.sandbox/agent-029-use-cache-directive-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},3695,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(94676);a.n(d("[project]/.sandbox/agent-029-use-cache-directive-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},61473,a=>{"use strict";a.i(12135);var b=a.i(3695);a.n(b)},65191,a=>{a.n(a.i(61473))}];
+
+//# sourceMappingURL=0p2g_next_dist_client_components_builtin_global-error_0pbwr80.js.map

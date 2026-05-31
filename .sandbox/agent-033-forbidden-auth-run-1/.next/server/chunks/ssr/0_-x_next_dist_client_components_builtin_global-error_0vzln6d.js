@@ -1,0 +1,3 @@
+module.exports=[50787,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(82010);a.n(d("[project]/.sandbox/agent-033-forbidden-auth-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},99309,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(82010);a.n(d("[project]/.sandbox/agent-033-forbidden-auth-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},60032,a=>{"use strict";a.i(50787);var b=a.i(99309);a.n(b)},63091,a=>{a.n(a.i(60032))}];
+
+//# sourceMappingURL=0_-x_next_dist_client_components_builtin_global-error_0vzln6d.js.map

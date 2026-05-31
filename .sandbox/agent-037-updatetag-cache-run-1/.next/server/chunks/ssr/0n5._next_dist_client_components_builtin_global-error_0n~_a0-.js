@@ -1,0 +1,3 @@
+module.exports=[89224,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(91266);a.n(d("[project]/.sandbox/agent-037-updatetag-cache-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},74425,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(91266);a.n(d("[project]/.sandbox/agent-037-updatetag-cache-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},66952,a=>{"use strict";a.i(89224);var b=a.i(74425);a.n(b)},74431,a=>{a.n(a.i(66952))}];
+
+//# sourceMappingURL=0n5._next_dist_client_components_builtin_global-error_0n~_a0-.js.map

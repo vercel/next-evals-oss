@@ -1,0 +1,1 @@
+self.__NEXT_FONT_MANIFEST="{\n  \"app\": {\n    \"[project]/.sandbox/agent-028-prefer-next-font-run-1/app/page\": [\n      \"static/media/2a65768255d6b625-s.p.14by5b4al-y~f.woff2\",\n      \"static/media/ce62453a442c7f35-s.p.0333ktddfbsxy.woff2\"\n    ]\n  },\n  \"appUsingSizeAdjust\": true,\n  \"pages\": {},\n  \"pagesUsingSizeAdjust\": false\n}"

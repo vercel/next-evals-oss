@@ -1,0 +1,3 @@
+module.exports=[9680,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(50646);a.n(d("[project]/.sandbox/agent-043-view-transitions-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},77074,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(50646);a.n(d("[project]/.sandbox/agent-043-view-transitions-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},32910,a=>{"use strict";a.i(9680);var b=a.i(77074);a.n(b)},33269,a=>{a.n(a.i(32910))}];
+
+//# sourceMappingURL=0n95_next_dist_client_components_builtin_global-error_120e4k_.js.map

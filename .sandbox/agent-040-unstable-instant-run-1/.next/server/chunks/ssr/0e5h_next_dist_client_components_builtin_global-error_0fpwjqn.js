@@ -1,0 +1,3 @@
+module.exports=[26277,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(4427);a.n(d("[project]/.sandbox/agent-040-unstable-instant-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},85945,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(4427);a.n(d("[project]/.sandbox/agent-040-unstable-instant-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},20237,a=>{"use strict";a.i(26277);var b=a.i(85945);a.n(b)},32997,a=>{a.n(a.i(20237))}];
+
+//# sourceMappingURL=0e5h_next_dist_client_components_builtin_global-error_0fpwjqn.js.map

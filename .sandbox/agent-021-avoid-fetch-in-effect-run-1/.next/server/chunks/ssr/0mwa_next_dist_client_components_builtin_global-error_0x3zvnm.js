@@ -1,0 +1,3 @@
+module.exports=[21294,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(44840);a.n(d("[project]/.sandbox/agent-021-avoid-fetch-in-effect-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},89366,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(44840);a.n(d("[project]/.sandbox/agent-021-avoid-fetch-in-effect-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},66234,a=>{"use strict";a.i(21294);var b=a.i(89366);a.n(b)},1413,a=>{a.n(a.i(66234))}];
+
+//# sourceMappingURL=0mwa_next_dist_client_components_builtin_global-error_0x3zvnm.js.map

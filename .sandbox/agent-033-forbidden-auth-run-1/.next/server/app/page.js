@@ -1,0 +1,13 @@
+var R=require("../chunks/ssr/[turbopack]_runtime.js")("server/app/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0.qfpjq._.js")
+R.c("server/chunks/ssr/0_-x_next_dist_esm_build_templates_app-page_0yb.7xt.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0q~p1-a._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0hbx1m_._.js")
+R.c("server/chunks/ssr/_sandbox_agent-033-forbidden-auth-run-1_app_layout_tsx_0xd31_8._.js")
+R.c("server/chunks/ssr/0_-x_next_dist_client_components_0s3rfkn._.js")
+R.c("server/chunks/ssr/_sandbox_agent-033-forbidden-auth-run-1_0_qhllf._.js")
+R.c("server/chunks/ssr/0_-x_next_dist_client_components_builtin_unauthorized_0qm9jas.js")
+R.c("server/chunks/ssr/0_-x_next_dist_client_components_builtin_global-error_0vzln6d.js")
+R.c("server/chunks/ssr/0jtf_agent-033-forbidden-auth-run-1__next-internal_server_app_page_actions_0zm35it.js")
+R.m(882)
+module.exports=R.m(882).exports

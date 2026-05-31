@@ -90,6 +90,12 @@ const MODEL_NAMES: Record<string, string> = {
   'glm-5.1': 'GLM 5.1',
   'glm-5.1-opencode': 'GLM 5.1',
   'glm-5.1-opencode--agents-md': 'GLM 5.1 + AGENTS.md',
+  'vtcode-deepseek-ai-DeepSeek-V4-Flash-novita': 'vtcode + DeepSeek V4 Flash (Novita)',
+  'vtcode-deepseek-ai-DeepSeek-V4-Flash-novita--agents-md': 'vtcode + DeepSeek V4 Flash (Novita) + AGENTS.md',
+  'vtcode-moonshotai-Kimi-K2.6-novita': 'vtcode + Kimi K2.6 (Novita)',
+  'vtcode-moonshotai-Kimi-K2.6-novita--agents-md': 'vtcode + Kimi K2.6 (Novita) + AGENTS.md',
+  'vtcode-zai-org-GLM-5.1-zai-org': 'vtcode + GLM 5.1 (ZAI)',
+  'vtcode-zai-org-GLM-5.1-zai-org--agents-md': 'vtcode + GLM 5.1 (ZAI) + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
@@ -100,6 +106,7 @@ const HARNESS_NAMES: Record<string, string> = {
   'cursor': 'Cursor',
   'gemini': 'Gemini CLI',
   'vercel-ai-gateway/claude-code': 'Claude Code',
+  'vtcode': 'vtcode',
 };
 
 function parseTimestamp(ts: string): string {

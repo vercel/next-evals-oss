@@ -1,0 +1,3 @@
+module.exports=[92671,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(68192);a.n(d("[project]/.sandbox/agent-034-async-cookies-run-1/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},10437,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(68192);a.n(d("[project]/.sandbox/agent-034-async-cookies-run-1/node_modules/next/dist/client/components/builtin/global-error.js"))},10676,a=>{"use strict";a.i(92671);var b=a.i(10437);a.n(b)},22412,a=>{a.n(a.i(10676))}];
+
+//# sourceMappingURL=0jm._next_dist_client_components_builtin_global-error_127n~av.js.map

@@ -1,0 +1,13 @@
+var R=require("../../chunks/ssr/[turbopack]_runtime.js")("server/app/about/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__10m5~7d._.js")
+R.c("server/chunks/ssr/0yc__next_dist_esm_build_templates_app-page_0wv.~d_.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0kx9g3p._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__07vctp7._.js")
+R.c("server/chunks/ssr/_sandbox_agent-000-app-router-migration-simple-run-1_app_layout_tsx_0-fu9m_._.js")
+R.c("server/chunks/ssr/0yc__next_dist_client_components_0me-ilp._.js")
+R.c("server/chunks/ssr/0yc__next_dist_client_components_builtin_forbidden_0-a2-aa.js")
+R.c("server/chunks/ssr/0yc__next_dist_client_components_builtin_unauthorized_0a3owg9.js")
+R.c("server/chunks/ssr/0yc__next_dist_client_components_builtin_global-error_0izz~yf.js")
+R.c("server/chunks/ssr/10uj_uter-migration-simple-run-1__next-internal_server_app_about_page_actions_0z0azid.js")
+R.m(17480)
+module.exports=R.m(17480).exports
