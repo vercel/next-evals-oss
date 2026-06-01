@@ -79,8 +79,12 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.4-xhigh--agents-md': 'GPT 5.4 (xhigh) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
+  'kimi-k2.6': 'Kimi K2.6',
+  'kimi-k2.6--agents-md': 'Kimi K2.6 + AGENTS.md',
   'minimax-m2.7': 'MiniMax M2.7',
   'minimax-m2.7--agents-md': 'MiniMax M2.7 + AGENTS.md',
+  'minimax-m3': 'MiniMax M3',
+  'minimax-m3--agents-md': 'MiniMax M3 + AGENTS.md',
   'glm-5.1': 'GLM 5.1',
   'glm-5.1-opencode': 'GLM 5.1',
   'glm-5.1-opencode--agents-md': 'GLM 5.1 + AGENTS.md',
@@ -272,7 +276,9 @@ async function main(): Promise<void> {
     'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
     'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
     'kimi-k2.5--agents-md': 'kimi-k2.5',
+    'kimi-k2.6--agents-md': 'kimi-k2.6',
     'minimax-m2.7--agents-md': 'minimax-m2.7',
+    'minimax-m3--agents-md': 'minimax-m3',
     'glm-5.1-opencode--agents-md': 'glm-5.1-opencode',
   };
 
