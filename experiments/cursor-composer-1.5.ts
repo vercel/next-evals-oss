@@ -2,6 +2,7 @@ import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
   agent: 'cursor',
+  evals: process.env.EVAL_FILTER ?? "*",
   model: 'composer-1.5',
   scripts: ['build'],
   runs: 4,
