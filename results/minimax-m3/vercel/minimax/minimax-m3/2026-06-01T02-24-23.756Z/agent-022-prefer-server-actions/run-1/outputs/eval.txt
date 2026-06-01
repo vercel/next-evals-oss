@@ -1,0 +1,106 @@
+
+ RUN  v3.2.4 /vercel/sandbox
+
+ ❯ EVAL.ts (6 tests | 1 failed) 11ms
+   ✓ renders contact form with Contact Us heading 2ms
+   × uses server action instead of client-side submission 6ms
+     → expected '\'use client\'\n\nimport { useActionS…' to match /async\s+function\s+\w+.*FormData/
+   ✓ processes form data using FormData API 0ms
+   ✓ has proper form structure with action attribute 1ms
+   ✓ includes form validation 0ms
+   ✓ does not use API routes pattern 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  02:25:53
+   Duration  285ms (transform 40ms, setup 0ms, collect 39ms, tests 11ms, environment 0ms, prepare 81ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > uses server action instead of client-side submission
+AssertionError: expected '\'use client\'\n\nimport { useActionS…' to match /async\s+function\s+\w+.*FormData/
+
+[32m- Expected:[39m 
+/async\s+function\s+\w+.*FormData/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useActionState } from 'react'
+
+type State = {
+  status: 'idle' | 'success' | 'error'
+  message: string
+}
+
+async function submitContactForm(
+  _prevState: State,
+  formData: FormData,
+): Promise<State> {
+  'use server'
+
+  const name = (formData.get('name') as string | null)?.trim()
+  const email = (formData.get('email') as string | null)?.trim()
+  const message = (formData.get('message') as string | null)?.trim()
+
+  if (!name || !email || !message) {
+    return {
+      status: 'error',
+      message: 'All fields are required.',
+    }
+  }
+
+  console.log('Saving contact message:', { name, email, message })
+
+  return {
+    status: 'success',
+    message: 'Thanks! Your message has been sent.',
+  }
+}
+
+const initialState: State = { status: 'idle', message: '' }
+
+export default function ContactForm() {
+  const [state, formAction, isPending] = useActionState(
+    submitContactForm,
+    initialState,
+  )
+
+  return (
+    <div>
+      <h2>Contact Us</h2>
+      <form action={formAction}>
+        <div>
+          <input name=\"name\" placeholder=\"Name\" required />
+        </div>
+        <div>
+          <input name=\"email\" type=\"email\" placeholder=\"Email\" required />
+        </div>
+        <div>
+          <textarea name=\"message\" placeholder=\"Message\" required />
+        </div>
+        <button type=\"submit\" disabled={isPending}>
+          {isPending ? 'Sending...' : 'Send Message'}
+        </button>
+        {state.message && (
+          <p role=\"status\" aria-live=\"polite\">
+            {state.message}
+          </p>
+        )}
+      </form>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:72:22
+     70|   expect(allRelated).toMatch(/['"]use server['"];?/)
+     71|   // Must have an async server action function that accepts FormData
+     72|   expect(allRelated).toMatch(/async\s+function\s+\w+.*FormData/)
+       |                      ^
+     73| })
+     74| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
