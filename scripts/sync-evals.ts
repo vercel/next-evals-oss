@@ -97,15 +97,18 @@ async function main(): Promise<void> {
   if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
   if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true });
 
-  // Sparse clone
+  // Sparse fetch. Use fetch + checkout (not clone --branch) so `ref` may be a
+  // branch/tag OR a pinned commit SHA — clone --branch rejects raw SHAs.
+  const repoDir = `${tmpDir}/next.js`;
+  execSync(`git init -q "${repoDir}"`, { stdio: 'inherit' });
+  execSync(`git -C "${repoDir}" remote add origin ${REPO_URL}`, { stdio: 'inherit' });
+  execSync(`git -C "${repoDir}" sparse-checkout init --cone`, { stdio: 'inherit' });
+  execSync(`git -C "${repoDir}" sparse-checkout set evals/evals`, { stdio: 'inherit' });
   execSync(
-    `git clone --depth 1 --filter=blob:none --sparse --branch ${ref} ${REPO_URL} "${tmpDir}/next.js"`,
+    `git -C "${repoDir}" fetch --depth 1 --filter=blob:none origin ${ref}`,
     { stdio: 'inherit' }
   );
-  execSync(
-    `git -C "${tmpDir}/next.js" sparse-checkout set evals/evals`,
-    { stdio: 'inherit' }
-  );
+  execSync(`git -C "${repoDir}" checkout -q FETCH_HEAD`, { stdio: 'inherit' });
 
   // Copy evals into place
   execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);

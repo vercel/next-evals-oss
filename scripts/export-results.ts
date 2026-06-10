@@ -55,6 +55,8 @@ interface ExportedData {
 }
 
 const MODEL_NAMES: Record<string, string> = {
+  'claude-fable-5': 'Claude Fable 5',
+  'claude-fable-5--agents-md': 'Claude Fable 5 + AGENTS.md',
   'claude-opus-4.6': 'Claude Opus 4.6',
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-opus-4.7': 'Claude Opus 4.7 (max)',
@@ -264,6 +266,7 @@ async function main(): Promise<void> {
   // Merge --agents-md variants into base experiments
   // variant → base (must use the same agent harness)
   const AGENTS_MD_PAIRS: Record<string, string> = {
+    'claude-fable-5--agents-md': 'claude-fable-5',
     'claude-opus-4.6--agents-md': 'claude-opus-4.6',
     'claude-opus-4.7--agents-md': 'claude-opus-4.7',
     'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
