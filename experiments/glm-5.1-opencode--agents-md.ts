@@ -2,6 +2,7 @@ import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
+  evals: process.env.EVAL_FILTER ?? "*",
   model: 'vercel/zai/glm-5.1',
   agentOptions: {
     binaryUrl:
