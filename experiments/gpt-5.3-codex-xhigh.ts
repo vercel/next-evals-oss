@@ -2,6 +2,7 @@ import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
   agent: 'codex',
+  evals: process.env.EVAL_FILTER ?? "*",
   model: 'gpt-5.3-codex?reasoningEffort=xhigh',
   scripts: ['build'],
   runs: 4,
