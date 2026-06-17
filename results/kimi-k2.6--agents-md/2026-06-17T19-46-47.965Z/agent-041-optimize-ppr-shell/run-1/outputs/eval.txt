@@ -1,0 +1,114 @@
+
+ RUN  v3.2.6 /workspace
+
+ ❯ EVAL.ts (3 tests | 1 failed) 9ms
+   ✓ Page has at least 3 Suspense boundaries 1ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 0ms
+   × Page does not await all data before rendering 6ms
+     → expected 'import { Suspense } from \'react\'\ni…' not to match /getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  19:50:56
+   Duration  272ms (transform 38ms, setup 0ms, collect 34ms, tests 9ms, environment 0ms, prepare 79ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' not to match /getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+
+async function getDashboardData() {
+  const res = await fetch('https://api.example.com/dashboard')
+  return res.json()
+}
+
+function CardStatsSkeleton() {
+  return (
+    <div className=\"grid grid-cols-2 gap-4\">
+      <div className=\"card\">
+        <div className=\"h-4 w-24 bg-gray-200 rounded mb-2\" />
+        <div className=\"h-8 w-32 bg-gray-200 rounded\" />
+      </div>
+      <div className=\"card\">
+        <div className=\"h-4 w-24 bg-gray-200 rounded mb-2\" />
+        <div className=\"h-8 w-32 bg-gray-200 rounded\" />
+      </div>
+    </div>
+  )
+}
+
+function RevenueChartSkeleton() {
+  return (
+    <div className=\"chart\">
+      <div className=\"h-6 w-32 bg-gray-200 rounded mb-4\" />
+      <ul className=\"space-y-2\">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <li key={i} className=\"h-4 w-full bg-gray-200 rounded\" />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function LatestInvoicesSkeleton() {
+  return (
+    <div className=\"invoices\">
+      <div className=\"h-6 w-40 bg-gray-200 rounded mb-4\" />
+      <ul className=\"space-y-2\">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <li key={i} className=\"h-4 w-full bg-gray-200 rounded\" />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+export default function Page() {
+  const dataPromise = getDashboardData()
+
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<CardStatsSkeleton />}>
+        {dataPromise.then((data) => (
+          <CardStats
+            totalRevenue={data.totalRevenue}
+            totalInvoices={data.totalInvoices}
+          />
+        ))}
+      </Suspense>
+      <Suspense fallback={<RevenueChartSkeleton />}>
+        {dataPromise.then((data) => (
+          <RevenueChart revenue={data.revenue} />
+        ))}
+      </Suspense>
+      <Suspense fallback={<LatestInvoicesSkeleton />}>
+        {dataPromise.then((data) => (
+          <LatestInvoices invoices={data.invoices} />
+        ))}
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:60:20
+     58|   // OR if it is async, it should not await a data fetch before return…
+     59|   // We check the simpler signal: getDashboardData should not be calle…
+     60|   expect(page).not.toMatch(/getDashboardData\s*\(/)
+       |                    ^
+     61| })
+     62| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
