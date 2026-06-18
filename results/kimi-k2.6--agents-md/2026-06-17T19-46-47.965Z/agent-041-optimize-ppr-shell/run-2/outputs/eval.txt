@@ -1,0 +1,126 @@
+
+ RUN  v3.2.6 /workspace
+
+ ❯ EVAL.ts (3 tests | 1 failed) 10ms
+   ✓ Page has at least 3 Suspense boundaries 2ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 1ms
+   × Page does not await all data before rendering 7ms
+     → expected 'import { Suspense } from \'react\'\ni…' not to match /await\s+getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  19:50:30
+   Duration  378ms (transform 53ms, setup 0ms, collect 27ms, tests 10ms, environment 0ms, prepare 135ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' not to match /await\s+getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/await\s+getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+
+export const instant = true
+
+async function getDashboardData() {
+  try {
+    const res = await fetch('https://api.example.com/dashboard')
+    return res.json()
+  } catch {
+    return {
+      totalRevenue: 0,
+      totalInvoices: 0,
+      revenue: [],
+      invoices: [],
+    }
+  }
+}
+
+async function CardStatsData() {
+  const data = await getDashboardData()
+  return (
+    <CardStats
+      totalRevenue={data.totalRevenue}
+      totalInvoices={data.totalInvoices}
+    />
+  )
+}
+
+async function RevenueChartData() {
+  const data = await getDashboardData()
+  return <RevenueChart revenue={data.revenue} />
+}
+
+async function LatestInvoicesData() {
+  const data = await getDashboardData()
+  return <LatestInvoices invoices={data.invoices} />
+}
+
+function CardStatsSkeleton() {
+  return (
+    <div className=\"grid grid-cols-2 gap-4\">
+      <div className=\"card\">
+        <h2>Total Revenue</h2>
+        <p>Loading...</p>
+      </div>
+      <div className=\"card\">
+        <h2>Total Invoices</h2>
+        <p>Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+function RevenueChartSkeleton() {
+  return (
+    <div className=\"chart\">
+      <h2>Revenue</h2>
+      <p>Loading chart...</p>
+    </div>
+  )
+}
+
+function LatestInvoicesSkeleton() {
+  return (
+    <div className=\"invoices\">
+      <h2>Latest Invoices</h2>
+      <p>Loading invoices...</p>
+    </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<CardStatsSkeleton />}>
+        <CardStatsData />
+      </Suspense>
+      <Suspense fallback={<RevenueChartSkeleton />}>
+        <RevenueChartData />
+      </Suspense>
+      <Suspense fallback={<LatestInvoicesSkeleton />}>
+        <LatestInvoicesData />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:55:20
+     53|   // The page should not call getDashboardData() or fetch() at the top…
+     54|   // A simple check: the page shouldn't contain the original monolithi…
+     55|   expect(page).not.toMatch(/await\s+getDashboardData\s*\(/)
+       |                    ^
+     56| 
+     57|   // The page component itself should not be async (data fetching move…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
