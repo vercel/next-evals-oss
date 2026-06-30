@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  dry-run:
+  status-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,21 +21,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Pinned to the canary commit before agent-040 was renamed
-      # (unstable_instant -> instant, vercel/next.js#94578 / d424aa8ec4c7).
-      # Tracking bare `canary` makes this gate red for every PR whenever an eval
-      # changes upstream until all models are re-run. Bump this SHA in the same
-      # PR that re-runs the affected eval across all models.
+      # Pinned to a known-good next.js commit. To adopt new/changed evals, bump this
+      # SHA in a PR that runs them for the experiments you're refreshing and
+      # `agent-eval keep`s the rest. The check below passes as long as every
+      # new/changed eval is either run or kept — so models may sit on an older eval
+      # version intentionally without going red.
       - run: pnpm sync-evals 9e4d718de41bc2bceb687c73c2a60fdf6c5c4440
 
-      - name: pnpm eval --dry must show no evals to run
-        run: |
-          set +e
-          output=$(pnpm eval --dry 2>&1)
-          set -e
-          echo "$output"
-          if ! grep -qE 'Nothing to run\.' <<<"$output"; then
-            echo ""
-            echo "::error::pnpm eval --dry reported evals that would re-run. Every committed experiment must be fully cached on main."
-            exit 1
-          fi
+      # The "which staleness is acceptable" policy lives in this repo, not the
+      # framework: check-stale.mjs reads `agent-eval status --json` and fails on
+      # new/changed evals except those whose experiment is in its ACCEPTED_STALE list.
+      - name: no unexpected stale evals
+        run: node scripts/check-stale.mjs
