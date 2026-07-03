@@ -1,9 +1,10 @@
 /**
  * Sync eval fixtures from the vercel/next.js repo (canary branch).
  *
- * Uses git sparse checkout to only download the evals/evals/ subtree.
- * After syncing, recomputes fingerprints in existing results so that
- * formatting-only changes don't invalidate cached runs.
+ * Uses git sparse checkout to only download the evals/evals/ subtree. After syncing,
+ * runs `agent-eval refingerprint` to carry CONFIG-only changes forward in existing
+ * results — a real eval-content change is left stale (so `agent-eval status` reports
+ * it), instead of being silently re-stamped as it was before.
  *
  * Usage:
  *   pnpm sync-evals              # sync from canary (default)
@@ -11,80 +12,10 @@
  */
 
 import { execSync } from 'node:child_process';
-import {
-  existsSync, rmSync, readdirSync, readFileSync, writeFileSync, statSync,
-} from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { computeFingerprint } from '@vercel/agent-eval';
 
 const REPO_URL = 'https://github.com/vercel/next.js.git';
-
-// ── Parse experiment config to build a RunnableExperimentConfig-like object ──
-
-function parseExperimentConfig(filePath: string): Record<string, unknown> | null {
-  const src = readFileSync(filePath, 'utf-8');
-  const agent = src.match(/agent:\s*['"]([^'"]+)['"]/)?.[1];
-  const model = src.match(/model:\s*['"]([^'"]+)['"]/)?.[1];
-  const scripts = src.match(/scripts:\s*\[([^\]]*)\]/)?.[1];
-  const runs = src.match(/runs:\s*(\d+)/)?.[1];
-  const earlyExit = src.match(/earlyExit:\s*(true|false)/)?.[1];
-  const timeout = src.match(/timeout:\s*(\d+)/)?.[1];
-  if (!agent || !model || !scripts || !runs || !earlyExit || !timeout) return null;
-  return {
-    agent,
-    model,
-    scripts: scripts.split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean),
-    timeout: Number(timeout),
-    earlyExit: earlyExit === 'true',
-    runs: Number(runs),
-  };
-}
-
-// ── Update fingerprints in existing results ─────────────────────────────────
-
-function updateFingerprints(): void {
-  const resultsDir = join(process.cwd(), 'results');
-  const evalsDir = join(process.cwd(), 'evals');
-  const experimentsDir = join(process.cwd(), 'experiments');
-  if (!existsSync(resultsDir) || !existsSync(experimentsDir)) return;
-
-  let updated = 0;
-
-  for (const experiment of readdirSync(experimentsDir).filter(f => f.endsWith('.ts'))) {
-    const experimentName = experiment.replace(/\.ts$/, '');
-    const config = parseExperimentConfig(join(experimentsDir, experiment));
-    if (!config) continue;
-
-    const expResultsDir = join(resultsDir, experimentName);
-    if (!existsSync(expResultsDir)) continue;
-
-    for (const timestamp of readdirSync(expResultsDir)) {
-      const tsDir = join(expResultsDir, timestamp);
-      if (!statSync(tsDir).isDirectory()) continue;
-
-      for (const evalName of readdirSync(tsDir)) {
-        const summaryPath = join(tsDir, evalName, 'summary.json');
-        const evalPath = join(evalsDir, evalName);
-        if (!existsSync(summaryPath) || !existsSync(evalPath)) continue;
-
-        const summary = JSON.parse(readFileSync(summaryPath, 'utf-8'));
-        const newFingerprint = computeFingerprint(evalPath, config as any);
-
-        if (summary.fingerprint !== newFingerprint) {
-          summary.fingerprint = newFingerprint;
-          writeFileSync(summaryPath, JSON.stringify(summary, null, 2) + '\n');
-          updated++;
-        }
-      }
-    }
-  }
-
-  if (updated > 0) {
-    console.log(`Updated ${updated} fingerprints in results.`);
-  }
-}
-
-// ── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const ref = process.argv[2] || 'canary';
@@ -114,10 +45,11 @@ async function main(): Promise<void> {
   execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);
   rmSync(tmpDir, { recursive: true, force: true });
 
-  // Update fingerprints in existing results
-  updateFingerprints();
+  // Carry config-only changes forward in cached results (the framework owns this now;
+  // it never masks a real eval-content change). Then `agent-eval status` shows the work.
+  execSync('pnpm exec agent-eval refingerprint', { stdio: 'inherit' });
 
-  console.log('\nDone.');
+  console.log('\nDone. Run `agent-eval status` to see what changed.');
 }
 
 main().catch((err) => {
