@@ -11,6 +11,7 @@
  * Output: agent-results.json (copy this to front repo)
  */
 
+import { execSync } from 'node:child_process';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -23,6 +24,10 @@ interface SummaryJson {
 
 interface AgentResult {
   evalPath: string;
+  // The experiment has no valid result for this eval (never ran it, or the
+  // eval's content changed since). Counts against the success rate so every
+  // experiment is scored over the same canonical eval set.
+  notAvailable?: boolean;
   result: {
     success: boolean;
     duration: number;
@@ -61,6 +66,8 @@ const MODEL_NAMES: Record<string, string> = {
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-opus-4.7': 'Claude Opus 4.7 (max)',
   'claude-opus-4.7--agents-md': 'Claude Opus 4.7 (max) + AGENTS.md',
+  'claude-opus-4.8': 'Claude Opus 4.8',
+  'claude-opus-4.8--agents-md': 'Claude Opus 4.8 + AGENTS.md',
   'claude-sonnet-4.5': 'Claude Sonnet 4.5',
   'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
   'claude-sonnet-4.6': 'Claude Sonnet 4.6',
@@ -69,6 +76,8 @@ const MODEL_NAMES: Record<string, string> = {
   'cursor-composer-1.5--agents-md': 'Cursor Composer 1.5 + AGENTS.md',
   'cursor-composer-2.0': 'Cursor Composer 2.0',
   'cursor-composer-2.0--agents-md': 'Cursor Composer 2.0 + AGENTS.md',
+  'cursor-composer-2.5': 'Cursor Composer 2.5',
+  'cursor-composer-2.5--agents-md': 'Cursor Composer 2.5 + AGENTS.md',
   'gemini-3-pro-preview--agents-md': 'Gemini 3.0 Pro Preview + AGENTS.md',
   'gemini-3-pro-preview-gemini-cli': 'Gemini 3.0 Pro Preview',
   'gemini-3.1-pro-preview': 'Gemini 3.1 Pro Preview',
@@ -79,6 +88,10 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.3-codex-xhigh--agents-md': 'GPT 5.3 Codex (xhigh) + AGENTS.md',
   'gpt-5.4-xhigh': 'GPT 5.4 (xhigh)',
   'gpt-5.4-xhigh--agents-md': 'GPT 5.4 (xhigh) + AGENTS.md',
+  'gpt-5.5-pro': 'GPT 5.5 Pro',
+  'gpt-5.5-pro--agents-md': 'GPT 5.5 Pro + AGENTS.md',
+  'gpt-5.6-xhigh': 'GPT 5.6 (xhigh)',
+  'gpt-5.6-xhigh--agents-md': 'GPT 5.6 (xhigh) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
   'kimi-k2.6': 'Kimi K2.6',
@@ -132,6 +145,27 @@ async function getAgentHarness(experiment: string): Promise<string> {
 
 async function main(): Promise<void> {
   const resultsDir = join(process.cwd(), 'results');
+
+  // Canonical eval set: what's in evals/ right now. Every experiment is
+  // scored over exactly this set so success rates are comparable.
+  const canonicalEvals = (await readdir(join(process.cwd(), 'evals')))
+    .filter((d) => !d.startsWith('.'))
+    .sort();
+
+  // The runner's staleness verdict: evals that are new (never run for an
+  // experiment) or whose content changed since the cached result. Those
+  // results must not be exported as if they tested today's eval.
+  const staleByExperiment = new Map<string, Set<string>>();
+  const statusRaw = execSync('npx agent-eval status --json', {
+    encoding: 'utf-8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const status = JSON.parse(statusRaw) as {
+    work: Array<{ experiment: string; new: string[]; changed: string[] }>;
+  };
+  for (const w of status.work) {
+    staleByExperiment.set(w.experiment, new Set([...w.new, ...w.changed]));
+  }
 
   let experiments = process.argv.slice(2);
 
@@ -252,6 +286,33 @@ async function main(): Promise<void> {
       continue;
     }
 
+    // Normalize to the canonical eval set: results for evals that no longer
+    // exist are dropped; missing or stale (new/changed content) evals become
+    // explicit notAvailable entries that count against the success rate.
+    const byEval = new Map(agentResults.map((r) => [r.evalPath, r]));
+    const stale = staleByExperiment.get(experiment);
+    let notAvailableCount = 0;
+    const normalized: AgentResult[] = canonicalEvals.map((evalName) => {
+      const found = byEval.get(evalName);
+      if (found && !stale?.has(evalName)) return found;
+      notAvailableCount++;
+      return {
+        evalPath: evalName,
+        notAvailable: true,
+        result: {
+          success: false,
+          duration: 0,
+          evalPath: evalName,
+          timestamp: parseTimestamp(latestTimestamp),
+        },
+      };
+    });
+    if (notAvailableCount > 0) {
+      console.warn(
+        `${experiment}: ${notAvailableCount}/${canonicalEvals.length} eval(s) not available (missing or stale) — counted as not passed`
+      );
+    }
+
     const modelName = MODEL_NAMES[experiment] || experiment;
     const agentHarness = await getAgentHarness(experiment);
 
@@ -262,9 +323,7 @@ async function main(): Promise<void> {
       agentHarness,
     });
 
-    exportedData.results[experiment] = agentResults.sort((a, b) =>
-      a.evalPath.localeCompare(b.evalPath)
-    );
+    exportedData.results[experiment] = normalized;
   }
 
   // Merge --agents-md variants into base experiments
@@ -273,15 +332,19 @@ async function main(): Promise<void> {
     'claude-fable-5--agents-md': 'claude-fable-5',
     'claude-opus-4.6--agents-md': 'claude-opus-4.6',
     'claude-opus-4.7--agents-md': 'claude-opus-4.7',
+    'claude-opus-4.8--agents-md': 'claude-opus-4.8',
     'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
     'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
     'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
     'cursor-composer-2.0--agents-md': 'cursor-composer-2.0',
+    'cursor-composer-2.5--agents-md': 'cursor-composer-2.5',
     'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
     'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
     'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
     'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
     'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
+    'gpt-5.5-pro--agents-md': 'gpt-5.5-pro',
+    'gpt-5.6-xhigh--agents-md': 'gpt-5.6-xhigh',
     'kimi-k2.5--agents-md': 'kimi-k2.5',
     'kimi-k2.6--agents-md': 'kimi-k2.6',
     'kimi-k2.7-code--agents-md': 'kimi-k2.7-code',
@@ -305,7 +368,13 @@ async function main(): Promise<void> {
     const docsSuccessRate =
       (variantResults.filter((r) => r.result.success).length / variantResults.length) * 100;
 
-    // Find evals that flipped fail→pass and pass→fail
+    // Find evals that flipped fail→pass and pass→fail. An eval that is
+    // notAvailable on either side is not a flip — there is nothing to compare.
+    const unavailable = new Set(
+      [...baseResults, ...variantResults]
+        .filter((r) => r.notAvailable)
+        .map((r) => r.evalPath),
+    );
     const baseFailSet = new Set(
       baseResults.filter((r) => !r.result.success).map((r) => r.evalPath),
     );
@@ -313,10 +382,20 @@ async function main(): Promise<void> {
       baseResults.filter((r) => r.result.success).map((r) => r.evalPath),
     );
     const newlyPassed = variantResults
-      .filter((r) => r.result.success && baseFailSet.has(r.evalPath))
+      .filter(
+        (r) =>
+          r.result.success &&
+          baseFailSet.has(r.evalPath) &&
+          !unavailable.has(r.evalPath),
+      )
       .map((r) => r.evalPath);
     const newlyFailed = variantResults
-      .filter((r) => !r.result.success && basePassSet.has(r.evalPath))
+      .filter(
+        (r) =>
+          !r.result.success &&
+          basePassSet.has(r.evalPath) &&
+          !unavailable.has(r.evalPath),
+      )
       .map((r) => r.evalPath);
 
     // Attach docsImpact to the base experiment
@@ -328,10 +407,11 @@ async function main(): Promise<void> {
       newlyFailed,
     };
 
-    // Average duration across base + variant runs (seconds)
-    const allDurationsMs = [...baseResults, ...variantResults].map(
-      (r) => r.result.duration,
-    );
+    // Average duration across base + variant runs (seconds), excluding
+    // notAvailable placeholders (their duration is 0).
+    const allDurationsMs = [...baseResults, ...variantResults]
+      .filter((r) => !r.notAvailable)
+      .map((r) => r.result.duration);
     baseExp.avgDuration =
       allDurationsMs.reduce((a, b) => a + b, 0) / allDurationsMs.length / 1000;
 
@@ -358,7 +438,10 @@ async function main(): Promise<void> {
     if (exp.avgDuration !== undefined) continue;
     const results = exportedData.results[exp.name];
     if (!results || results.length === 0) continue;
-    const durations = results.map((r) => r.result.duration);
+    const durations = results
+      .filter((r) => !r.notAvailable)
+      .map((r) => r.result.duration);
+    if (durations.length === 0) continue;
     exp.avgDuration =
       durations.reduce((a, b) => a + b, 0) / durations.length / 1000;
   }
@@ -366,10 +449,12 @@ async function main(): Promise<void> {
   // Count stats
   let totalSuccess = 0;
   let totalResults = 0;
+  let totalNotAvailable = 0;
   for (const results of Object.values(exportedData.results)) {
     for (const r of results) {
       totalResults++;
       if (r.result.success) totalSuccess++;
+      if (r.notAvailable) totalNotAvailable++;
     }
   }
 
@@ -378,7 +463,9 @@ async function main(): Promise<void> {
 
   console.log('\n' + '-'.repeat(60));
   console.log(`Exported to: ${outputPath}`);
-  console.log(`Total: ${totalResults} | Pass: ${totalSuccess} | Fail: ${totalResults - totalSuccess}`);
+  console.log(
+    `Total: ${totalResults} | Pass: ${totalSuccess} | Fail: ${totalResults - totalSuccess - totalNotAvailable} | N/A: ${totalNotAvailable}`
+  );
   console.log('-'.repeat(60));
 }
 
