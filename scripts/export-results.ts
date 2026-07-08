@@ -60,8 +60,8 @@ interface ExportedData {
 }
 
 const MODEL_NAMES: Record<string, string> = {
-  'claude-fable-5': 'Claude Fable 5',
-  'claude-fable-5--agents-md': 'Claude Fable 5 + AGENTS.md',
+  'claude-fable-5': 'Claude Fable 5 (high)',
+  'claude-fable-5--agents-md': 'Claude Fable 5 (high) + AGENTS.md',
   'claude-opus-4.6': 'Claude Opus 4.6',
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-opus-4.7': 'Claude Opus 4.7 (max)',
@@ -92,6 +92,8 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.5-pro--agents-md': 'GPT 5.5 Pro + AGENTS.md',
   'gpt-5.6-xhigh': 'GPT 5.6 (xhigh)',
   'gpt-5.6-xhigh--agents-md': 'GPT 5.6 (xhigh) + AGENTS.md',
+  'gpt-5.6-sol-xhigh': 'GPT 5.6 Sol (xhigh)',
+  'gpt-5.6-sol-xhigh--agents-md': 'GPT 5.6 Sol (xhigh) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
   'kimi-k2.6': 'Kimi K2.6',
@@ -345,6 +347,7 @@ async function main(): Promise<void> {
     'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
     'gpt-5.5-pro--agents-md': 'gpt-5.5-pro',
     'gpt-5.6-xhigh--agents-md': 'gpt-5.6-xhigh',
+    'gpt-5.6-sol-xhigh--agents-md': 'gpt-5.6-sol-xhigh',
     'kimi-k2.5--agents-md': 'kimi-k2.5',
     'kimi-k2.6--agents-md': 'kimi-k2.6',
     'kimi-k2.7-code--agents-md': 'kimi-k2.7-code',

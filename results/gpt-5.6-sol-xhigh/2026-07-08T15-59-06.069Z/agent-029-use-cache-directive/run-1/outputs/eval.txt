@@ -1,0 +1,162 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (4 tests | 1 failed) 8ms
+   × Catalog reads use use-cache directive and products cache tag 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Page fetches products via lib/db 0ms
+   ✓ Inline form-triggered Server Action flow exists 0ms
+   ✓ Server Action revalidates products using revalidateTag profile 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  16:18:41
+   Duration  239ms (transform 49ms, setup 18ms, collect 32ms, tests 8ms, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog reads use use-cache directive and products cache tag
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+
+import './styles.css'
+
+export const metadata: Metadata = {
+  title: 'Product Catalog',
+  description: 'E-commerce product catalog administration',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag, unstable_cache } from 'next/cache'
+
+import { getAllProducts } from '@/lib/db'
+
+const getProducts = unstable_cache(getAllProducts, ['products'], {
+  tags: ['products'],
+})
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+export default async function Page() {
+  const products = await getProducts()
+
+  async function syncLatestCatalog() {
+    'use server'
+
+    revalidateTag('products', 'max')
+  }
+
+  return (
+    <main>
+      <section aria-labelledby=\"catalog-heading\">
+        <div>
+          <p>Commerce administration</p>
+          <h1 id=\"catalog-heading\">Product catalog</h1>
+          <p>
+            Browse the current catalog snapshot. Sync after ERP or PIM updates
+            to refresh product data across catalog views.
+          </p>
+        </div>
+
+        <form action={syncLatestCatalog}>
+          <button type=\"submit\">Sync latest catalog</button>
+        </form>
+      </section>
+
+      <section aria-label=\"Products\">
+        <header>
+          <h2>All products</h2>
+          <span>{products.length} products</span>
+        </header>
+
+        <table>
+          <thead>
+            <tr>
+              <th scope=\"col\">ID</th>
+              <th scope=\"col\">Product</th>
+              <th scope=\"col\">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id}>
+                <td>#{product.id}</td>
+                <td>{product.name}</td>
+                <td>{currencyFormatter.format(product.price)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </main>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:66:18
+     64| test('Catalog reads use use-cache directive and products cache tag', (…
+     65|   // Allow caching logic to live in app or lib helper modules.
+     66|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     67| 
+     68|   // Tagged invalidation should target the required products key.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
