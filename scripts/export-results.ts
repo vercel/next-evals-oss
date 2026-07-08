@@ -109,6 +109,8 @@ const MODEL_NAMES: Record<string, string> = {
   'glm-5.1-opencode--agents-md': 'GLM 5.1 + AGENTS.md',
   'glm-5.2': 'GLM 5.2',
   'glm-5.2--agents-md': 'GLM 5.2 + AGENTS.md',
+  'grok-4.5': 'Grok 4.5',
+  'grok-4.5--agents-md': 'Grok 4.5 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
@@ -355,6 +357,7 @@ async function main(): Promise<void> {
     'minimax-m3--agents-md': 'minimax-m3',
     'glm-5.1-opencode--agents-md': 'glm-5.1-opencode',
     'glm-5.2--agents-md': 'glm-5.2',
+    'grok-4.5--agents-md': 'grok-4.5',
   };
 
   for (const [variantName, baseName] of Object.entries(AGENTS_MD_PAIRS)) {
