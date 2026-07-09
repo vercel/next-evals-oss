@@ -50,8 +50,6 @@ const ACCEPTED_STALE = {
   'gpt-5.4-xhigh--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'gpt-5.5-pro': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'gpt-5.5-pro--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
-  'grok-4.5': ['agent-041-optimize-ppr-shell'],
-  'grok-4.5--agents-md': ['agent-041-optimize-ppr-shell'],
   'kimi-k2.5': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'kimi-k2.5--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'kimi-k2.6': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
