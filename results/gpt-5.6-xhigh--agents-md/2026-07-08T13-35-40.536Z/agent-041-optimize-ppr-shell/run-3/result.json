@@ -1,0 +1,87 @@
+{
+  "status": "failed",
+  "duration": 211.434,
+  "model": "gpt-5.6?reasoningEffort=xhigh",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 7,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"printf '%s\\\\n' '--- files ---'; rg --files -g '\"'!*node_modules*'\"' | sed -n '1,160p'; printf '%s\\\\n' '--- package ---'; cat package.json; printf '%s\\\\n' '--- agent files ---'; find . -name AGENTS.md -print\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"printf '%s\\\\n' '--- app files ---'; for f in app/*.tsx next.config.ts; do echo \\\"### \"'$f\"; sed -n '\"'1,240p' \\\"\"'$f\"; done; printf '\"'%s\\\\n' '--- relevant docs ---'; rg -l -i \\\"partial prerender|cache components|use cache|suspense\\\" node_modules/next/dist/docs | sed -n '1,100p'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"for f in \\\\\n node_modules/next/dist/docs/01-app/02-guides/migrating-to-cache-components.md \\\\\n node_modules/next/dist/docs/01-app/02-guides/ppr-platform-guide.md \\\\\n node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md \\\\\n node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md \\\\\n node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md \\\\\n node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheLife.md \\\\\n node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/loading.md; do\n  echo \\\"### \"'$f\"\n  rg -n -C 4 \"Partial Prerender|Suspense|use cache|cacheLife|loading|shell|runtime data|uncached\" \"$f\" | sed -n '\"'1,240p'\ndone\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,280p' node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md; printf '\\\\n--- use cache ---\\\\n'; sed -n '1,240p' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md; printf '\\\\n--- cache life ---\\\\n'; sed -n '1,220p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheLife.md; printf '\\\\n--- fetching ---\\\\n'; sed -n '1,220p' node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short; npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"printf '%s\\\\n' '--- build artifacts ---'; find .next/server/app -maxdepth 3 -type f | sort | sed -n '1,120p'; printf '%s\\\\n' '--- prerendered shell markers ---'; rg -n \\\"Dashboard|Loading dashboard|Total Revenue|Revenue\\\" .next/server/app .next/static 2>/dev/null | sed -n '1,100p'; printf '%s\\\\n' '--- tsconfig diff ---'; git diff -- tsconfig.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node - <<'NODE'\nimport fs from 'node:fs'\nconst html = fs.readFileSync('.next/server/app/index.html', 'utf8')\nfor (const marker of ['<h1>Dashboard</h1>', 'Total Revenue', 'Total Invoices', 'Revenue', 'Latest Invoices', 'Loading dashboard...']) {\n  console.log(\"'`${html.includes(marker) ? '\"'FOUND' : 'MISSING'} \"'${marker}`)\n}\nNODE\nprintf '\"'%s\\\\n' '--- status ---'; git status --short; printf '%s\\\\n' '--- diff ---'; git diff -- app/page.tsx app/loading.tsx app/DashboardSkeleton.tsx tsconfig.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: tsconfig.json\n@@\n-    \\\"lib\\\": [\n-      \\\"dom\\\",\n-      \\\"dom.iterable\\\",\n-      \\\"esnext\\\"\n-    ],\n+    \\\"lib\\\": [\\\"dom\\\", \\\"dom.iterable\\\", \\\"esnext\\\"],\n@@\n-      \\\"@/*\\\": [\n-        \\\"./*\\\"\n-      ]\n+      \\\"@/*\\\": [\\\"./*\\\"]\n@@\n-  \\\"include\\\": [\n-    \\\"next-env.d.ts\\\",\n-    \\\"**/*.ts\\\",\n-    \\\"**/*.tsx\\\",\n-    \\\".next/types/**/*.ts\\\",\n-    \\\".next/dev/types/**/*.ts\\\"\n-  ],\n-  \\\"exclude\\\": [\n-    \\\"node_modules\\\"\n-  ]\n+  \\\"include\\\": [\\\"next-env.d.ts\\\", \\\"**/*.ts\\\", \\\"**/*.tsx\\\", \\\".next/types/**/*.ts\\\"],\n+  \\\"exclude\\\": [\\\"node_modules\\\"]\n }\n*** End Patch\nPATCH\nrm -rf .next next-env.d.ts\nprintf '%s\\\\n' '--- final status ---'; git status --short\nprintf '%s\\\\n' '--- focused diff check ---'; git diff --check -- app/page.tsx app/loading.tsx app/DashboardSkeleton.tsx\nprintf '%s\\\\n' '--- changed files ---'; git diff --stat -- app/page.tsx app/loading.tsx; wc -l app/DashboardSkeleton.tsx\nprintf '%s\\\\n' '--- numbered sources ---'; nl -ba app/page.tsx; nl -ba app/loading.tsx; nl -ba app/DashboardSkeleton.tsx\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: app/DashboardSkeleton.tsx\n@@\n export function DashboardSkeleton() {\n   return (\n-    <div aria-busy=\\\"true\\\" aria-label=\\\"Loading dashboard\\\">\n+    <div role=\\\"status\\\" aria-busy=\\\"true\\\" aria-label=\\\"Loading dashboard\\\">\n*** End Patch\nPATCH\ngit diff --check -- app/page.tsx app/loading.tsx app/DashboardSkeleton.tsx\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

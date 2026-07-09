@@ -5,6 +5,9 @@ const config: ExperimentConfig = {
   model: "claude-fable-5",
   agentOptions: {
     cliPackage: "@anthropic-ai/claude-code@next",
+    // Explicit, but identical to the CLI default for Fable 5 — existing
+    // results were produced at this effort and remain valid (refingerprinted).
+    effort: "high",
   },
   scripts: ["build"],
   runs: 4,

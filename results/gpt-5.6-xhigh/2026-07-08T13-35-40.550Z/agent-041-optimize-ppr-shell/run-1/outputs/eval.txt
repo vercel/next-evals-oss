@@ -1,0 +1,130 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (3 tests | 1 failed) 8ms
+   ✓ Page has at least 3 Suspense boundaries 1ms
+   ✓ Each dashboard section has its own Suspense boundary in page.tsx 0ms
+   × Page does not await all data before rendering 5ms
+     → expected 'import { cache, Suspense } from \'rea…' not to match /await\s+getDashboardData\s*\(/
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  13:37:43
+   Duration  242ms (transform 36ms, setup 18ms, collect 22ms, tests 8ms, environment 0ms, prepare 71ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+AssertionError: expected 'import { cache, Suspense } from \'rea…' not to match /await\s+getDashboardData\s*\(/
+
+[32m- Expected:[39m 
+/await\s+getDashboardData\s*\(/
+
+[31m+ Received:[39m 
+"import { cache, Suspense } from 'react'
+import { RevenueChart } from './RevenueChart'
+import { LatestInvoices } from './LatestInvoices'
+import { CardStats } from './CardStats'
+
+type DashboardData = {
+  totalRevenue: number
+  totalInvoices: number
+  revenue: { month: string; amount: number }[]
+  invoices: { id: string; name: string; amount: number }[]
+}
+
+const getDashboardData = cache(async (): Promise<DashboardData> => {
+  const response = await fetch('https://api.example.com/dashboard')
+
+  if (!response.ok) {
+    throw new Error('Failed to load dashboard data')
+  }
+
+  return response.json()
+})
+
+async function CardStatsData() {
+  const data = await getDashboardData()
+
+  return (
+    <CardStats
+      totalRevenue={data.totalRevenue}
+      totalInvoices={data.totalInvoices}
+    />
+  )
+}
+
+async function RevenueChartData() {
+  const { revenue } = await getDashboardData()
+
+  return <RevenueChart revenue={revenue} />
+}
+
+async function LatestInvoicesData() {
+  const { invoices } = await getDashboardData()
+
+  return <LatestInvoices invoices={invoices} />
+}
+
+function CardStatsSkeleton() {
+  return (
+    <div className=\"grid grid-cols-2 gap-4\" aria-busy=\"true\">
+      <div className=\"card\">
+        <h2>Total Revenue</h2>
+        <p>Loading...</p>
+      </div>
+      <div className=\"card\">
+        <h2>Total Invoices</h2>
+        <p>Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+function RevenueChartSkeleton() {
+  return (
+    <div className=\"chart\" aria-busy=\"true\">
+      <h2>Revenue</h2>
+      <p>Loading chart...</p>
+    </div>
+  )
+}
+
+function LatestInvoicesSkeleton() {
+  return (
+    <div className=\"invoices\" aria-busy=\"true\">
+      <h2>Latest Invoices</h2>
+      <p>Loading invoices...</p>
+    </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Dashboard</h1>
+      <Suspense fallback={<CardStatsSkeleton />}>
+        <CardStatsData />
+      </Suspense>
+      <Suspense fallback={<RevenueChartSkeleton />}>
+        <RevenueChartData />
+      </Suspense>
+      <Suspense fallback={<LatestInvoicesSkeleton />}>
+        <LatestInvoicesData />
+      </Suspense>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:55:20
+     53|   // The page should not call getDashboardData() or fetch() at the top…
+     54|   // A simple check: the page shouldn't contain the original monolithi…
+     55|   expect(page).not.toMatch(/await\s+getDashboardData\s*\(/)
+       |                    ^
+     56| 
+     57|   // The page component itself should not be async (data fetching move…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
