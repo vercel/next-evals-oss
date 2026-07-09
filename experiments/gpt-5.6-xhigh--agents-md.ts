@@ -6,7 +6,9 @@ const config: ExperimentConfig = {
   scripts: ["build"],
   runs: 4,
   earlyExit: true,
-  timeout: 1200,
+  // 2400 over the usual 1200: with the docs pointer this model reasons
+  // 1500-1950s on the hardest evals (agent-041) and times out at 1200.
+  timeout: 2400,
   sandbox: "vercel",
   setup: async (sandbox) => {
     // Bump Next.js to latest canary
