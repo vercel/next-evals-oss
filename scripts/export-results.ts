@@ -156,10 +156,11 @@ async function main(): Promise<void> {
     .filter((d) => !d.startsWith('.'))
     .sort();
 
-  // The runner's staleness verdict: evals that are new (never run for an
-  // experiment) or whose content changed since the cached result. Those
-  // results must not be exported as if they tested today's eval.
-  const staleByExperiment = new Map<string, Set<string>>();
+  // The runner's staleness verdict. Only evals an experiment has NEVER run
+  // (new — e.g. added or renamed upstream) export as notAvailable. Evals
+  // whose content changed keep their last measured result until the model
+  // is rerun — the board shows the previous measurement, not a hole.
+  const missingByExperiment = new Map<string, Set<string>>();
   const statusRaw = execSync('npx agent-eval status --json', {
     encoding: 'utf-8',
     maxBuffer: 64 * 1024 * 1024,
@@ -168,7 +169,7 @@ async function main(): Promise<void> {
     work: Array<{ experiment: string; new: string[]; changed: string[] }>;
   };
   for (const w of status.work) {
-    staleByExperiment.set(w.experiment, new Set([...w.new, ...w.changed]));
+    missingByExperiment.set(w.experiment, new Set(w.new));
   }
 
   let experiments = process.argv.slice(2);
@@ -291,14 +292,16 @@ async function main(): Promise<void> {
     }
 
     // Normalize to the canonical eval set: results for evals that no longer
-    // exist are dropped; missing or stale (new/changed content) evals become
-    // explicit notAvailable entries that count against the success rate.
+    // exist are dropped; evals the experiment never ran become explicit
+    // notAvailable entries that count against the success rate. Evals whose
+    // content changed since the cached result keep that last measurement
+    // until the model is rerun.
     const byEval = new Map(agentResults.map((r) => [r.evalPath, r]));
-    const stale = staleByExperiment.get(experiment);
+    const missing = missingByExperiment.get(experiment);
     let notAvailableCount = 0;
     const normalized: AgentResult[] = canonicalEvals.map((evalName) => {
       const found = byEval.get(evalName);
-      if (found && !stale?.has(evalName)) return found;
+      if (found && !missing?.has(evalName)) return found;
       notAvailableCount++;
       return {
         evalPath: evalName,
@@ -313,7 +316,7 @@ async function main(): Promise<void> {
     });
     if (notAvailableCount > 0) {
       console.warn(
-        `${experiment}: ${notAvailableCount}/${canonicalEvals.length} eval(s) not available (missing or stale) — counted as not passed`
+        `${experiment}: ${notAvailableCount}/${canonicalEvals.length} eval(s) not available (never run) — counted as not passed`
       );
     }
 
