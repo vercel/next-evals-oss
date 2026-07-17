@@ -12,6 +12,10 @@ set -uo pipefail
 
 # The LLM-judge matcher re-invokes the claude CLI installed for the agent run.
 export PATH="$HOME/.local/bin:$PATH"
+# Harbor containers run the verifier as root; Claude Code refuses
+# --dangerously-skip-permissions as root unless IS_SANDBOX=1 (harbor's agent
+# phase sets the same flag).
+export IS_SANDBOX=1
 
 # task.toml [verifier.env] forwards ANTHROPIC_* with empty-string defaults so
 # non-judge runs work without credentials; drop the empties so the claude CLI
