@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 
 // Current staleness (pin bump to vercel/next.js#95630):
 //   - agent-041: converted to the agentic LLM judge; rerun per-model incrementally
-//     and delete the pair (fable + gpt-5.6 + gpt-5.6-sol pairs already rerun here).
+//     and delete the pair (fable pair already rerun here).
 //   - agent-030 / agent-034: judge conversions from #95440; rerun per-model
 //     (fable pair done).
 //   - agent-040-instant: renamed upstream from agent-040-unstable-instant; needs
