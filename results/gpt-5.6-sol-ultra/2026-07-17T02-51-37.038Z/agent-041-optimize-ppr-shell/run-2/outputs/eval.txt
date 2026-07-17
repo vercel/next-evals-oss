@@ -1,0 +1,105 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (3 tests | 3 failed) 44201ms
+   × Page has at least 3 Suspense boundaries 5ms
+     → expected 1 to be greater than or equal to 3
+   × Each dashboard section has its own Suspense boundary in page.tsx 3ms
+     → CardStats should be inside its own <Suspense>: expected false to be true // Object.is equality
+   × Page does not await all data before rendering 44192ms
+     → [judge:environment] FAIL — The dashboard page must produce a static PPR shell: the default-exported Page component in app/page.tsx returns its JSX frame without blocking on dashboard data, and the data-driven sections stream in under <Suspense> boundaries.
+
+For reference, one correct solution keeps Page synchronous and moves each await into a Suspense-wrapped child:
+
+  export default function Page() {
+    return (
+      <main>
+        <h1>Dashboard</h1>
+        <Suspense fallback={<CardStatsSkeleton />}>
+          <CardStatsSection />
+        </Suspense>
+        {/* ...RevenueChart and LatestInvoices sections likewise... */}
+      </main>
+    )
+  }
+
+  async function CardStatsSection() {
+    const data = await getDashboardData()
+    return <CardStats totalRevenue={data.totalRevenue} totalInvoices={data.totalInvoices} />
+  }
+
+Equivalent forms are also correct, judge runtime behavior rather than style: the section components may live in this same file or be imported from another file; Page may start the fetch without awaiting it and pass the promise to children that unwrap it; the fetch may be deduplicated with React's cache().
+
+Incorrect: the Page component itself blocks on the data before returning JSX — e.g. it awaits the fetch (or unwraps it with use()) in its own body — or the sections do not actually suspend independently, which collapses the shell back to the original all-or-nothing loading state.
+  reason: Although Page is synchronous, app/page.tsx has only one Suspense boundary around DashboardContent, whose await of getDashboardData() occurs before CardStats, RevenueChart, and LatestInvoices are returned together. The three data-driven sections therefore resolve as one all-or-nothing block instead of suspending and streaming independently.
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  02:56:39
+   Duration  44.43s (transform 44ms, setup 16ms, collect 29ms, tests 44.20s, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Page has at least 3 Suspense boundaries
+AssertionError: expected 1 to be greater than or equal to 3
+ ❯ EVAL.ts:39:25
+     37| 
+     38|   const suspenseCount = (page.match(/<Suspense[\s>]/g) || []).length
+     39|   expect(suspenseCount).toBeGreaterThanOrEqual(3)
+       |                         ^
+     40| })
+     41| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > Each dashboard section has its own Suspense boundary in page.tsx
+AssertionError: CardStats should be inside its own <Suspense>: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:53:76
+     51|       (block) => block.includes(component) && block.includes('</Suspen…
+     52|     )
+     53|     expect(inOwnBlock, `${component} should be inside its own <Suspens…
+       |                                                                            ^
+     54|       true
+     55|     )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > Page does not await all data before rendering
+Error: [judge:environment] FAIL — The dashboard page must produce a static PPR shell: the default-exported Page component in app/page.tsx returns its JSX frame without blocking on dashboard data, and the data-driven sections stream in under <Suspense> boundaries.
+
+For reference, one correct solution keeps Page synchronous and moves each await into a Suspense-wrapped child:
+
+  export default function Page() {
+    return (
+      <main>
+        <h1>Dashboard</h1>
+        <Suspense fallback={<CardStatsSkeleton />}>
+          <CardStatsSection />
+        </Suspense>
+        {/* ...RevenueChart and LatestInvoices sections likewise... */}
+      </main>
+    )
+  }
+
+  async function CardStatsSection() {
+    const data = await getDashboardData()
+    return <CardStats totalRevenue={data.totalRevenue} totalInvoices={data.totalInvoices} />
+  }
+
+Equivalent forms are also correct, judge runtime behavior rather than style: the section components may live in this same file or be imported from another file; Page may start the fetch without awaiting it and pass the promise to children that unwrap it; the fetch may be deduplicated with React's cache().
+
+Incorrect: the Page component itself blocks on the data before returning JSX — e.g. it awaits the fetch (or unwraps it with use()) in its own body — or the sections do not actually suspend independently, which collapses the shell back to the original all-or-nothing loading state.
+  reason: Although Page is synchronous, app/page.tsx has only one Suspense boundary around DashboardContent, whose await of getDashboardData() occurs before CardStats, RevenueChart, and LatestInvoices are returned together. The three data-driven sections therefore resolve as one all-or-nothing block instead of suspending and streaming independently.
+ ❯ EVAL.ts:60:29
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
