@@ -42,7 +42,16 @@ verifier runs in the same container.
 Prereqs: Docker running, `uv tool install harbor`. `-y` auto-confirms the
 host-env access prompt (required for non-interactive runs).
 
+Set `HARBOR_TELEMETRY=0` for every run. Harbor sends a PostHog event per job
+by default, and the payload includes `model_names`, `agent_names`, and
+`reward_mean` (`telemetry.py:115-117,151` at harbor 19f72aa). With
+unreleased or EAP model strings that is a leak. Job results themselves never
+leave the machine: `harbor run` only writes the local `jobs/` directory, and
+Hub sharing is a separate explicit command.
+
 ```bash
+export HARBOR_TELEMETRY=0
+
 # Red-path proof, no tokens: nop agent leaves the fixture unmodified.
 harbor run -y -p harbor/tasks/agent-021-avoid-fetch-in-effect -a nop --job-name nop-021
 
