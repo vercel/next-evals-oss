@@ -62,6 +62,24 @@ harbor run -y -p harbor/tasks -a claude-code -m claude-sonnet-4-6 -k 4 \
 both pass, mirroring agent-eval's `allPassed`), plus `vitestPassed` /
 `buildPassed` for diagnosis.
 
+## Proven runs (2026-07-17, local Docker, harbor 0.19.0)
+
+| job           | agent                          | reward | vitestPassed | buildPassed | cost  |
+|---------------|--------------------------------|--------|--------------|-------------|-------|
+| nop-021       | nop (red-path proof)           | 0      | 0            | 1           | $0    |
+| claude-021    | claude-code, claude-sonnet-4-6 | 1      | 1            | 1           | $0.23 |
+| claude-034-v2 | claude-code, claude-sonnet-4-6 | 1      | 1            | 1           | $0.08 |
+
+claude-034 is one of the three LLM-judge evals: its judge invocation ran
+inside the verifier (19.7s on the judged test vs 236ms when the judge could
+not launch). The nop row shows the grader discriminates: the untouched
+scaffold builds but fails 2 of 5 EVAL.ts assertions.
+
+Gotcha found by these runs: harbor containers run the verifier as root, and
+Claude Code refuses `--dangerously-skip-permissions` as root. test.sh sets
+`IS_SANDBOX=1` (the same flag harbor's agent phase sets); agent-eval never
+hit this because its Vercel sandbox validation runs unprivileged.
+
 ## Not ported (yet)
 
 - The `--agents-md` experiment arm (injects `AGENTS.md` into the fixture) —
