@@ -31,6 +31,12 @@ The runner automatically detects:
 
 Exports clean results to `agent-results.json`. Non-model failures (infra/timeout) are automatically deleted during eval runs, so only valid model results are exported.
 
+Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens are read from each run's `transcript-raw.jsonl` (handled per harness in `scripts/cost.ts`) and multiplied by the list prices in `MODEL_PRICING`. A model with no price entry, or whose runs carry no token usage, exports `null` and renders as N/A. Prices are a snapshot, so re-run the export to refresh them.
+
+### `npm run test:cost`
+
+Unit tests for the token extraction and pricing in `scripts/cost.ts`.
+
 ## Eval structure
 
 Each eval is a self-contained Next.js project in `evals/`:
@@ -67,7 +73,8 @@ evals/agent-031-proxy-middleware/
 
 1. Create a config in `experiments/` (e.g., `experiments/gpt-5.ts`)
 2. Add the display name to `MODEL_NAMES` in `scripts/export-results.ts`
-3. Run `npm run eval` — it will automatically run all evals for the new model
+3. Add the list price to `MODEL_PRICING` in `scripts/cost.ts` (or the cost column shows N/A)
+4. Run `npm run eval` — it will automatically run all evals for the new model
 
 ## Publishing to nextjs.org/evals
 
