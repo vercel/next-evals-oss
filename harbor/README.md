@@ -45,9 +45,9 @@ host-env access prompt (required for non-interactive runs).
 Set `HARBOR_TELEMETRY=0` for every run. Harbor sends a PostHog event per job
 by default, and the payload includes `model_names`, `agent_names`, and
 `reward_mean` (`telemetry.py:115-117,151` at harbor 19f72aa). With
-unreleased or EAP model strings that is a leak. Job results themselves never
-leave the machine: `harbor run` only writes the local `jobs/` directory, and
-Hub sharing is a separate explicit command.
+unreleased or EAP model strings that is a leak. Job results stay in the
+local `jobs/` directory unless you pass `--upload`, which streams them to
+the Harbor Hub during the run. Never pass it for EAP work.
 
 ```bash
 export HARBOR_TELEMETRY=0
