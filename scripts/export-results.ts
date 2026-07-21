@@ -14,6 +14,7 @@
 import { execSync } from 'node:child_process';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { MODEL_PRICING, extractRunTokens, priceUsage } from './cost.js';
 
 interface SummaryJson {
   totalRuns: number;
@@ -28,12 +29,94 @@ interface AgentResult {
   // eval's content changed since). Counts against the success rate so every
   // experiment is scored over the same canonical eval set.
   notAvailable?: boolean;
+  // Mean list cost in USD across this eval's runs, or undefined when the run
+  // saved no token usage (e.g. a timeout) or the model has no price entry.
+  costUsd?: number;
   result: {
     success: boolean;
     duration: number;
     evalPath: string;
     timestamp: string;
   };
+}
+
+// variant → base experiment (same agent harness). Hoisted to module scope so
+// both cost pricing (per eval) and the docs-impact merge resolve the same base.
+const AGENTS_MD_PAIRS: Record<string, string> = {
+  'claude-fable-5--agents-md': 'claude-fable-5',
+  'claude-opus-4.6--agents-md': 'claude-opus-4.6',
+  'claude-opus-4.7--agents-md': 'claude-opus-4.7',
+  'claude-opus-4.8--agents-md': 'claude-opus-4.8',
+  'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
+  'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
+  'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
+  'cursor-composer-2.0--agents-md': 'cursor-composer-2.0',
+  'cursor-composer-2.5--agents-md': 'cursor-composer-2.5',
+  'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
+  'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
+  'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
+  'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
+  'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
+  'gpt-5.5-pro--agents-md': 'gpt-5.5-pro',
+  'gpt-5.6-sol-ultra--agents-md': 'gpt-5.6-sol-ultra',
+  'kimi-k2.5--agents-md': 'kimi-k2.5',
+  'kimi-k2.6--agents-md': 'kimi-k2.6',
+  'kimi-k2.7-code--agents-md': 'kimi-k2.7-code',
+  'kimi-k3--agents-md': 'kimi-k3',
+  'minimax-m2.7--agents-md': 'minimax-m2.7',
+  'minimax-m3--agents-md': 'minimax-m3',
+  'glm-5.1-opencode--agents-md': 'glm-5.1-opencode',
+  'glm-5.2--agents-md': 'glm-5.2',
+  'grok-4.5--agents-md': 'grok-4.5',
+};
+
+/**
+ * Mean list cost (USD) for one eval, averaged over its runs. Reads each run's
+ * transcript-raw.jsonl, extracts tokens, and prices them at the experiment's
+ * list rate. Returns undefined when the model has no price or no run carried
+ * usage (e.g. a timeout), so the caller can leave it out of the average.
+ */
+async function meanEvalCostUsd(
+  evalDir: string,
+  experiment: string,
+): Promise<number | undefined> {
+  const baseSlug = AGENTS_MD_PAIRS[experiment] ?? experiment;
+  const pricing = MODEL_PRICING[baseSlug];
+  if (!pricing) return undefined;
+
+  let runEntries: string[];
+  try {
+    runEntries = await readdir(evalDir);
+  } catch {
+    return undefined;
+  }
+
+  const costs: number[] = [];
+  for (const entry of runEntries) {
+    if (!entry.startsWith('run-')) continue;
+    try {
+      const raw = await readFile(join(evalDir, entry, 'transcript-raw.jsonl'), 'utf-8');
+      const usage = extractRunTokens(raw);
+      if (usage) costs.push(priceUsage(usage, pricing));
+    } catch {
+      // No transcript for this run (e.g. timeout) — skip it.
+    }
+  }
+
+  if (costs.length === 0) return undefined;
+  return costs.reduce((a, b) => a + b, 0) / costs.length;
+}
+
+/**
+ * Mean per-eval list cost across results, over cells that have a cost. Returns
+ * null when none do (so an all-timeout or unpriced experiment reads as N/A).
+ */
+function avgCost(results: AgentResult[]): number | null {
+  const costs = results
+    .filter((r) => !r.notAvailable && typeof r.costUsd === 'number')
+    .map((r) => r.costUsd as number);
+  if (costs.length === 0) return null;
+  return costs.reduce((a, b) => a + b, 0) / costs.length;
 }
 
 interface DocsImpact {
@@ -53,6 +136,9 @@ interface ExportedData {
       modelName: string;
       agentHarness: string;
       avgDuration?: number;
+      // Mean list cost per eval (USD). null = not estimated (no price, or the
+      // model's runs carry no usable token usage) — rendered as N/A.
+      avgCostUsd?: number | null;
       docsImpact?: DocsImpact;
     }>;
   };
@@ -270,8 +356,11 @@ async function main(): Promise<void> {
           // Skip invalid results (infra/timeout failures)
           if (summary.valid === false) continue;
 
+          const costUsd = await meanEvalCostUsd(join(runDir, evalDir), experiment);
+
           agentResults.push({
             evalPath: evalDir,
+            ...(costUsd !== undefined ? { costUsd } : {}),
             result: {
               success: summary.passedRuns > 0,
               duration: summary.meanDuration * 1000,
@@ -333,36 +422,8 @@ async function main(): Promise<void> {
     exportedData.results[experiment] = normalized;
   }
 
-  // Merge --agents-md variants into base experiments
-  // variant → base (must use the same agent harness)
-  const AGENTS_MD_PAIRS: Record<string, string> = {
-    'claude-fable-5--agents-md': 'claude-fable-5',
-    'claude-opus-4.6--agents-md': 'claude-opus-4.6',
-    'claude-opus-4.7--agents-md': 'claude-opus-4.7',
-    'claude-opus-4.8--agents-md': 'claude-opus-4.8',
-    'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
-    'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
-    'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
-    'cursor-composer-2.0--agents-md': 'cursor-composer-2.0',
-    'cursor-composer-2.5--agents-md': 'cursor-composer-2.5',
-    'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
-    'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
-    'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
-    'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
-    'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
-    'gpt-5.5-pro--agents-md': 'gpt-5.5-pro',
-    'gpt-5.6-sol-ultra--agents-md': 'gpt-5.6-sol-ultra',
-    'kimi-k2.5--agents-md': 'kimi-k2.5',
-    'kimi-k2.6--agents-md': 'kimi-k2.6',
-    'kimi-k2.7-code--agents-md': 'kimi-k2.7-code',
-    'kimi-k3--agents-md': 'kimi-k3',
-    'minimax-m2.7--agents-md': 'minimax-m2.7',
-    'minimax-m3--agents-md': 'minimax-m3',
-    'glm-5.1-opencode--agents-md': 'glm-5.1-opencode',
-    'glm-5.2--agents-md': 'glm-5.2',
-    'grok-4.5--agents-md': 'grok-4.5',
-  };
-
+  // Merge --agents-md variants into base experiments (AGENTS_MD_PAIRS is
+  // defined at module scope so per-eval cost pricing resolves the same base).
   for (const [variantName, baseName] of Object.entries(AGENTS_MD_PAIRS)) {
     const baseExp = exportedData.metadata.experiments.find((e) => e.name === baseName);
     const variantExp = exportedData.metadata.experiments.find((e) => e.name === variantName);
@@ -424,6 +485,13 @@ async function main(): Promise<void> {
     baseExp.avgDuration =
       allDurationsMs.reduce((a, b) => a + b, 0) / allDurationsMs.length / 1000;
 
+    // Average list cost per eval across base + variant, over cells that have a
+    // cost (a timed-out eval has none and is simply left out). null when the
+    // model has no price at all → N/A on the board.
+    baseExp.avgCostUsd = MODEL_PRICING[baseName]
+      ? avgCost([...baseResults, ...variantResults])
+      : null;
+
     // Use the newer of base / variant timestamps
     if (new Date(variantExp.timestamp) > new Date(baseExp.timestamp)) {
       baseExp.timestamp = variantExp.timestamp;
@@ -442,17 +510,23 @@ async function main(): Promise<void> {
     delete exportedData.results[variantName];
   }
 
-  // Fill avgDuration for any experiments that didn't go through the merge
+  // Fill avgDuration / avgCostUsd for experiments that didn't go through the
+  // merge (standalone, no --agents-md pair).
   for (const exp of exportedData.metadata.experiments) {
-    if (exp.avgDuration !== undefined) continue;
     const results = exportedData.results[exp.name];
     if (!results || results.length === 0) continue;
-    const durations = results
-      .filter((r) => !r.notAvailable)
-      .map((r) => r.result.duration);
-    if (durations.length === 0) continue;
-    exp.avgDuration =
-      durations.reduce((a, b) => a + b, 0) / durations.length / 1000;
+    if (exp.avgDuration === undefined) {
+      const durations = results
+        .filter((r) => !r.notAvailable)
+        .map((r) => r.result.duration);
+      if (durations.length > 0) {
+        exp.avgDuration =
+          durations.reduce((a, b) => a + b, 0) / durations.length / 1000;
+      }
+    }
+    if (exp.avgCostUsd === undefined) {
+      exp.avgCostUsd = MODEL_PRICING[exp.name] ? avgCost(results) : null;
+    }
   }
 
   // Count stats
