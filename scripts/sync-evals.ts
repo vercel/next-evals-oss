@@ -12,7 +12,7 @@
  */
 
 import { execFileSync, execSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { nonPublicEvalNames } from '../lib/published-evals.js';
 
@@ -106,7 +106,7 @@ async function main(): Promise<void> {
 
   // Swap the fetched tree into place: only now is the old one expendable.
   if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
-  execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);
+  cpSync(join(tmpDir, 'next.js', 'evals', 'evals'), evalsDir, { recursive: true });
 
   // Upstream fixtures with a local skill treatment or `publish: false` are
   // PR-development evals, not part of the public model and bundled-docs matrix.
