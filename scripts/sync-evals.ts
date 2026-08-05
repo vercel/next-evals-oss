@@ -12,7 +12,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const REPO_URL = 'https://github.com/vercel/next.js.git';
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   execSync(`git -C "${repoDir}" checkout -q FETCH_HEAD`, { stdio: 'inherit' });
 
   // Copy evals into place
-  execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);
+  cpSync(join(tmpDir, 'next.js', 'evals', 'evals'), evalsDir, { recursive: true });
   rmSync(tmpDir, { recursive: true, force: true });
 
   // Carry config-only changes forward in cached results (the framework owns this now;
