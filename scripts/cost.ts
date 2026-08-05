@@ -42,6 +42,9 @@ export interface Pricing {
  */
 export const MODEL_PRICING: Record<string, Pricing | null> = {
   'claude-fable-5': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  // Introductory pricing through 2026-08-31; standard is 3/15/0.3/3.75 after.
+  'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   'claude-opus-4.6': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.7': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.8': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },

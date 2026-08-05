@@ -1,0 +1,123 @@
+{
+  "status": "passed",
+  "duration": 468.876,
+  "model": "claude-opus-5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 9,
+    "toolCalls": {
+      "file_read": 7,
+      "file_write": 5,
+      "file_edit": 1,
+      "shell": 18,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 31,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/app/page.tsx",
+      "/workspace/app/layout.tsx",
+      "/workspace/app/loading.tsx",
+      "/workspace/app/CardStats.tsx",
+      "/workspace/app/RevenueChart.tsx",
+      "/workspace/app/LatestInvoices.tsx",
+      "/workspace/__agent_eval__/run.mjs"
+    ],
+    "filesModified": [
+      "/workspace/app/data.ts",
+      "/workspace/app/CardStats.tsx",
+      "/workspace/app/RevenueChart.tsx",
+      "/workspace/app/LatestInvoices.tsx",
+      "/workspace/app/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la && cat package.json",
+        "success": true
+      },
+      {
+        "command": "find app __agent_eval__ -type f | head -50 && echo \"---CONFIG---\" && cat next.config.ts && echo \"---TSCONFIG---\" && cat tsconfig.json && echo \"---GITIGNORE---\" && cat .gitignore",
+        "success": true
+      },
+      {
+        "command": "node -p \"require('next/package.json').version\" && git log --oneline -3 && git diff --stat HEAD",
+        "success": true
+      },
+      {
+        "command": "ls node_modules/next/dist/lib/metadata 2>/dev/null | head; grep -rl \"cacheComponents\" node_modules/next/dist/server/config-schema.js 2>/dev/null",
+        "success": true
+      },
+      {
+        "command": "timeout 300 npx next build 2>&1 | tail -60",
+        "success": true
+      },
+      {
+        "command": "find .next -name \"index.html\" -o -name \"*.html\" | grep -v _not-found | head -20",
+        "success": true
+      },
+      {
+        "command": "python3 - <<'EOF'\nimport re\nh=open('.next/server/app/index.html').read()\nprint(\"TOTAL BYTES:\", len(h))\n# strip script tags to see the visible markup\nbody=re.sub(r'<script[\\s\\S]*?</script>','',h)\nprint(\"--- MARKUP WITHOUT SCRIPTS ---\")\nprint(body)\nEOF",
+        "success": true
+      },
+      {
+        "command": "timeout 300 npx next build 2>&1 | tail -20",
+        "success": true
+      },
+      {
+        "command": "python3 - <<'EOF'\nimport re\nh=open('.next/server/app/index.html').read()\nprint(\"TOTAL BYTES:\", len(h))\nbody=re.sub(r'<script[\\s\\S]*?</script>','',h)\nprint(\"--- MARKUP WITHOUT SCRIPTS ---\")\nprint(body)\nEOF",
+        "success": true
+      },
+      {
+        "command": "mv app/loading.tsx /tmp/loading.tsx.bak && timeout 300 npx next build 2>&1 | grep -E \"^(┌|└|○|◐|✓ Gen)\" ; python3 -c \"\nimport re\nh=open('.next/server/app/index.html').read()\nprint('TOTAL BYTES:', len(h))\nprint(re.sub(r'<script[\\s\\S]*?</script>','',h)[-700:])\n\"",
+        "success": true
+      },
+      {
+        "command": "(timeout 60 npx next start -p 3111 > /tmp/start.log 2>&1 &) ; sleep 6; echo \"--- server log ---\"; cat /tmp/start.log",
+        "success": true
+      },
+      {
+        "command": "curl -s -N --max-time 25 -w \"\\n[TOTAL_TIME:%{time_total}s TTFB:%{time_starttransfer}s]\\n\" http://localhost:3111/ 2>&1 | python3 -c \"\nimport sys,re\nd=sys.stdin.read()\nprint('BYTES:',len(d))\nm=re.search(r'\\[TOTAL_TIME.*',d)\nprint(m.group(0) if m else 'no timing')\nprint('shell has <h1>Dashboard</h1>:', '<h1>Dashboard</h1>' in d)\nprint('shell has skeletons:', d.count('class=\\\"skeleton\\\"'))\nprint('boundaries B:0/1/2 present:', all(f'B:{i}' in d for i in range(3)))\n\"",
+        "success": true
+      },
+      {
+        "command": "curl -s -N --max-time 25 http://localhost:3111/ > /tmp/resp.html 2>&1; echo \"--- server log tail ---\"; tail -25 /tmp/start.log",
+        "success": true
+      },
+      {
+        "command": "before=$(grep -c \"fetch failed\" /tmp/start.log); curl -s --max-time 25 -o /dev/null http://localhost:3111/; sleep 1; after=$(grep -c \"fetch failed\" /tmp/start.log); echo \"fetch attempts added by ONE request: $((after-before))  (3 widgets awaited getDashboardData)\"",
+        "success": true
+      },
+      {
+        "command": "python3 -c \"\nd=open('/tmp/resp.html').read()\nprint('BYTES:',len(d))\nprint('has <h1>Dashboard</h1>:','<h1>Dashboard</h1>' in d)\nimport re\n# look for error signals in the streamed tail\nfor kw in ['Application error','\\$Sreact','A server error','digest']:\n    print(f'{kw!r}:', kw in d)\n\"; pkill -f \"next start\" 2>/dev/null; echo \"--- typecheck ---\"; timeout 120 npx tsc --noEmit 2>&1 | tail -20; echo \"tsc exit: $?\"",
+        "success": false
+      },
+      {
+        "command": "timeout 180 npx tsc --noEmit; echo \"tsc exit: $?\"",
+        "success": true
+      },
+      {
+        "command": "git status --short && echo \"--- DIFF ---\" && git diff -- app/ && echo \"--- package.json diff (pre-existing) ---\" && git diff -- package.json",
+        "success": true
+      },
+      {
+        "command": "rm -rf .next tsconfig.tsbuildinfo && git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

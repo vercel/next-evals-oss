@@ -44,6 +44,8 @@ interface AgentResult {
 // both cost pricing (per eval) and the docs-impact merge resolve the same base.
 const AGENTS_MD_PAIRS: Record<string, string> = {
   'claude-fable-5--agents-md': 'claude-fable-5',
+  'claude-opus-5--agents-md': 'claude-opus-5',
+  'claude-sonnet-5--agents-md': 'claude-sonnet-5',
   'claude-opus-4.6--agents-md': 'claude-opus-4.6',
   'claude-opus-4.7--agents-md': 'claude-opus-4.7',
   'claude-opus-4.8--agents-md': 'claude-opus-4.8',
@@ -148,6 +150,10 @@ interface ExportedData {
 const MODEL_NAMES: Record<string, string> = {
   'claude-fable-5': 'Claude Fable 5 (high)',
   'claude-fable-5--agents-md': 'Claude Fable 5 (high) + AGENTS.md',
+  'claude-opus-5': 'Claude Opus 5',
+  'claude-opus-5--agents-md': 'Claude Opus 5 + AGENTS.md',
+  'claude-sonnet-5': 'Claude Sonnet 5',
+  'claude-sonnet-5--agents-md': 'Claude Sonnet 5 + AGENTS.md',
   'claude-opus-4.6': 'Claude Opus 4.6',
   'claude-opus-4.6--agents-md': 'Claude Opus 4.6 + AGENTS.md',
   'claude-opus-4.7': 'Claude Opus 4.7 (max)',
