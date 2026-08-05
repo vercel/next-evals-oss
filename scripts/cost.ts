@@ -67,9 +67,6 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'glm-5.1-opencode': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
   'glm-5.2': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
   'grok-4.5': { input: 2, output: 6, cacheRead: 0.3, cacheWrite: 0 },
-  // AI Gateway list (not on models.dev yet); DeepSeek's direct API uses
-  // peak/valley pricing, so the gateway's flat rate is the comparable one.
-  'deepseek-v4-pro': { input: 1.74, output: 3.48, cacheRead: 0.14, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
 };
