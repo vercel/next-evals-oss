@@ -1,0 +1,55 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 10ms
+   ✓ proxy.ts file exists in root (Next.js 16+ convention) 1ms
+   ✓ Proxy function uses correct name (not middleware) 1ms
+   ✓ Proxy imports NextResponse from next/server 0ms
+   × Proxy adds custom header X-Request-Id 6ms
+     → expected 'import { NextResponse, type NextReque…' to match /NextResponse\.next\(\)/
+   ✓ Proxy logs request pathname 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  15:22:35
+   Duration  315ms (transform 56ms, setup 22ms, collect 28ms, tests 10ms, environment 0ms, prepare 87ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Proxy adds custom header X-Request-Id
+AssertionError: expected 'import { NextResponse, type NextReque…' to match /NextResponse\.next\(\)/
+
+[32m- Expected:[39m 
+/NextResponse\.next\(\)/
+
+[31m+ Received:[39m 
+"import { NextResponse, type NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  console.log(request.nextUrl.pathname)
+
+  const requestId = crypto.randomUUID()
+
+  // Forward the id to route handlers and server components so they can log
+  // against the same value the client sees on the response.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('X-Request-Id', requestId)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set('X-Request-Id', requestId)
+
+  return response
+}
+"
+
+ ❯ EVAL.ts:63:21
+     61| 
+     62|     // Should use NextResponse.next()
+     63|     expect(content).toMatch(/NextResponse\.next\(\)/)
+       |                     ^
+     64| 
+     65|     // Should set X-Request-Id header
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

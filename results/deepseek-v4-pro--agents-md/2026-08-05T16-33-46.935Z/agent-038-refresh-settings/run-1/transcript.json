@@ -1,0 +1,1409 @@
+{
+  "agent": "vercel-ai-gateway/opencode",
+  "model": "vercel/deepseek/deepseek-v4-pro",
+  "events": [
+    {
+      "timestamp": "2026-08-05T16:35:48.302Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "unknown",
+        "originalName": "task",
+        "args": {
+          "description": "Explore codebase structure",
+          "prompt": "Explore the codebase to understand:\n1. The overall project structure (what framework, language, etc.)\n2. Where Server Actions are defined (look for \"use server\" directive, action files, or patterns)\n3. Any existing notification preference or user settings code\n4. Any existing revalidation/refresh patterns used in Server Actions\n5. How the database is accessed (ORM, direct queries, etc.)\n6. Check if there's a user model/schema that includes notification preferences\n\nReport back all findings including file paths and relevant code snippets. Be thorough - check src/, app/, lib/, components/, and any other relevant directories.",
+          "subagent_type": "explore"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947748302,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c6db700017puCySX1qGf3ma",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c6d42c001IoyeyIFDY6GK5A",
+          "type": "tool",
+          "callID": "call_eb5d8f728eb44b6cb9bbf056",
+          "tool": "task",
+          "state": {
+            "status": "completed",
+            "input": {
+              "description": "Explore codebase structure",
+              "prompt": "Explore the codebase to understand:\n1. The overall project structure (what framework, language, etc.)\n2. Where Server Actions are defined (look for \"use server\" directive, action files, or patterns)\n3. Any existing notification preference or user settings code\n4. Any existing revalidation/refresh patterns used in Server Actions\n5. How the database is accessed (ORM, direct queries, etc.)\n6. Check if there's a user model/schema that includes notification preferences\n\nReport back all findings including file paths and relevant code snippets. Be thorough - check src/, app/, lib/, components/, and any other relevant directories.",
+              "subagent_type": "explore"
+            },
+            "output": "Here is the complete report of all findings:\n\n---\n\n## 1. Overall Project Structure\n\n**Framework:** Next.js (App Router)\n**Language:** TypeScript\n**Next.js version:** `16.3.1-canary.3` (a canary/pre-release of Next.js 16)\n\nThis is a **minimal, nearly blank starter project**. The entire codebase consists of just a few files:\n\n| File | Purpose |\n|---|---|\n| `/workspace/package.json` | Package manifest - Next.js 16.3.1-canary.3, React 19.1.0, dev deps: vitest, vite-tsconfig-paths |\n| `/workspace/tsconfig.json` | TypeScript config with `@/*` path alias to root |\n| `/workspace/app/page.tsx` | **The only source file** - a single Home page component |\n| `/workspace/.gitignore` | Ignores `node_modules/` and `__agent_eval__/` |\n\nThere is no `src/`, `lib/`, `components/`, `next.config.js`, `.env`, schema file, or any other application code.\n\n---\n\n## 2. Where Server Actions Are Defined\n\n**There are currently ZERO Server Actions in the codebase.** The grep for `\"use server\"` returned no matches across all `.ts/.tsx/.js/jsx` files.\n\nThe only code file is `/workspace/app/page.tsx`:\n\n```tsx\n// /workspace/app/page.tsx\nexport default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n```\n\nThe page itself is a simple Server Component with the prompt text describing what needs to be built.\n\n---\n\n## 3. Notification Preference / User Settings Code\n\n**There is NO existing notification preference or user settings code whatsoever.**\n\nGrep for `notification|preference|settings` across the project matched only the prompt text in `page.tsx` (line 5: \"Please implement a notification toggle with server-side refresh.\").\n\n---\n\n## 4. Revalidation/Refresh Patterns\n\n**There are NO existing revalidation/refresh patterns in the application code.**\n\nThe only match for `revalidatePath|revalidateTag|unstable_cache|refresh` was the instructional text in `page.tsx`.\n\nHowever, the **Next.js 16 docs** (bundled in `node_modules/next/dist/docs/`) provide current patterns. Here are the relevant APIs available in this version:\n\n### Available revalidation APIs (from `next/cache`):\n\n1. **`revalidatePath(path, type?)`** - Invalidates cached data for a specific path. Can be called in Server Functions and Route Handlers. (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`)\n\n2. **`revalidateTag(tag, profile)`** - Stale-while-revalidate refresh of a tag. Note: the **single-argument form is deprecated** in v16; the two-argument form with `profile` is required. (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`)\n\n3. **`updateTag(tag)`** - Immediate expiration of a tag for read-your-own-writes. **Server Actions only.** (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md`)\n\n4. **`refresh()`** - Refetches the current route's RSC Payload. **Server Actions only.** (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md`)\n\n### Key behavior (per Next.js 16 docs):\n- When a Server Action calls `updateTag`, `revalidatePath`, or `refresh`, **the server re-renders the current route and includes the re-rendered RSC Payload in the same HTTP response** -- a single roundtrip (page re-render is automatic, no client-side refetch needed).\n- `revalidateTag` with a stale-while-revalidate profile does NOT include an immediate re-render.\n\n### Server Actions pattern (from docs):\n```ts\n// app/actions.ts\n'use server'\nimport { revalidatePath } from 'next/cache'\nimport { refresh } from 'next/cache'\nimport { updateTag } from 'next/cache'\n\nexport async function myAction(formData: FormData) {\n  // mutate data...\n  revalidatePath('/settings')  // immediate UI update + cache invalidation\n  // or\n  refresh()                    // refetch current route's RSC Payload\n  // or  \n  updateTag('settings')        // immediate tag expiration (Server Actions only)\n}\n```\n\n---\n\n## 5. How the Database Is Accessed\n\n**There is NO database configured or accessed.**\n\n- No ORM packages installed (no Prisma, Drizzle, Knex, Kysely, pg, mysql, sqlite, etc.).\n- No database schema files.\n- No `.env` file for database connection strings.\n- No `lib/db.ts` or similar database client file.\n- The `package.json` dependencies are solely: `next`, `react`, `react-dom`, and dev deps for testing (`vitest`, `typescript`, `@types/*`, `@vitejs/plugin-react`, `vite-tsconfig-paths`).\n\nThe docs examples consistently show a pattern like `import { db } from '@/lib/db'`, but no such file exists in this project.\n\n---\n\n## 6. User Model/Schema with Notification Preferences\n\n**There is NO user model or schema of any kind.**\n\n- No `prisma/schema.prisma` file\n- No `drizzle.config.ts` or `drizzle/` directory\n- No `models/`, `schemas/`, or `db/` directories\n- No TypeScript interfaces/types for User, Settings, NotificationPreferences, etc.\n- The project has zero files beyond `app/page.tsx` in terms of application code.\n\n---\n\n## Summary\n\nThis is a **blank Next.js 16 (canary) starter project** with a single page (`/workspace/app/page.tsx`) that displays a heading \"Settings\" and instructional text asking for a notification toggle with server-side refresh to be implemented. Everything needs to be built from scratch:\n\n- No Server Actions exist yet\n- No database/ORM is set up\n- No user/settings/notification models exist\n- No revalidation patterns are in use\n\nThe **file structure that needs to be created** would likely follow Next.js App Router conventions:\n- `app/actions.ts` -- for `'use server'` actions\n- `app/lib/db.ts` -- for database access\n- `app/page.tsx` -- the existing page to be enhanced\n- A schema/model of some kind for settings/preferences\n- Potentially `next.config.js` if server action configuration is needed\n\n<task_metadata>\nsession_id: ses_02d391943ffeyevi0AxuqxmXP3\n</task_metadata>",
+            "title": "Explore codebase structure",
+            "metadata": {
+              "summary": [
+                {
+                  "id": "prt_fd2c6ee5f001RntpY27L8dddgu",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "List top-level directory"
+                  }
+                },
+                {
+                  "id": "prt_fd2c6efd5001XGDH03hePEm5uX",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c6f9c0001D2k8FpKSqkugq4",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "package.json"
+                  }
+                },
+                {
+                  "id": "prt_fd2c6facd001Miv6BXSPBi6tgd",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "tsconfig.json"
+                  }
+                },
+                {
+                  "id": "prt_fd2c6fbe9001AdynA5Gjf0Vg4Z",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "List app directory"
+                  }
+                },
+                {
+                  "id": "prt_fd2c6fd8c001JWkKsuRFhQfDo9",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": "app"
+                  }
+                },
+                {
+                  "id": "prt_fd2c70731001YBb5uhXB6stppC",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "app/page.tsx"
+                  }
+                },
+                {
+                  "id": "prt_fd2c7083f001zL2szZvkYJHz66",
+                  "tool": "grep",
+                  "state": {
+                    "status": "completed",
+                    "title": "use server"
+                  }
+                },
+                {
+                  "id": "prt_fd2c70aa30014boFpIt0M3pyGu",
+                  "tool": "grep",
+                  "state": {
+                    "status": "completed",
+                    "title": "revalidatePath|revalidateTag|unstable_cache|refresh"
+                  }
+                },
+                {
+                  "id": "prt_fd2c70e02001wDKdStW53Q4LVz",
+                  "tool": "grep",
+                  "state": {
+                    "status": "completed",
+                    "title": "notification|preference|settings"
+                  }
+                },
+                {
+                  "id": "prt_fd2c710ae001KboUbjwR0UtWYi",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c71b6c0015D6yScQtkEVwID",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c71d100011IWy5SlB2tqGu5",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c71eb80013V3LQ3RKWnZ845",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c7203f001mWWVcs1Dd2L51M",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c721c1001KWL2l3UkSS05Wd",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c72352001LHgc85fDVhUzDh",
+                  "tool": "glob",
+                  "state": {
+                    "status": "completed",
+                    "title": ""
+                  }
+                },
+                {
+                  "id": "prt_fd2c72576001b4jkmfHI5z9nYd",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "Check agent eval directory"
+                  }
+                },
+                {
+                  "id": "prt_fd2c72fa8001PG3efn1YrGqZw4",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "Check for Next.js docs directory"
+                  }
+                },
+                {
+                  "id": "prt_fd2c73276001VVgHI4ILpB3QF8",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "CLAUDE.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c733a5001IEoDjHme4Ssdm3",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "GEMINI.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c734e3001YErqcogJmbr5Mu",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "AGENTS.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c735d6001msZHZEtUedFGEv",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "opencode.json"
+                  }
+                },
+                {
+                  "id": "prt_fd2c736fc001SZwasOQlnmFPM8",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "__agent_eval__/run.mjs"
+                  }
+                },
+                {
+                  "id": "prt_fd2c743c9001UNYjX8EwQOpYGV",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "List all Next.js docs files"
+                  }
+                },
+                {
+                  "id": "prt_fd2c745ef001VeByG0Y4kxXbAU",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "Check for any database ORM packages"
+                  }
+                },
+                {
+                  "id": "prt_fd2c74adf0011PN62IEdGMKHHl",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "Check Next.js version"
+                  }
+                },
+                {
+                  "id": "prt_fd2c75a30001HC2GUBVjz9UdVP",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/02-guides/server-actions.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c75ca10011EfngbIirTgw26",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c75f72001y6jcDCDA20CyU6",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c76246001kyYrOqmzz4m2mq",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c7652d001Wkzh17XWj5x941",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-server.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c7760b001pSHnOLjFiLs52W",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c77927001XgWGk5Z6fRR8xV",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md"
+                  }
+                },
+                {
+                  "id": "prt_fd2c77be7001nrQNtzp2wGKBLW",
+                  "tool": "read",
+                  "state": {
+                    "status": "completed",
+                    "title": ".gitignore"
+                  }
+                },
+                {
+                  "id": "prt_fd2c77dac001tHRU7cxf4fX1T9",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "Check Next.js version in package.json"
+                  }
+                },
+                {
+                  "id": "prt_fd2c78de3001WUPlPSIQVBepxB",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "List all non-node_modules files/dirs"
+                  }
+                },
+                {
+                  "id": "prt_fd2c793500013q40mSqVEoPQM5",
+                  "tool": "bash",
+                  "state": {
+                    "status": "completed",
+                    "title": "Check if forms guide exists"
+                  }
+                }
+              ],
+              "sessionId": "ses_02d391943ffeyevi0AxuqxmXP3"
+            },
+            "time": {
+              "start": 1785947678391,
+              "end": 1785947748297
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:48.302Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "unknown",
+        "originalName": "task",
+        "result": "Here is the complete report of all findings:\n\n---\n\n## 1. Overall Project Structure\n\n**Framework:** Next.js (App Router)\n**Language:** TypeScript\n**Next.js version:** `16.3.1-canary.3` (a canary/pre-release of Next.js 16)\n\nThis is a **minimal, nearly blank starter project**. The entire codebase consists of just a few files:\n\n| File | Purpose |\n|---|---|\n| `/workspace/package.json` | Package manifest - Next.js 16.3.1-canary.3, React 19.1.0, dev deps: vitest, vite-tsconfig-paths |\n| `/workspace/tsconfig.json` | TypeScript config with `@/*` path alias to root |\n| `/workspace/app/page.tsx` | **The only source file** - a single Home page component |\n| `/workspace/.gitignore` | Ignores `node_modules/` and `__agent_eval__/` |\n\nThere is no `src/`, `lib/`, `components/`, `next.config.js`, `.env`, schema file, or any other application code.\n\n---\n\n## 2. Where Server Actions Are Defined\n\n**There are currently ZERO Server Actions in the codebase.** The grep for `\"use server\"` returned no matches across all `.ts/.tsx/.js/jsx` files.\n\nThe only code file is `/workspace/app/page.tsx`:\n\n```tsx\n// /workspace/app/page.tsx\nexport default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n```\n\nThe page itself is a simple Server Component with the prompt text describing what needs to be built.\n\n---\n\n## 3. Notification Preference / User Settings Code\n\n**There is NO existing notification preference or user settings code whatsoever.**\n\nGrep for `notification|preference|settings` across the project matched only the prompt text in `page.tsx` (line 5: \"Please implement a notification toggle with server-side refresh.\").\n\n---\n\n## 4. Revalidation/Refresh Patterns\n\n**There are NO existing revalidation/refresh patterns in the application code.**\n\nThe only match for `revalidatePath|revalidateTag|unstable_cache|refresh` was the instructional text in `page.tsx`.\n\nHowever, the **Next.js 16 docs** (bundled in `node_modules/next/dist/docs/`) provide current patterns. Here are the relevant APIs available in this version:\n\n### Available revalidation APIs (from `next/cache`):\n\n1. **`revalidatePath(path, type?)`** - Invalidates cached data for a specific path. Can be called in Server Functions and Route Handlers. (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`)\n\n2. **`revalidateTag(tag, profile)`** - Stale-while-revalidate refresh of a tag. Note: the **single-argument form is deprecated** in v16; the two-argument form with `profile` is required. (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`)\n\n3. **`updateTag(tag)`** - Immediate expiration of a tag for read-your-own-writes. **Server Actions only.** (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md`)\n\n4. **`refresh()`** - Refetches the current route's RSC Payload. **Server Actions only.** (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md`)\n\n### Key behavior (per Next.js 16 docs):\n- When a Server Action calls `updateTag`, `revalidatePath`, or `refresh`, **the server re-renders the current route and includes the re-rendered RSC Payload in the same HTTP response** -- a single roundtrip (page re-render is automatic, no client-side refetch needed).\n- `revalidateTag` with a stale-while-revalidate profile does NOT include an immediate re-render.\n\n### Server Actions pattern (from docs):\n```ts\n// app/actions.ts\n'use server'\nimport { revalidatePath } from 'next/cache'\nimport { refresh } from 'next/cache'\nimport { updateTag } from 'next/cache'\n\nexport async function myAction(formData: FormData) {\n  // mutate data...\n  revalidatePath('/settings')  // immediate UI update + cache invalidation\n  // or\n  refresh()                    // refetch current route's RSC Payload\n  // or  \n  updateTag('settings')        // immediate tag expiration (Server Actions only)\n}\n```\n\n---\n\n## 5. How the Database Is Accessed\n\n**There is NO database configured or accessed.**\n\n- No ORM packages installed (no Prisma, Drizzle, Knex, Kysely, pg, mysql, sqlite, etc.).\n- No database schema files.\n- No `.env` file for database connection strings.\n- No `lib/db.ts` or similar database client file.\n- The `package.json` dependencies are solely: `next`, `react`, `react-dom`, and dev deps for testing (`vitest`, `typescript`, `@types/*`, `@vitejs/plugin-react`, `vite-tsconfig-paths`).\n\nThe docs examples consistently show a pattern like `import { db } from '@/lib/db'`, but no such file exists in this project.\n\n---\n\n## 6. User Model/Schema with Notification Preferences\n\n**There is NO user model or schema of any kind.**\n\n- No `prisma/schema.prisma` file\n- No `drizzle.config.ts` or `drizzle/` directory\n- No `models/`, `schemas/`, or `db/` directories\n- No TypeScript interfaces/types for User, Settings, NotificationPreferences, etc.\n- The project has zero files beyond `app/page.tsx` in terms of application code.\n\n---\n\n## Summary\n\nThis is a **blank Next.js 16 (canary) starter project** with a single page (`/workspace/app/page.tsx`) that displays a heading \"Settings\" and instructional text asking for a notification toggle with server-side refresh to be implemented. Everything needs to be built from scratch:\n\n- No Server Actions exist yet\n- No database/ORM is set up\n- No user/settings/notification models exist\n- No revalidation patterns are in use\n\nThe **file structure that needs to be created** would likely follow Next.js App Router conventions:\n- `app/actions.ts` -- for `'use server'` actions\n- `app/lib/db.ts` -- for database access\n- `app/page.tsx` -- the existing page to be enhanced\n- A schema/model of some kind for settings/preferences\n- Potentially `next.config.js` if server action configuration is needed\n\n<task_metadata>\nsession_id: ses_02d391943ffeyevi0AxuqxmXP3\n</task_metadata>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "description": "Explore codebase structure",
+          "prompt": "Explore the codebase to understand:\n1. The overall project structure (what framework, language, etc.)\n2. Where Server Actions are defined (look for \"use server\" directive, action files, or patterns)\n3. Any existing notification preference or user settings code\n4. Any existing revalidation/refresh patterns used in Server Actions\n5. How the database is accessed (ORM, direct queries, etc.)\n6. Check if there's a user model/schema that includes notification preferences\n\nReport back all findings including file paths and relevant code snippets. Be thorough - check src/, app/, lib/, components/, and any other relevant directories.",
+          "subagent_type": "explore"
+        },
+        "output": "Here is the complete report of all findings:\n\n---\n\n## 1. Overall Project Structure\n\n**Framework:** Next.js (App Router)\n**Language:** TypeScript\n**Next.js version:** `16.3.1-canary.3` (a canary/pre-release of Next.js 16)\n\nThis is a **minimal, nearly blank starter project**. The entire codebase consists of just a few files:\n\n| File | Purpose |\n|---|---|\n| `/workspace/package.json` | Package manifest - Next.js 16.3.1-canary.3, React 19.1.0, dev deps: vitest, vite-tsconfig-paths |\n| `/workspace/tsconfig.json` | TypeScript config with `@/*` path alias to root |\n| `/workspace/app/page.tsx` | **The only source file** - a single Home page component |\n| `/workspace/.gitignore` | Ignores `node_modules/` and `__agent_eval__/` |\n\nThere is no `src/`, `lib/`, `components/`, `next.config.js`, `.env`, schema file, or any other application code.\n\n---\n\n## 2. Where Server Actions Are Defined\n\n**There are currently ZERO Server Actions in the codebase.** The grep for `\"use server\"` returned no matches across all `.ts/.tsx/.js/jsx` files.\n\nThe only code file is `/workspace/app/page.tsx`:\n\n```tsx\n// /workspace/app/page.tsx\nexport default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n```\n\nThe page itself is a simple Server Component with the prompt text describing what needs to be built.\n\n---\n\n## 3. Notification Preference / User Settings Code\n\n**There is NO existing notification preference or user settings code whatsoever.**\n\nGrep for `notification|preference|settings` across the project matched only the prompt text in `page.tsx` (line 5: \"Please implement a notification toggle with server-side refresh.\").\n\n---\n\n## 4. Revalidation/Refresh Patterns\n\n**There are NO existing revalidation/refresh patterns in the application code.**\n\nThe only match for `revalidatePath|revalidateTag|unstable_cache|refresh` was the instructional text in `page.tsx`.\n\nHowever, the **Next.js 16 docs** (bundled in `node_modules/next/dist/docs/`) provide current patterns. Here are the relevant APIs available in this version:\n\n### Available revalidation APIs (from `next/cache`):\n\n1. **`revalidatePath(path, type?)`** - Invalidates cached data for a specific path. Can be called in Server Functions and Route Handlers. (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`)\n\n2. **`revalidateTag(tag, profile)`** - Stale-while-revalidate refresh of a tag. Note: the **single-argument form is deprecated** in v16; the two-argument form with `profile` is required. (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md`)\n\n3. **`updateTag(tag)`** - Immediate expiration of a tag for read-your-own-writes. **Server Actions only.** (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md`)\n\n4. **`refresh()`** - Refetches the current route's RSC Payload. **Server Actions only.** (`/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md`)\n\n### Key behavior (per Next.js 16 docs):\n- When a Server Action calls `updateTag`, `revalidatePath`, or `refresh`, **the server re-renders the current route and includes the re-rendered RSC Payload in the same HTTP response** -- a single roundtrip (page re-render is automatic, no client-side refetch needed).\n- `revalidateTag` with a stale-while-revalidate profile does NOT include an immediate re-render.\n\n### Server Actions pattern (from docs):\n```ts\n// app/actions.ts\n'use server'\nimport { revalidatePath } from 'next/cache'\nimport { refresh } from 'next/cache'\nimport { updateTag } from 'next/cache'\n\nexport async function myAction(formData: FormData) {\n  // mutate data...\n  revalidatePath('/settings')  // immediate UI update + cache invalidation\n  // or\n  refresh()                    // refetch current route's RSC Payload\n  // or  \n  updateTag('settings')        // immediate tag expiration (Server Actions only)\n}\n```\n\n---\n\n## 5. How the Database Is Accessed\n\n**There is NO database configured or accessed.**\n\n- No ORM packages installed (no Prisma, Drizzle, Knex, Kysely, pg, mysql, sqlite, etc.).\n- No database schema files.\n- No `.env` file for database connection strings.\n- No `lib/db.ts` or similar database client file.\n- The `package.json` dependencies are solely: `next`, `react`, `react-dom`, and dev deps for testing (`vitest`, `typescript`, `@types/*`, `@vitejs/plugin-react`, `vite-tsconfig-paths`).\n\nThe docs examples consistently show a pattern like `import { db } from '@/lib/db'`, but no such file exists in this project.\n\n---\n\n## 6. User Model/Schema with Notification Preferences\n\n**There is NO user model or schema of any kind.**\n\n- No `prisma/schema.prisma` file\n- No `drizzle.config.ts` or `drizzle/` directory\n- No `models/`, `schemas/`, or `db/` directories\n- No TypeScript interfaces/types for User, Settings, NotificationPreferences, etc.\n- The project has zero files beyond `app/page.tsx` in terms of application code.\n\n---\n\n## Summary\n\nThis is a **blank Next.js 16 (canary) starter project** with a single page (`/workspace/app/page.tsx`) that displays a heading \"Settings\" and instructional text asking for a notification toggle with server-side refresh to be implemented. Everything needs to be built from scratch:\n\n- No Server Actions exist yet\n- No database/ORM is set up\n- No user/settings/notification models exist\n- No revalidation patterns are in use\n\nThe **file structure that needs to be created** would likely follow Next.js App Router conventions:\n- `app/actions.ts` -- for `'use server'` actions\n- `app/lib/db.ts` -- for database access\n- `app/page.tsx` -- the existing page to be enhanced\n- A schema/model of some kind for settings/preferences\n- Potentially `next.config.js` if server action configuration is needed\n\n<task_metadata>\nsession_id: ses_02d391943ffeyevi0AxuqxmXP3\n</task_metadata>",
+        "title": "Explore codebase structure",
+        "metadata": {
+          "summary": [
+            {
+              "id": "prt_fd2c6ee5f001RntpY27L8dddgu",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "List top-level directory"
+              }
+            },
+            {
+              "id": "prt_fd2c6efd5001XGDH03hePEm5uX",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c6f9c0001D2k8FpKSqkugq4",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "package.json"
+              }
+            },
+            {
+              "id": "prt_fd2c6facd001Miv6BXSPBi6tgd",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "tsconfig.json"
+              }
+            },
+            {
+              "id": "prt_fd2c6fbe9001AdynA5Gjf0Vg4Z",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "List app directory"
+              }
+            },
+            {
+              "id": "prt_fd2c6fd8c001JWkKsuRFhQfDo9",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": "app"
+              }
+            },
+            {
+              "id": "prt_fd2c70731001YBb5uhXB6stppC",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "app/page.tsx"
+              }
+            },
+            {
+              "id": "prt_fd2c7083f001zL2szZvkYJHz66",
+              "tool": "grep",
+              "state": {
+                "status": "completed",
+                "title": "use server"
+              }
+            },
+            {
+              "id": "prt_fd2c70aa30014boFpIt0M3pyGu",
+              "tool": "grep",
+              "state": {
+                "status": "completed",
+                "title": "revalidatePath|revalidateTag|unstable_cache|refresh"
+              }
+            },
+            {
+              "id": "prt_fd2c70e02001wDKdStW53Q4LVz",
+              "tool": "grep",
+              "state": {
+                "status": "completed",
+                "title": "notification|preference|settings"
+              }
+            },
+            {
+              "id": "prt_fd2c710ae001KboUbjwR0UtWYi",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c71b6c0015D6yScQtkEVwID",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c71d100011IWy5SlB2tqGu5",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c71eb80013V3LQ3RKWnZ845",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c7203f001mWWVcs1Dd2L51M",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c721c1001KWL2l3UkSS05Wd",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c72352001LHgc85fDVhUzDh",
+              "tool": "glob",
+              "state": {
+                "status": "completed",
+                "title": ""
+              }
+            },
+            {
+              "id": "prt_fd2c72576001b4jkmfHI5z9nYd",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "Check agent eval directory"
+              }
+            },
+            {
+              "id": "prt_fd2c72fa8001PG3efn1YrGqZw4",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "Check for Next.js docs directory"
+              }
+            },
+            {
+              "id": "prt_fd2c73276001VVgHI4ILpB3QF8",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "CLAUDE.md"
+              }
+            },
+            {
+              "id": "prt_fd2c733a5001IEoDjHme4Ssdm3",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "GEMINI.md"
+              }
+            },
+            {
+              "id": "prt_fd2c734e3001YErqcogJmbr5Mu",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "AGENTS.md"
+              }
+            },
+            {
+              "id": "prt_fd2c735d6001msZHZEtUedFGEv",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "opencode.json"
+              }
+            },
+            {
+              "id": "prt_fd2c736fc001SZwasOQlnmFPM8",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "__agent_eval__/run.mjs"
+              }
+            },
+            {
+              "id": "prt_fd2c743c9001UNYjX8EwQOpYGV",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "List all Next.js docs files"
+              }
+            },
+            {
+              "id": "prt_fd2c745ef001VeByG0Y4kxXbAU",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "Check for any database ORM packages"
+              }
+            },
+            {
+              "id": "prt_fd2c74adf0011PN62IEdGMKHHl",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "Check Next.js version"
+              }
+            },
+            {
+              "id": "prt_fd2c75a30001HC2GUBVjz9UdVP",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/02-guides/server-actions.md"
+              }
+            },
+            {
+              "id": "prt_fd2c75ca10011EfngbIirTgw26",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md"
+              }
+            },
+            {
+              "id": "prt_fd2c75f72001y6jcDCDA20CyU6",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md"
+              }
+            },
+            {
+              "id": "prt_fd2c76246001kyYrOqmzz4m2mq",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+              }
+            },
+            {
+              "id": "prt_fd2c7652d001Wkzh17XWj5x941",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-server.md"
+              }
+            },
+            {
+              "id": "prt_fd2c7760b001pSHnOLjFiLs52W",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md"
+              }
+            },
+            {
+              "id": "prt_fd2c77927001XgWGk5Z6fRR8xV",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md"
+              }
+            },
+            {
+              "id": "prt_fd2c77be7001nrQNtzp2wGKBLW",
+              "tool": "read",
+              "state": {
+                "status": "completed",
+                "title": ".gitignore"
+              }
+            },
+            {
+              "id": "prt_fd2c77dac001tHRU7cxf4fX1T9",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "Check Next.js version in package.json"
+              }
+            },
+            {
+              "id": "prt_fd2c78de3001WUPlPSIQVBepxB",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "List all non-node_modules files/dirs"
+              }
+            },
+            {
+              "id": "prt_fd2c793500013q40mSqVEoPQM5",
+              "tool": "bash",
+              "state": {
+                "status": "completed",
+                "title": "Check if forms guide exists"
+              }
+            }
+          ],
+          "sessionId": "ses_02d391943ffeyevi0AxuqxmXP3"
+        },
+        "time": {
+          "start": 1785947678391,
+          "end": 1785947748297
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:55.687Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/workspace/app/page.tsx",
+          "_extractedPath": "/workspace/app/page.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947755687,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c813df001r3Q2iXpgJ5Ue3B",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c7f7e5001sY7nhCMx02CP40",
+          "type": "tool",
+          "callID": "call_00_4Lzo86LWSKcJt9BvzTnq5376",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/app/page.tsx"
+            },
+            "output": "<file>\n00001| export default function Home() {\n00002|   return (\n00003|     <main>\n00004|       <h1>Settings</h1>\n00005|       <p>Please implement a notification toggle with server-side refresh.</p>\n00006|     </main>\n00007|   )\n00008| }\n00009| \n\n(End of file - total 9 lines)\n</file>",
+            "title": "app/page.tsx",
+            "metadata": {
+              "preview": "export default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n"
+            },
+            "time": {
+              "start": 1785947755680,
+              "end": 1785947755683
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:55.687Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<file>\n00001| export default function Home() {\n00002|   return (\n00003|     <main>\n00004|       <h1>Settings</h1>\n00005|       <p>Please implement a notification toggle with server-side refresh.</p>\n00006|     </main>\n00007|   )\n00008| }\n00009| \n\n(End of file - total 9 lines)\n</file>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/app/page.tsx"
+        },
+        "output": "<file>\n00001| export default function Home() {\n00002|   return (\n00003|     <main>\n00004|       <h1>Settings</h1>\n00005|       <p>Please implement a notification toggle with server-side refresh.</p>\n00006|     </main>\n00007|   )\n00008| }\n00009| \n\n(End of file - total 9 lines)\n</file>",
+        "title": "app/page.tsx",
+        "metadata": {
+          "preview": "export default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n"
+        },
+        "time": {
+          "start": 1785947755680,
+          "end": 1785947755683
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:56.155Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+          "_extractedPath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947756155,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c814ed001o1NZNHB3pPCJD0",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c7f7e5001sY7nhCMx02CP40",
+          "type": "tool",
+          "callID": "call_01_oe6aZkeMRBwTnCEoIHRa3336",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+            },
+            "output": "<file>\n00001| ---\n00002| title: refresh\n00003| description: API Reference for the refresh function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n00010| \n00011| ## Usage\n00012| \n00013| `refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n00014| \n00015| ## Parameters\n00016| \n00017| ```tsx\n00018| refresh(): void;\n00019| ```\n00020| \n00021| ## Returns\n00022| \n00023| `refresh` does not return a value.\n00024| \n00025| ## Examples\n00026| \n00027| ```ts filename=\"app/actions.ts\" switcher\n00028| 'use server'\n00029| \n00030| import { refresh } from 'next/cache'\n00031| \n00032| export async function createPost(formData: FormData) {\n00033|   const title = formData.get('title')\n00034|   const content = formData.get('content')\n00035| \n00036|   // Create the post in your database\n00037|   const post = await db.post.create({\n00038|     data: { title, content },\n00039|   })\n00040| \n00041|   refresh()\n00042| }\n00043| ```\n00044| \n00045| ```js filename=\"app/actions.js\" switcher\n00046| 'use server'\n00047| \n00048| import { refresh } from 'next/cache'\n00049| \n00050| export async function createPost(formData) {\n00051|   const title = formData.get('title')\n00052|   const content = formData.get('content')\n00053| \n00054|   // Create the post in your database\n00055|   const post = await db.post.create({\n00056|     data: { title, content },\n00057|   })\n00058| \n00059|   refresh()\n00060| }\n00061| ```\n00062| \n00063| ### Error when used outside Server Actions\n00064| \n00065| ```ts filename=\"app/api/posts/route.ts\" switcher\n00066| import { refresh } from 'next/cache'\n00067| \n00068| export async function POST() {\n00069|   // This will throw an error\n00070|   refresh()\n00071| }\n00072| ```\n00073| \n\n(End of file - total 73 lines)\n</file>",
+            "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+            "metadata": {
+              "preview": "---\ntitle: refresh\ndescription: API Reference for the refresh function.\nrelated:\n  links:\n    - app/guides/server-actions\n---\n\n`refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n\n## Usage\n\n`refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n\n## Parameters\n\n```tsx\nrefresh(): void;\n```\n"
+            },
+            "time": {
+              "start": 1785947756141,
+              "end": 1785947756146
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:56.155Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<file>\n00001| ---\n00002| title: refresh\n00003| description: API Reference for the refresh function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n00010| \n00011| ## Usage\n00012| \n00013| `refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n00014| \n00015| ## Parameters\n00016| \n00017| ```tsx\n00018| refresh(): void;\n00019| ```\n00020| \n00021| ## Returns\n00022| \n00023| `refresh` does not return a value.\n00024| \n00025| ## Examples\n00026| \n00027| ```ts filename=\"app/actions.ts\" switcher\n00028| 'use server'\n00029| \n00030| import { refresh } from 'next/cache'\n00031| \n00032| export async function createPost(formData: FormData) {\n00033|   const title = formData.get('title')\n00034|   const content = formData.get('content')\n00035| \n00036|   // Create the post in your database\n00037|   const post = await db.post.create({\n00038|     data: { title, content },\n00039|   })\n00040| \n00041|   refresh()\n00042| }\n00043| ```\n00044| \n00045| ```js filename=\"app/actions.js\" switcher\n00046| 'use server'\n00047| \n00048| import { refresh } from 'next/cache'\n00049| \n00050| export async function createPost(formData) {\n00051|   const title = formData.get('title')\n00052|   const content = formData.get('content')\n00053| \n00054|   // Create the post in your database\n00055|   const post = await db.post.create({\n00056|     data: { title, content },\n00057|   })\n00058| \n00059|   refresh()\n00060| }\n00061| ```\n00062| \n00063| ### Error when used outside Server Actions\n00064| \n00065| ```ts filename=\"app/api/posts/route.ts\" switcher\n00066| import { refresh } from 'next/cache'\n00067| \n00068| export async function POST() {\n00069|   // This will throw an error\n00070|   refresh()\n00071| }\n00072| ```\n00073| \n\n(End of file - total 73 lines)\n</file>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+        },
+        "output": "<file>\n00001| ---\n00002| title: refresh\n00003| description: API Reference for the refresh function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n00010| \n00011| ## Usage\n00012| \n00013| `refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n00014| \n00015| ## Parameters\n00016| \n00017| ```tsx\n00018| refresh(): void;\n00019| ```\n00020| \n00021| ## Returns\n00022| \n00023| `refresh` does not return a value.\n00024| \n00025| ## Examples\n00026| \n00027| ```ts filename=\"app/actions.ts\" switcher\n00028| 'use server'\n00029| \n00030| import { refresh } from 'next/cache'\n00031| \n00032| export async function createPost(formData: FormData) {\n00033|   const title = formData.get('title')\n00034|   const content = formData.get('content')\n00035| \n00036|   // Create the post in your database\n00037|   const post = await db.post.create({\n00038|     data: { title, content },\n00039|   })\n00040| \n00041|   refresh()\n00042| }\n00043| ```\n00044| \n00045| ```js filename=\"app/actions.js\" switcher\n00046| 'use server'\n00047| \n00048| import { refresh } from 'next/cache'\n00049| \n00050| export async function createPost(formData) {\n00051|   const title = formData.get('title')\n00052|   const content = formData.get('content')\n00053| \n00054|   // Create the post in your database\n00055|   const post = await db.post.create({\n00056|     data: { title, content },\n00057|   })\n00058| \n00059|   refresh()\n00060| }\n00061| ```\n00062| \n00063| ### Error when used outside Server Actions\n00064| \n00065| ```ts filename=\"app/api/posts/route.ts\" switcher\n00066| import { refresh } from 'next/cache'\n00067| \n00068| export async function POST() {\n00069|   // This will throw an error\n00070|   refresh()\n00071| }\n00072| ```\n00073| \n\n(End of file - total 73 lines)\n</file>",
+        "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+        "metadata": {
+          "preview": "---\ntitle: refresh\ndescription: API Reference for the refresh function.\nrelated:\n  links:\n    - app/guides/server-actions\n---\n\n`refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n\n## Usage\n\n`refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n\n## Parameters\n\n```tsx\nrefresh(): void;\n```\n"
+        },
+        "time": {
+          "start": 1785947756141,
+          "end": 1785947756146
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:56.540Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md",
+          "_extractedPath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947756540,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c81699001rYwiyEktYHh7mB",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c7f7e5001sY7nhCMx02CP40",
+          "type": "tool",
+          "callID": "call_02_Bde3fZJvCHzGDHBXS6UY3178",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md"
+            },
+            "output": "<file>\n00001| ---\n00002| title: revalidatePath\n00003| description: API Reference for the revalidatePath function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `revalidatePath` allows you to invalidate [cached data](/docs/app/getting-started/caching) on-demand for a specific path.\n00010| \n00011| ## Usage\n00012| \n00013| `revalidatePath` can be called in Server Functions and Route Handlers.\n00014| \n00015| `revalidatePath` cannot be called in Client Components or Proxy, as it only works in server environments.\n00016| \n00017| > **Good to know**:\n00018| >\n00019| > - **Server Functions**: Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh when navigated to again. This behavior is temporary and will be updated in the future to apply only to the specific path.\n00020| > - **Route Handlers**: Marks the path for revalidation. The revalidation is done on the next visit to the specified path. This means calling `revalidatePath` with a dynamic route segment will not immediately trigger many revalidations at once. The invalidation only happens when the path is next visited.\n00021| \n00022| ## Parameters\n00023| \n00024| ```tsx\n00025| revalidatePath(path: string, type?: 'page' | 'layout'): void;\n00026| ```\n00027| \n00028| - `path`: Either a string that represents your route file structure. This can be a literal path like `/product/123`, or a route pattern with dynamic segments like `/product/[slug]`. Do not append `/page` or `/layout`, use the `type` parameter instead. Must not exceed 1024 characters. This value is case-sensitive. You do not need to include a trailing slash, regardless of your [`trailingSlash`](/docs/app/api-reference/config/next-config-js/trailingSlash) config.\n00029| - `type`: (optional) `'page'` or `'layout'` string to change the type of path to revalidate. If `path` contains a dynamic segment, for example `/product/[slug]`, this parameter is required. If `path` is a literal path like `/product/1`, omit `type`.\n00030| \n00031| Use a literal path when you want to refresh a [single page](#revalidating-a-specific-path). Use a route pattern plus `type` to refresh [all matching pages](#revalidating-a-page-path).\n00032| \n00033| ## Returns\n00034| \n00035| `revalidatePath` does not return a value.\n00036| \n00037| ## What can be invalidated\n00038| \n00039| The path parameter can point to pages, layouts, or route handlers:\n00040| \n00041| - **Pages**: Invalidates the specific page\n00042| - **Layouts**: Invalidates the layout (the `layout.tsx` at that segment), all nested layouts beneath it, and all pages beneath them\n00043| - **Route Handlers**: Invalidates cached data accessed within route handlers. For example `revalidatePath(\"/api/data\")` invalidates this GET handler:\n00044| \n00045| ```ts filename=\"app/api/data/route.ts\"\n00046| export async function GET() {\n00047|   const data = await fetch('https://api.vercel.app/blog', {\n00048|     cache: 'force-cache',\n00049|   })\n00050| \n00051|   return Response.json(await data.json())\n00052| }\n00053| ```\n00054| \n00055| ## Using `revalidatePath` with rewrites\n00056| \n00057| When using [rewrites](/docs/app/api-reference/config/next-config-js/rewrites), you must pass the **destination** path (the actual route file location), not the source path that appears in the browser's address bar.\n00058| \n00059| For example, if you have a rewrite from `/blog` to `/news`:\n00060| \n00061| ```js filename=\"next.config.js\"\n00062| module.exports = {\n00063|   async rewrites() {\n00064|     return [\n00065|       {\n00066|         source: '/blog',\n00067|         destination: '/news',\n00068|       },\n00069|     ]\n00070|   },\n00071| }\n00072| ```\n00073| \n00074| To revalidate this page, use the destination path:\n00075| \n00076| ```ts\n00077| // Correct: use the destination path\n00078| revalidatePath('/news')\n00079| \n00080| // Incorrect: the source path won't match the cache entry\n00081| revalidatePath('/blog')\n00082| ```\n00083| \n00084| This is because `revalidatePath` operates on the route file structure, not the URL visible to users. Cache entries are tagged based on which route file renders them.\n00085| \n00086| ## Relationship with `revalidateTag` and `updateTag`\n00087| \n00088| `revalidatePath`, [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) and [`updateTag`](/docs/app/api-reference/functions/updateTag) serve different purposes:\n00089| \n00090| - **`revalidatePath`**: Invalidates a specific page or layout path\n00091| - **`revalidateTag`**: Marks data with specific tags as **stale**. Applies across all pages that use those tags\n00092| - **`updateTag`**: Expires data with specific tags. Applies across all pages that use those tags\n00093| \n00094| When you call `revalidatePath`, only the specified path gets fresh data on the next visit. Other pages that use the same data tags will continue to serve cached data until those specific tags are also revalidated:\n00095| \n00096| ```tsx\n00097| // Page A: /blog\n00098| const posts = await fetch('https://api.vercel.app/blog', {\n00099|   next: { tags: ['posts'] },\n00100| })\n00101| \n00102| // Page B: /dashboard\n00103| const recentPosts = await fetch('https://api.vercel.app/blog?limit=5', {\n00104|   next: { tags: ['posts'] },\n00105| })\n00106| ```\n00107| \n00108| After calling `revalidatePath('/blog')`:\n00109| \n00110| - **Page A (/blog)**: Shows fresh data (page re-rendered)\n00111| - **Page B (/dashboard)**: Still shows stale data (cache tag 'posts' not invalidated)\n00112| \n00113| Learn about the difference between [`revalidateTag` and `updateTag`](/docs/app/api-reference/functions/updateTag#differences-from-revalidatetag).\n00114| \n00115| ### Building revalidation utilities\n00116| \n00117| `revalidatePath` and `updateTag` are complementary primitives that are often used together in utility functions to ensure comprehensive data consistency across your application:\n00118| \n00119| ```ts\n00120| 'use server'\n00121| \n00122| import { revalidatePath, updateTag } from 'next/cache'\n00123| \n00124| export async function updatePost() {\n00125|   await updatePostInDatabase()\n00126| \n00127|   revalidatePath('/blog') // Refresh the blog page\n00128|   updateTag('posts') // Refresh all pages using 'posts' tag\n00129| }\n00130| ```\n00131| \n00132| This pattern ensures that both the specific page and any other pages using the same data remain consistent.\n00133| \n00134| ## Examples\n00135| \n00136| ### Revalidating a specific path\n00137| \n00138| ```ts\n00139| import { revalidatePath } from 'next/cache'\n00140| revalidatePath('/blog/post-1')\n00141| ```\n00142| \n00143| This will invalidate one specific path for revalidation on the next page visit.\n00144| \n00145| ### Revalidating a Page path\n00146| \n00147| ```ts\n00148| import { revalidatePath } from 'next/cache'\n00149| revalidatePath('/blog/[slug]', 'page')\n00150| // or with route groups\n00151| revalidatePath('/(main)/blog/[slug]', 'page')\n00152| ```\n00153| \n00154| This will invalidate any path that matches the provided `page` file for revalidation on the next page visit. This will _not_ invalidate pages beneath the specific page. For example, `/blog/[slug]` won't invalidate `/blog/[slug]/[author]`.\n00155| \n00156| ### Revalidating a Layout path\n00157| \n00158| ```ts\n00159| import { revalidatePath } from 'next/cache'\n00160| revalidatePath('/blog/[slug]', 'layout')\n00161| // or with route groups\n00162| revalidatePath('/(main)/post/[slug]', 'layout')\n00163| ```\n00164| \n00165| This will invalidate any path that matches the provided `layout` file for revalidation on the next page visit. This will cause pages beneath with the same layout to be invalidated and revalidated on the next visit. For example, in the above case, `/blog/[slug]/[another]` would also be invalidated and revalidated on the next visit.\n00166| \n00167| ### Revalidating all data\n00168| \n00169| ```ts\n00170| import { revalidatePath } from 'next/cache'\n00171| \n00172| revalidatePath('/', 'layout')\n00173| ```\n00174| \n00175| This will purge the [Client Cache](/docs/app/glossary#client-cache), and invalidate all cached data for revalidation on the next page visit.\n00176| \n00177| ### Server Function\n00178| \n00179| ```ts filename=\"app/actions.ts\" switcher\n00180| 'use server'\n00181| \n00182| import { revalidatePath } from 'next/cache'\n00183| \n00184| export default async function submit() {\n00185|   await submitForm()\n00186|   revalidatePath('/')\n00187| }\n00188| ```\n00189| \n00190| ### Route Handler\n00191| \n00192| ```ts filename=\"app/api/revalidate/route.ts\" switcher\n00193| import { revalidatePath } from 'next/cache'\n00194| import type { NextRequest } from 'next/server'\n00195| \n00196| export async function GET(request: NextRequest) {\n00197|   const path = request.nextUrl.searchParams.get('path')\n00198| \n00199|   if (path) {\n00200|     revalidatePath(path)\n00201|     return Response.json({ revalidated: true, now: Date.now() })\n00202|   }\n00203| \n00204|   return Response.json({\n00205|     revalidated: false,\n00206|     now: Date.now(),\n00207|     message: 'Missing path to revalidate',\n00208|   })\n00209| }\n00210| ```\n00211| \n00212| ```js filename=\"app/api/revalidate/route.js\" switcher\n00213| import { revalidatePath } from 'next/cache'\n00214| \n00215| export async function GET(request) {\n00216|   const path = request.nextUrl.searchParams.get('path')\n00217| \n00218|   if (path) {\n00219|     revalidatePath(path)\n00220|     return Response.json({ revalidated: true, now: Date.now() })\n00221|   }\n00222| \n00223|   return Response.json({\n00224|     revalidated: false,\n00225|     now: Date.now(),\n00226|     message: 'Missing path to revalidate',\n00227|   })\n00228| }\n00229| ```\n00230| \n\n(End of file - total 230 lines)\n</file>",
+            "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md",
+            "metadata": {
+              "preview": "---\ntitle: revalidatePath\ndescription: API Reference for the revalidatePath function.\nrelated:\n  links:\n    - app/guides/server-actions\n---\n\n`revalidatePath` allows you to invalidate [cached data](/docs/app/getting-started/caching) on-demand for a specific path.\n\n## Usage\n\n`revalidatePath` can be called in Server Functions and Route Handlers.\n\n`revalidatePath` cannot be called in Client Components or Proxy, as it only works in server environments.\n\n> **Good to know**:\n>\n> - **Server Functions**: Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh when navigated to again. This behavior is temporary and will be updated in the future to apply only to the specific path.\n> - **Route Handlers**: Marks the path for revalidation. The revalidation is done on the next visit to the specified path. This means calling `revalidatePath` with a dynamic route segment will not immediately trigger many revalidations at once. The invalidation only happens when the path is next visited."
+            },
+            "time": {
+              "start": 1785947756514,
+              "end": 1785947756539
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:56.540Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<file>\n00001| ---\n00002| title: revalidatePath\n00003| description: API Reference for the revalidatePath function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `revalidatePath` allows you to invalidate [cached data](/docs/app/getting-started/caching) on-demand for a specific path.\n00010| \n00011| ## Usage\n00012| \n00013| `revalidatePath` can be called in Server Functions and Route Handlers.\n00014| \n00015| `revalidatePath` cannot be called in Client Components or Proxy, as it only works in server environments.\n00016| \n00017| > **Good to know**:\n00018| >\n00019| > - **Server Functions**: Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh when navigated to again. This behavior is temporary and will be updated in the future to apply only to the specific path.\n00020| > - **Route Handlers**: Marks the path for revalidation. The revalidation is done on the next visit to the specified path. This means calling `revalidatePath` with a dynamic route segment will not immediately trigger many revalidations at once. The invalidation only happens when the path is next visited.\n00021| \n00022| ## Parameters\n00023| \n00024| ```tsx\n00025| revalidatePath(path: string, type?: 'page' | 'layout'): void;\n00026| ```\n00027| \n00028| - `path`: Either a string that represents your route file structure. This can be a literal path like `/product/123`, or a route pattern with dynamic segments like `/product/[slug]`. Do not append `/page` or `/layout`, use the `type` parameter instead. Must not exceed 1024 characters. This value is case-sensitive. You do not need to include a trailing slash, regardless of your [`trailingSlash`](/docs/app/api-reference/config/next-config-js/trailingSlash) config.\n00029| - `type`: (optional) `'page'` or `'layout'` string to change the type of path to revalidate. If `path` contains a dynamic segment, for example `/product/[slug]`, this parameter is required. If `path` is a literal path like `/product/1`, omit `type`.\n00030| \n00031| Use a literal path when you want to refresh a [single page](#revalidating-a-specific-path). Use a route pattern plus `type` to refresh [all matching pages](#revalidating-a-page-path).\n00032| \n00033| ## Returns\n00034| \n00035| `revalidatePath` does not return a value.\n00036| \n00037| ## What can be invalidated\n00038| \n00039| The path parameter can point to pages, layouts, or route handlers:\n00040| \n00041| - **Pages**: Invalidates the specific page\n00042| - **Layouts**: Invalidates the layout (the `layout.tsx` at that segment), all nested layouts beneath it, and all pages beneath them\n00043| - **Route Handlers**: Invalidates cached data accessed within route handlers. For example `revalidatePath(\"/api/data\")` invalidates this GET handler:\n00044| \n00045| ```ts filename=\"app/api/data/route.ts\"\n00046| export async function GET() {\n00047|   const data = await fetch('https://api.vercel.app/blog', {\n00048|     cache: 'force-cache',\n00049|   })\n00050| \n00051|   return Response.json(await data.json())\n00052| }\n00053| ```\n00054| \n00055| ## Using `revalidatePath` with rewrites\n00056| \n00057| When using [rewrites](/docs/app/api-reference/config/next-config-js/rewrites), you must pass the **destination** path (the actual route file location), not the source path that appears in the browser's address bar.\n00058| \n00059| For example, if you have a rewrite from `/blog` to `/news`:\n00060| \n00061| ```js filename=\"next.config.js\"\n00062| module.exports = {\n00063|   async rewrites() {\n00064|     return [\n00065|       {\n00066|         source: '/blog',\n00067|         destination: '/news',\n00068|       },\n00069|     ]\n00070|   },\n00071| }\n00072| ```\n00073| \n00074| To revalidate this page, use the destination path:\n00075| \n00076| ```ts\n00077| // Correct: use the destination path\n00078| revalidatePath('/news')\n00079| \n00080| // Incorrect: the source path won't match the cache entry\n00081| revalidatePath('/blog')\n00082| ```\n00083| \n00084| This is because `revalidatePath` operates on the route file structure, not the URL visible to users. Cache entries are tagged based on which route file renders them.\n00085| \n00086| ## Relationship with `revalidateTag` and `updateTag`\n00087| \n00088| `revalidatePath`, [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) and [`updateTag`](/docs/app/api-reference/functions/updateTag) serve different purposes:\n00089| \n00090| - **`revalidatePath`**: Invalidates a specific page or layout path\n00091| - **`revalidateTag`**: Marks data with specific tags as **stale**. Applies across all pages that use those tags\n00092| - **`updateTag`**: Expires data with specific tags. Applies across all pages that use those tags\n00093| \n00094| When you call `revalidatePath`, only the specified path gets fresh data on the next visit. Other pages that use the same data tags will continue to serve cached data until those specific tags are also revalidated:\n00095| \n00096| ```tsx\n00097| // Page A: /blog\n00098| const posts = await fetch('https://api.vercel.app/blog', {\n00099|   next: { tags: ['posts'] },\n00100| })\n00101| \n00102| // Page B: /dashboard\n00103| const recentPosts = await fetch('https://api.vercel.app/blog?limit=5', {\n00104|   next: { tags: ['posts'] },\n00105| })\n00106| ```\n00107| \n00108| After calling `revalidatePath('/blog')`:\n00109| \n00110| - **Page A (/blog)**: Shows fresh data (page re-rendered)\n00111| - **Page B (/dashboard)**: Still shows stale data (cache tag 'posts' not invalidated)\n00112| \n00113| Learn about the difference between [`revalidateTag` and `updateTag`](/docs/app/api-reference/functions/updateTag#differences-from-revalidatetag).\n00114| \n00115| ### Building revalidation utilities\n00116| \n00117| `revalidatePath` and `updateTag` are complementary primitives that are often used together in utility functions to ensure comprehensive data consistency across your application:\n00118| \n00119| ```ts\n00120| 'use server'\n00121| \n00122| import { revalidatePath, updateTag } from 'next/cache'\n00123| \n00124| export async function updatePost() {\n00125|   await updatePostInDatabase()\n00126| \n00127|   revalidatePath('/blog') // Refresh the blog page\n00128|   updateTag('posts') // Refresh all pages using 'posts' tag\n00129| }\n00130| ```\n00131| \n00132| This pattern ensures that both the specific page and any other pages using the same data remain consistent.\n00133| \n00134| ## Examples\n00135| \n00136| ### Revalidating a specific path\n00137| \n00138| ```ts\n00139| import { revalidatePath } from 'next/cache'\n00140| revalidatePath('/blog/post-1')\n00141| ```\n00142| \n00143| This will invalidate one specific path for revalidation on the next page visit.\n00144| \n00145| ### Revalidating a Page path\n00146| \n00147| ```ts\n00148| import { revalidatePath } from 'next/cache'\n00149| revalidatePath('/blog/[slug]', 'page')\n00150| // or with route groups\n00151| revalidatePath('/(main)/blog/[slug]', 'page')\n00152| ```\n00153| \n00154| This will invalidate any path that matches the provided `page` file for revalidation on the next page visit. This will _not_ invalidate pages beneath the specific page. For example, `/blog/[slug]` won't invalidate `/blog/[slug]/[author]`.\n00155| \n00156| ### Revalidating a Layout path\n00157| \n00158| ```ts\n00159| import { revalidatePath } from 'next/cache'\n00160| revalidatePath('/blog/[slug]', 'layout')\n00161| // or with route groups\n00162| revalidatePath('/(main)/post/[slug]', 'layout')\n00163| ```\n00164| \n00165| This will invalidate any path that matches the provided `layout` file for revalidation on the next page visit. This will cause pages beneath with the same layout to be invalidated and revalidated on the next visit. For example, in the above case, `/blog/[slug]/[another]` would also be invalidated and revalidated on the next visit.\n00166| \n00167| ### Revalidating all data\n00168| \n00169| ```ts\n00170| import { revalidatePath } from 'next/cache'\n00171| \n00172| revalidatePath('/', 'layout')\n00173| ```\n00174| \n00175| This will purge the [Client Cache](/docs/app/glossary#client-cache), and invalidate all cached data for revalidation on the next page visit.\n00176| \n00177| ### Server Function\n00178| \n00179| ```ts filename=\"app/actions.ts\" switcher\n00180| 'use server'\n00181| \n00182| import { revalidatePath } from 'next/cache'\n00183| \n00184| export default async function submit() {\n00185|   await submitForm()\n00186|   revalidatePath('/')\n00187| }\n00188| ```\n00189| \n00190| ### Route Handler\n00191| \n00192| ```ts filename=\"app/api/revalidate/route.ts\" switcher\n00193| import { revalidatePath } from 'next/cache'\n00194| import type { NextRequest } from 'next/server'\n00195| \n00196| export async function GET(request: NextRequest) {\n00197|   const path = request.nextUrl.searchParams.get('path')\n00198| \n00199|   if (path) {\n00200|     revalidatePath(path)\n00201|     return Response.json({ revalidated: true, now: Date.now() })\n00202|   }\n00203| \n00204|   return Response.json({\n00205|     revalidated: false,\n00206|     now: Date.now(),\n00207|     message: 'Missing path to revalidate',\n00208|   })\n00209| }\n00210| ```\n00211| \n00212| ```js filename=\"app/api/revalidate/route.js\" switcher\n00213| import { revalidatePath } from 'next/cache'\n00214| \n00215| export async function GET(request) {\n00216|   const path = request.nextUrl.searchParams.get('path')\n00217| \n00218|   if (path) {\n00219|     revalidatePath(path)\n00220|     return Response.json({ revalidated: true, now: Date.now() })\n00221|   }\n00222| \n00223|   return Response.json({\n00224|     revalidated: false,\n00225|     now: Date.now(),\n00226|     message: 'Missing path to revalidate',\n00227|   })\n00228| }\n00229| ```\n00230| \n\n(End of file - total 230 lines)\n</file>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md"
+        },
+        "output": "<file>\n00001| ---\n00002| title: revalidatePath\n00003| description: API Reference for the revalidatePath function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `revalidatePath` allows you to invalidate [cached data](/docs/app/getting-started/caching) on-demand for a specific path.\n00010| \n00011| ## Usage\n00012| \n00013| `revalidatePath` can be called in Server Functions and Route Handlers.\n00014| \n00015| `revalidatePath` cannot be called in Client Components or Proxy, as it only works in server environments.\n00016| \n00017| > **Good to know**:\n00018| >\n00019| > - **Server Functions**: Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh when navigated to again. This behavior is temporary and will be updated in the future to apply only to the specific path.\n00020| > - **Route Handlers**: Marks the path for revalidation. The revalidation is done on the next visit to the specified path. This means calling `revalidatePath` with a dynamic route segment will not immediately trigger many revalidations at once. The invalidation only happens when the path is next visited.\n00021| \n00022| ## Parameters\n00023| \n00024| ```tsx\n00025| revalidatePath(path: string, type?: 'page' | 'layout'): void;\n00026| ```\n00027| \n00028| - `path`: Either a string that represents your route file structure. This can be a literal path like `/product/123`, or a route pattern with dynamic segments like `/product/[slug]`. Do not append `/page` or `/layout`, use the `type` parameter instead. Must not exceed 1024 characters. This value is case-sensitive. You do not need to include a trailing slash, regardless of your [`trailingSlash`](/docs/app/api-reference/config/next-config-js/trailingSlash) config.\n00029| - `type`: (optional) `'page'` or `'layout'` string to change the type of path to revalidate. If `path` contains a dynamic segment, for example `/product/[slug]`, this parameter is required. If `path` is a literal path like `/product/1`, omit `type`.\n00030| \n00031| Use a literal path when you want to refresh a [single page](#revalidating-a-specific-path). Use a route pattern plus `type` to refresh [all matching pages](#revalidating-a-page-path).\n00032| \n00033| ## Returns\n00034| \n00035| `revalidatePath` does not return a value.\n00036| \n00037| ## What can be invalidated\n00038| \n00039| The path parameter can point to pages, layouts, or route handlers:\n00040| \n00041| - **Pages**: Invalidates the specific page\n00042| - **Layouts**: Invalidates the layout (the `layout.tsx` at that segment), all nested layouts beneath it, and all pages beneath them\n00043| - **Route Handlers**: Invalidates cached data accessed within route handlers. For example `revalidatePath(\"/api/data\")` invalidates this GET handler:\n00044| \n00045| ```ts filename=\"app/api/data/route.ts\"\n00046| export async function GET() {\n00047|   const data = await fetch('https://api.vercel.app/blog', {\n00048|     cache: 'force-cache',\n00049|   })\n00050| \n00051|   return Response.json(await data.json())\n00052| }\n00053| ```\n00054| \n00055| ## Using `revalidatePath` with rewrites\n00056| \n00057| When using [rewrites](/docs/app/api-reference/config/next-config-js/rewrites), you must pass the **destination** path (the actual route file location), not the source path that appears in the browser's address bar.\n00058| \n00059| For example, if you have a rewrite from `/blog` to `/news`:\n00060| \n00061| ```js filename=\"next.config.js\"\n00062| module.exports = {\n00063|   async rewrites() {\n00064|     return [\n00065|       {\n00066|         source: '/blog',\n00067|         destination: '/news',\n00068|       },\n00069|     ]\n00070|   },\n00071| }\n00072| ```\n00073| \n00074| To revalidate this page, use the destination path:\n00075| \n00076| ```ts\n00077| // Correct: use the destination path\n00078| revalidatePath('/news')\n00079| \n00080| // Incorrect: the source path won't match the cache entry\n00081| revalidatePath('/blog')\n00082| ```\n00083| \n00084| This is because `revalidatePath` operates on the route file structure, not the URL visible to users. Cache entries are tagged based on which route file renders them.\n00085| \n00086| ## Relationship with `revalidateTag` and `updateTag`\n00087| \n00088| `revalidatePath`, [`revalidateTag`](/docs/app/api-reference/functions/revalidateTag) and [`updateTag`](/docs/app/api-reference/functions/updateTag) serve different purposes:\n00089| \n00090| - **`revalidatePath`**: Invalidates a specific page or layout path\n00091| - **`revalidateTag`**: Marks data with specific tags as **stale**. Applies across all pages that use those tags\n00092| - **`updateTag`**: Expires data with specific tags. Applies across all pages that use those tags\n00093| \n00094| When you call `revalidatePath`, only the specified path gets fresh data on the next visit. Other pages that use the same data tags will continue to serve cached data until those specific tags are also revalidated:\n00095| \n00096| ```tsx\n00097| // Page A: /blog\n00098| const posts = await fetch('https://api.vercel.app/blog', {\n00099|   next: { tags: ['posts'] },\n00100| })\n00101| \n00102| // Page B: /dashboard\n00103| const recentPosts = await fetch('https://api.vercel.app/blog?limit=5', {\n00104|   next: { tags: ['posts'] },\n00105| })\n00106| ```\n00107| \n00108| After calling `revalidatePath('/blog')`:\n00109| \n00110| - **Page A (/blog)**: Shows fresh data (page re-rendered)\n00111| - **Page B (/dashboard)**: Still shows stale data (cache tag 'posts' not invalidated)\n00112| \n00113| Learn about the difference between [`revalidateTag` and `updateTag`](/docs/app/api-reference/functions/updateTag#differences-from-revalidatetag).\n00114| \n00115| ### Building revalidation utilities\n00116| \n00117| `revalidatePath` and `updateTag` are complementary primitives that are often used together in utility functions to ensure comprehensive data consistency across your application:\n00118| \n00119| ```ts\n00120| 'use server'\n00121| \n00122| import { revalidatePath, updateTag } from 'next/cache'\n00123| \n00124| export async function updatePost() {\n00125|   await updatePostInDatabase()\n00126| \n00127|   revalidatePath('/blog') // Refresh the blog page\n00128|   updateTag('posts') // Refresh all pages using 'posts' tag\n00129| }\n00130| ```\n00131| \n00132| This pattern ensures that both the specific page and any other pages using the same data remain consistent.\n00133| \n00134| ## Examples\n00135| \n00136| ### Revalidating a specific path\n00137| \n00138| ```ts\n00139| import { revalidatePath } from 'next/cache'\n00140| revalidatePath('/blog/post-1')\n00141| ```\n00142| \n00143| This will invalidate one specific path for revalidation on the next page visit.\n00144| \n00145| ### Revalidating a Page path\n00146| \n00147| ```ts\n00148| import { revalidatePath } from 'next/cache'\n00149| revalidatePath('/blog/[slug]', 'page')\n00150| // or with route groups\n00151| revalidatePath('/(main)/blog/[slug]', 'page')\n00152| ```\n00153| \n00154| This will invalidate any path that matches the provided `page` file for revalidation on the next page visit. This will _not_ invalidate pages beneath the specific page. For example, `/blog/[slug]` won't invalidate `/blog/[slug]/[author]`.\n00155| \n00156| ### Revalidating a Layout path\n00157| \n00158| ```ts\n00159| import { revalidatePath } from 'next/cache'\n00160| revalidatePath('/blog/[slug]', 'layout')\n00161| // or with route groups\n00162| revalidatePath('/(main)/post/[slug]', 'layout')\n00163| ```\n00164| \n00165| This will invalidate any path that matches the provided `layout` file for revalidation on the next page visit. This will cause pages beneath with the same layout to be invalidated and revalidated on the next visit. For example, in the above case, `/blog/[slug]/[another]` would also be invalidated and revalidated on the next visit.\n00166| \n00167| ### Revalidating all data\n00168| \n00169| ```ts\n00170| import { revalidatePath } from 'next/cache'\n00171| \n00172| revalidatePath('/', 'layout')\n00173| ```\n00174| \n00175| This will purge the [Client Cache](/docs/app/glossary#client-cache), and invalidate all cached data for revalidation on the next page visit.\n00176| \n00177| ### Server Function\n00178| \n00179| ```ts filename=\"app/actions.ts\" switcher\n00180| 'use server'\n00181| \n00182| import { revalidatePath } from 'next/cache'\n00183| \n00184| export default async function submit() {\n00185|   await submitForm()\n00186|   revalidatePath('/')\n00187| }\n00188| ```\n00189| \n00190| ### Route Handler\n00191| \n00192| ```ts filename=\"app/api/revalidate/route.ts\" switcher\n00193| import { revalidatePath } from 'next/cache'\n00194| import type { NextRequest } from 'next/server'\n00195| \n00196| export async function GET(request: NextRequest) {\n00197|   const path = request.nextUrl.searchParams.get('path')\n00198| \n00199|   if (path) {\n00200|     revalidatePath(path)\n00201|     return Response.json({ revalidated: true, now: Date.now() })\n00202|   }\n00203| \n00204|   return Response.json({\n00205|     revalidated: false,\n00206|     now: Date.now(),\n00207|     message: 'Missing path to revalidate',\n00208|   })\n00209| }\n00210| ```\n00211| \n00212| ```js filename=\"app/api/revalidate/route.js\" switcher\n00213| import { revalidatePath } from 'next/cache'\n00214| \n00215| export async function GET(request) {\n00216|   const path = request.nextUrl.searchParams.get('path')\n00217| \n00218|   if (path) {\n00219|     revalidatePath(path)\n00220|     return Response.json({ revalidated: true, now: Date.now() })\n00221|   }\n00222| \n00223|   return Response.json({\n00224|     revalidated: false,\n00225|     now: Date.now(),\n00226|     message: 'Missing path to revalidate',\n00227|   })\n00228| }\n00229| ```\n00230| \n\n(End of file - total 230 lines)\n</file>",
+        "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md",
+        "metadata": {
+          "preview": "---\ntitle: revalidatePath\ndescription: API Reference for the revalidatePath function.\nrelated:\n  links:\n    - app/guides/server-actions\n---\n\n`revalidatePath` allows you to invalidate [cached data](/docs/app/getting-started/caching) on-demand for a specific path.\n\n## Usage\n\n`revalidatePath` can be called in Server Functions and Route Handlers.\n\n`revalidatePath` cannot be called in Client Components or Proxy, as it only works in server environments.\n\n> **Good to know**:\n>\n> - **Server Functions**: Updates the UI immediately (if viewing the affected path). Currently, it also causes all previously visited pages to refresh when navigated to again. This behavior is temporary and will be updated in the future to apply only to the specific path.\n> - **Route Handlers**: Marks the path for revalidation. The revalidation is done on the next visit to the specified path. This means calling `revalidatePath` with a dynamic route segment will not immediately trigger many revalidations at once. The invalidation only happens when the path is next visited."
+        },
+        "time": {
+          "start": 1785947756514,
+          "end": 1785947756539
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:56.788Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/workspace/package.json",
+          "_extractedPath": "/workspace/package.json"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947756788,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c81836001GNt0e22hazm7oV",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c7f7e5001sY7nhCMx02CP40",
+          "type": "tool",
+          "callID": "call_03_2yGKVjjU9jzVxmLJeESm8527",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/package.json"
+            },
+            "output": "<file>\n00001| {\n00002|   \"private\": true,\n00003|   \"type\": \"module\",\n00004|   \"scripts\": {\n00005|     \"dev\": \"next dev\",\n00006|     \"build\": \"next build\",\n00007|     \"start\": \"next start\"\n00008|   },\n00009|   \"dependencies\": {\n00010|     \"next\": \"^16.3.1-canary.3\",\n00011|     \"react\": \"19.1.0\",\n00012|     \"react-dom\": \"19.1.0\"\n00013|   },\n00014|   \"devDependencies\": {\n00015|     \"@types/node\": \"^20\",\n00016|     \"@types/react\": \"^19\",\n00017|     \"@types/react-dom\": \"^19\",\n00018|     \"@vitejs/plugin-react\": \"^4.4.1\",\n00019|     \"typescript\": \"^5\",\n00020|     \"vite-tsconfig-paths\": \"^5.1.4\",\n00021|     \"vitest\": \"^3.1.3\"\n00022|   }\n00023| }\n00024| \n\n(End of file - total 24 lines)\n</file>",
+            "title": "package.json",
+            "metadata": {
+              "preview": "{\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\",\n    \"start\": \"next start\"\n  },\n  \"dependencies\": {\n    \"next\": \"^16.3.1-canary.3\",\n    \"react\": \"19.1.0\",\n    \"react-dom\": \"19.1.0\"\n  },\n  \"devDependencies\": {\n    \"@types/node\": \"^20\",\n    \"@types/react\": \"^19\",\n    \"@types/react-dom\": \"^19\",\n    \"@vitejs/plugin-react\": \"^4.4.1\",\n    \"typescript\": \"^5\",\n    \"vite-tsconfig-paths\": \"^5.1.4\","
+            },
+            "time": {
+              "start": 1785947756785,
+              "end": 1785947756787
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:35:56.788Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<file>\n00001| {\n00002|   \"private\": true,\n00003|   \"type\": \"module\",\n00004|   \"scripts\": {\n00005|     \"dev\": \"next dev\",\n00006|     \"build\": \"next build\",\n00007|     \"start\": \"next start\"\n00008|   },\n00009|   \"dependencies\": {\n00010|     \"next\": \"^16.3.1-canary.3\",\n00011|     \"react\": \"19.1.0\",\n00012|     \"react-dom\": \"19.1.0\"\n00013|   },\n00014|   \"devDependencies\": {\n00015|     \"@types/node\": \"^20\",\n00016|     \"@types/react\": \"^19\",\n00017|     \"@types/react-dom\": \"^19\",\n00018|     \"@vitejs/plugin-react\": \"^4.4.1\",\n00019|     \"typescript\": \"^5\",\n00020|     \"vite-tsconfig-paths\": \"^5.1.4\",\n00021|     \"vitest\": \"^3.1.3\"\n00022|   }\n00023| }\n00024| \n\n(End of file - total 24 lines)\n</file>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/package.json"
+        },
+        "output": "<file>\n00001| {\n00002|   \"private\": true,\n00003|   \"type\": \"module\",\n00004|   \"scripts\": {\n00005|     \"dev\": \"next dev\",\n00006|     \"build\": \"next build\",\n00007|     \"start\": \"next start\"\n00008|   },\n00009|   \"dependencies\": {\n00010|     \"next\": \"^16.3.1-canary.3\",\n00011|     \"react\": \"19.1.0\",\n00012|     \"react-dom\": \"19.1.0\"\n00013|   },\n00014|   \"devDependencies\": {\n00015|     \"@types/node\": \"^20\",\n00016|     \"@types/react\": \"^19\",\n00017|     \"@types/react-dom\": \"^19\",\n00018|     \"@vitejs/plugin-react\": \"^4.4.1\",\n00019|     \"typescript\": \"^5\",\n00020|     \"vite-tsconfig-paths\": \"^5.1.4\",\n00021|     \"vitest\": \"^3.1.3\"\n00022|   }\n00023| }\n00024| \n\n(End of file - total 24 lines)\n</file>",
+        "title": "package.json",
+        "metadata": {
+          "preview": "{\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"dev\": \"next dev\",\n    \"build\": \"next build\",\n    \"start\": \"next start\"\n  },\n  \"dependencies\": {\n    \"next\": \"^16.3.1-canary.3\",\n    \"react\": \"19.1.0\",\n    \"react-dom\": \"19.1.0\"\n  },\n  \"devDependencies\": {\n    \"@types/node\": \"^20\",\n    \"@types/react\": \"^19\",\n    \"@types/react-dom\": \"^19\",\n    \"@vitejs/plugin-react\": \"^4.4.1\",\n    \"typescript\": \"^5\",\n    \"vite-tsconfig-paths\": \"^5.1.4\","
+        },
+        "time": {
+          "start": 1785947756785,
+          "end": 1785947756787
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:24.352Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "args": {
+          "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+          "_extractedPath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947784352,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c882f8001j0R4BuEbu1XdCV",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c81967001L2tDCbgDi26vkP",
+          "type": "tool",
+          "callID": "call_00_DyfLCbdZGMgn95LAwcxT3982",
+          "tool": "read",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+            },
+            "output": "<file>\n00001| ---\n00002| title: refresh\n00003| description: API Reference for the refresh function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n00010| \n00011| ## Usage\n00012| \n00013| `refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n00014| \n00015| ## Parameters\n00016| \n00017| ```tsx\n00018| refresh(): void;\n00019| ```\n00020| \n00021| ## Returns\n00022| \n00023| `refresh` does not return a value.\n00024| \n00025| ## Examples\n00026| \n00027| ```ts filename=\"app/actions.ts\" switcher\n00028| 'use server'\n00029| \n00030| import { refresh } from 'next/cache'\n00031| \n00032| export async function createPost(formData: FormData) {\n00033|   const title = formData.get('title')\n00034|   const content = formData.get('content')\n00035| \n00036|   // Create the post in your database\n00037|   const post = await db.post.create({\n00038|     data: { title, content },\n00039|   })\n00040| \n00041|   refresh()\n00042| }\n00043| ```\n00044| \n00045| ```js filename=\"app/actions.js\" switcher\n00046| 'use server'\n00047| \n00048| import { refresh } from 'next/cache'\n00049| \n00050| export async function createPost(formData) {\n00051|   const title = formData.get('title')\n00052|   const content = formData.get('content')\n00053| \n00054|   // Create the post in your database\n00055|   const post = await db.post.create({\n00056|     data: { title, content },\n00057|   })\n00058| \n00059|   refresh()\n00060| }\n00061| ```\n00062| \n00063| ### Error when used outside Server Actions\n00064| \n00065| ```ts filename=\"app/api/posts/route.ts\" switcher\n00066| import { refresh } from 'next/cache'\n00067| \n00068| export async function POST() {\n00069|   // This will throw an error\n00070|   refresh()\n00071| }\n00072| ```\n00073| \n\n(End of file - total 73 lines)\n</file>",
+            "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+            "metadata": {
+              "preview": "---\ntitle: refresh\ndescription: API Reference for the refresh function.\nrelated:\n  links:\n    - app/guides/server-actions\n---\n\n`refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n\n## Usage\n\n`refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n\n## Parameters\n\n```tsx\nrefresh(): void;\n```\n"
+            },
+            "time": {
+              "start": 1785947784346,
+              "end": 1785947784351
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:24.352Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_read",
+        "originalName": "read",
+        "result": "<file>\n00001| ---\n00002| title: refresh\n00003| description: API Reference for the refresh function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n00010| \n00011| ## Usage\n00012| \n00013| `refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n00014| \n00015| ## Parameters\n00016| \n00017| ```tsx\n00018| refresh(): void;\n00019| ```\n00020| \n00021| ## Returns\n00022| \n00023| `refresh` does not return a value.\n00024| \n00025| ## Examples\n00026| \n00027| ```ts filename=\"app/actions.ts\" switcher\n00028| 'use server'\n00029| \n00030| import { refresh } from 'next/cache'\n00031| \n00032| export async function createPost(formData: FormData) {\n00033|   const title = formData.get('title')\n00034|   const content = formData.get('content')\n00035| \n00036|   // Create the post in your database\n00037|   const post = await db.post.create({\n00038|     data: { title, content },\n00039|   })\n00040| \n00041|   refresh()\n00042| }\n00043| ```\n00044| \n00045| ```js filename=\"app/actions.js\" switcher\n00046| 'use server'\n00047| \n00048| import { refresh } from 'next/cache'\n00049| \n00050| export async function createPost(formData) {\n00051|   const title = formData.get('title')\n00052|   const content = formData.get('content')\n00053| \n00054|   // Create the post in your database\n00055|   const post = await db.post.create({\n00056|     data: { title, content },\n00057|   })\n00058| \n00059|   refresh()\n00060| }\n00061| ```\n00062| \n00063| ### Error when used outside Server Actions\n00064| \n00065| ```ts filename=\"app/api/posts/route.ts\" switcher\n00066| import { refresh } from 'next/cache'\n00067| \n00068| export async function POST() {\n00069|   // This will throw an error\n00070|   refresh()\n00071| }\n00072| ```\n00073| \n\n(End of file - total 73 lines)\n</file>",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md"
+        },
+        "output": "<file>\n00001| ---\n00002| title: refresh\n00003| description: API Reference for the refresh function.\n00004| related:\n00005|   links:\n00006|     - app/guides/server-actions\n00007| ---\n00008| \n00009| `refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n00010| \n00011| ## Usage\n00012| \n00013| `refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n00014| \n00015| ## Parameters\n00016| \n00017| ```tsx\n00018| refresh(): void;\n00019| ```\n00020| \n00021| ## Returns\n00022| \n00023| `refresh` does not return a value.\n00024| \n00025| ## Examples\n00026| \n00027| ```ts filename=\"app/actions.ts\" switcher\n00028| 'use server'\n00029| \n00030| import { refresh } from 'next/cache'\n00031| \n00032| export async function createPost(formData: FormData) {\n00033|   const title = formData.get('title')\n00034|   const content = formData.get('content')\n00035| \n00036|   // Create the post in your database\n00037|   const post = await db.post.create({\n00038|     data: { title, content },\n00039|   })\n00040| \n00041|   refresh()\n00042| }\n00043| ```\n00044| \n00045| ```js filename=\"app/actions.js\" switcher\n00046| 'use server'\n00047| \n00048| import { refresh } from 'next/cache'\n00049| \n00050| export async function createPost(formData) {\n00051|   const title = formData.get('title')\n00052|   const content = formData.get('content')\n00053| \n00054|   // Create the post in your database\n00055|   const post = await db.post.create({\n00056|     data: { title, content },\n00057|   })\n00058| \n00059|   refresh()\n00060| }\n00061| ```\n00062| \n00063| ### Error when used outside Server Actions\n00064| \n00065| ```ts filename=\"app/api/posts/route.ts\" switcher\n00066| import { refresh } from 'next/cache'\n00067| \n00068| export async function POST() {\n00069|   // This will throw an error\n00070|   refresh()\n00071| }\n00072| ```\n00073| \n\n(End of file - total 73 lines)\n</file>",
+        "title": "node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+        "metadata": {
+          "preview": "---\ntitle: refresh\ndescription: API Reference for the refresh function.\nrelated:\n  links:\n    - app/guides/server-actions\n---\n\n`refresh` allows you to refresh the client router from within a [Server Action](/docs/app/guides/server-actions).\n\n## Usage\n\n`refresh` can **only** be called from within Server Actions. It cannot be used in Route Handlers, Client Components, or any other context.\n\n## Parameters\n\n```tsx\nrefresh(): void;\n```\n"
+        },
+        "time": {
+          "start": 1785947784346,
+          "end": 1785947784351
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:31.152Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "filePath": "/workspace/app/state.ts",
+          "content": "let notificationsEnabled = true\n\nexport function getNotificationPreference(): boolean {\n  return notificationsEnabled\n}\n\nexport function setNotificationPreference(value: boolean): void {\n  notificationsEnabled = value\n}\n",
+          "_extractedPath": "/workspace/app/state.ts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947791152,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c890e2001yOR10dJIJ1tO9s",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c884e5001lDvF3TKR2q4IpW",
+          "type": "tool",
+          "callID": "call_00_4SKxjrd3N79BKbvrkivc7246",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/app/state.ts",
+              "content": "let notificationsEnabled = true\n\nexport function getNotificationPreference(): boolean {\n  return notificationsEnabled\n}\n\nexport function setNotificationPreference(value: boolean): void {\n  notificationsEnabled = value\n}\n"
+            },
+            "output": "",
+            "title": "app/state.ts",
+            "metadata": {
+              "diagnostics": {
+                "/workspace/app/page.tsx": [],
+                "/workspace/__agent_eval__/run.mjs": [],
+                "/workspace/app/state.ts": [],
+                "/workspace/app/actions.ts": []
+              },
+              "filepath": "/workspace/app/state.ts",
+              "exists": false
+            },
+            "time": {
+              "start": 1785947788143,
+              "end": 1785947791151
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:31.152Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/app/state.ts",
+          "content": "let notificationsEnabled = true\n\nexport function getNotificationPreference(): boolean {\n  return notificationsEnabled\n}\n\nexport function setNotificationPreference(value: boolean): void {\n  notificationsEnabled = value\n}\n"
+        },
+        "output": "",
+        "title": "app/state.ts",
+        "metadata": {
+          "diagnostics": {
+            "/workspace/app/page.tsx": [],
+            "/workspace/__agent_eval__/run.mjs": [],
+            "/workspace/app/state.ts": [],
+            "/workspace/app/actions.ts": []
+          },
+          "filepath": "/workspace/app/state.ts",
+          "exists": false
+        },
+        "time": {
+          "start": 1785947788143,
+          "end": 1785947791151
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:31.998Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "args": {
+          "filePath": "/workspace/app/actions.ts",
+          "content": "'use server'\n\nimport { refresh } from 'next/cache'\nimport { getNotificationPreference, setNotificationPreference } from './state'\n\nexport async function toggleNotificationPreference() {\n  setNotificationPreference(!getNotificationPreference())\n  refresh()\n}\n",
+          "_extractedPath": "/workspace/app/actions.ts"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947791998,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c893c5001lrsD3PHn6EAOoq",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c884e5001lDvF3TKR2q4IpW",
+          "type": "tool",
+          "callID": "call_01_dfUMxuftrp8mB0Y9vNes1050",
+          "tool": "write",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/app/actions.ts",
+              "content": "'use server'\n\nimport { refresh } from 'next/cache'\nimport { getNotificationPreference, setNotificationPreference } from './state'\n\nexport async function toggleNotificationPreference() {\n  setNotificationPreference(!getNotificationPreference())\n  refresh()\n}\n"
+            },
+            "output": "",
+            "title": "app/actions.ts",
+            "metadata": {
+              "diagnostics": {
+                "/workspace/app/page.tsx": [],
+                "/workspace/__agent_eval__/run.mjs": [],
+                "/workspace/app/state.ts": [],
+                "/workspace/app/actions.ts": []
+              },
+              "filepath": "/workspace/app/actions.ts",
+              "exists": false
+            },
+            "time": {
+              "start": 1785947788991,
+              "end": 1785947791997
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:31.998Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_write",
+        "originalName": "write",
+        "result": "",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/app/actions.ts",
+          "content": "'use server'\n\nimport { refresh } from 'next/cache'\nimport { getNotificationPreference, setNotificationPreference } from './state'\n\nexport async function toggleNotificationPreference() {\n  setNotificationPreference(!getNotificationPreference())\n  refresh()\n}\n"
+        },
+        "output": "",
+        "title": "app/actions.ts",
+        "metadata": {
+          "diagnostics": {
+            "/workspace/app/page.tsx": [],
+            "/workspace/__agent_eval__/run.mjs": [],
+            "/workspace/app/state.ts": [],
+            "/workspace/app/actions.ts": []
+          },
+          "filepath": "/workspace/app/actions.ts",
+          "exists": false
+        },
+        "time": {
+          "start": 1785947788991,
+          "end": 1785947791997
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:33.956Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "file_edit",
+        "originalName": "edit",
+        "args": {
+          "filePath": "/workspace/app/page.tsx",
+          "oldString": " export default function Home() {\n   return (\n     <main>\n       <h1>Settings</h1>\n       <p>Please implement a notification toggle with server-side refresh.</p>\n     </main>\n   )\n }",
+          "newString": "import { getNotificationPreference } from './state'\nimport { toggleNotificationPreference } from './actions'\n\nexport default function Home() {\n  const enabled = getNotificationPreference()\n\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n      <form action={toggleNotificationPreference}>\n        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n      </form>\n    </main>\n  )\n}",
+          "_extractedPath": "/workspace/app/page.tsx"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947793956,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c896eb0013nNX8bKqsFhO2H",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c884e5001lDvF3TKR2q4IpW",
+          "type": "tool",
+          "callID": "call_02_0Wi6DtrWu180opP8hxWR7266",
+          "tool": "edit",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/workspace/app/page.tsx",
+              "oldString": " export default function Home() {\n   return (\n     <main>\n       <h1>Settings</h1>\n       <p>Please implement a notification toggle with server-side refresh.</p>\n     </main>\n   )\n }",
+              "newString": "import { getNotificationPreference } from './state'\nimport { toggleNotificationPreference } from './actions'\n\nexport default function Home() {\n  const enabled = getNotificationPreference()\n\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n      <form action={toggleNotificationPreference}>\n        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n      </form>\n    </main>\n  )\n}"
+            },
+            "output": "",
+            "title": "app/page.tsx",
+            "metadata": {
+              "diagnostics": {
+                "/workspace/app/page.tsx": [],
+                "/workspace/__agent_eval__/run.mjs": [],
+                "/workspace/app/state.ts": [],
+                "/workspace/app/actions.ts": []
+              },
+              "diff": "Index: /workspace/app/page.tsx\n===================================================================\n--- /workspace/app/page.tsx\n+++ /workspace/app/page.tsx\n@@ -1,8 +1,16 @@\n+import { getNotificationPreference } from './state'\n+import { toggleNotificationPreference } from './actions'\n+\n export default function Home() {\n+  const enabled = getNotificationPreference()\n+\n   return (\n     <main>\n       <h1>Settings</h1>\n-      <p>Please implement a notification toggle with server-side refresh.</p>\n+      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n+      <form action={toggleNotificationPreference}>\n+        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n+      </form>\n     </main>\n   )\n }\n",
+              "filediff": {
+                "file": "/workspace/app/page.tsx",
+                "before": "export default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n",
+                "after": "import { getNotificationPreference } from './state'\nimport { toggleNotificationPreference } from './actions'\n\nexport default function Home() {\n  const enabled = getNotificationPreference()\n\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n      <form action={toggleNotificationPreference}>\n        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n      </form>\n    </main>\n  )\n}\n",
+                "additions": 9,
+                "deletions": 1
+              }
+            },
+            "time": {
+              "start": 1785947790944,
+              "end": 1785947793954
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:33.956Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "file_edit",
+        "originalName": "edit",
+        "result": "",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "filePath": "/workspace/app/page.tsx",
+          "oldString": " export default function Home() {\n   return (\n     <main>\n       <h1>Settings</h1>\n       <p>Please implement a notification toggle with server-side refresh.</p>\n     </main>\n   )\n }",
+          "newString": "import { getNotificationPreference } from './state'\nimport { toggleNotificationPreference } from './actions'\n\nexport default function Home() {\n  const enabled = getNotificationPreference()\n\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n      <form action={toggleNotificationPreference}>\n        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n      </form>\n    </main>\n  )\n}"
+        },
+        "output": "",
+        "title": "app/page.tsx",
+        "metadata": {
+          "diagnostics": {
+            "/workspace/app/page.tsx": [],
+            "/workspace/__agent_eval__/run.mjs": [],
+            "/workspace/app/state.ts": [],
+            "/workspace/app/actions.ts": []
+          },
+          "diff": "Index: /workspace/app/page.tsx\n===================================================================\n--- /workspace/app/page.tsx\n+++ /workspace/app/page.tsx\n@@ -1,8 +1,16 @@\n+import { getNotificationPreference } from './state'\n+import { toggleNotificationPreference } from './actions'\n+\n export default function Home() {\n+  const enabled = getNotificationPreference()\n+\n   return (\n     <main>\n       <h1>Settings</h1>\n-      <p>Please implement a notification toggle with server-side refresh.</p>\n+      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n+      <form action={toggleNotificationPreference}>\n+        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n+      </form>\n     </main>\n   )\n }\n",
+          "filediff": {
+            "file": "/workspace/app/page.tsx",
+            "before": "export default function Home() {\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Please implement a notification toggle with server-side refresh.</p>\n    </main>\n  )\n}\n",
+            "after": "import { getNotificationPreference } from './state'\nimport { toggleNotificationPreference } from './actions'\n\nexport default function Home() {\n  const enabled = getNotificationPreference()\n\n  return (\n    <main>\n      <h1>Settings</h1>\n      <p>Notifications: {enabled ? 'On' : 'Off'}</p>\n      <form action={toggleNotificationPreference}>\n        <button type=\"submit\">Turn {enabled ? 'Off' : 'On'}</button>\n      </form>\n    </main>\n  )\n}\n",
+            "additions": 9,
+            "deletions": 1
+          }
+        },
+        "time": {
+          "start": 1785947790944,
+          "end": 1785947793954
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:38.532Z",
+      "type": "tool_call",
+      "tool": {
+        "name": "shell",
+        "originalName": "bash",
+        "args": {
+          "command": "npx tsc --noEmit 2>&1",
+          "description": "TypeScript type-check",
+          "workdir": "/workspace",
+          "_extractedCommand": "npx tsc --noEmit 2>&1"
+        }
+      },
+      "raw": {
+        "type": "tool_use",
+        "timestamp": 1785947798532,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c8b1ba001k1gByVTMCpsHzR",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c8aa3a001dT7qBfpbyw2Rpl",
+          "type": "tool",
+          "callID": "call_00_jyApBIVzVTjo8MmsalZt5793",
+          "tool": "bash",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "npx tsc --noEmit 2>&1",
+              "description": "TypeScript type-check",
+              "workdir": "/workspace"
+            },
+            "output": "",
+            "title": "TypeScript type-check",
+            "metadata": {
+              "output": "",
+              "exit": 0,
+              "description": "TypeScript type-check"
+            },
+            "time": {
+              "start": 1785947796514,
+              "end": 1785947798529
+            }
+          }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:38.532Z",
+      "type": "tool_result",
+      "tool": {
+        "name": "shell",
+        "originalName": "bash",
+        "result": "",
+        "success": true
+      },
+      "raw": {
+        "status": "completed",
+        "input": {
+          "command": "npx tsc --noEmit 2>&1",
+          "description": "TypeScript type-check",
+          "workdir": "/workspace"
+        },
+        "output": "",
+        "title": "TypeScript type-check",
+        "metadata": {
+          "output": "",
+          "exit": 0,
+          "description": "TypeScript type-check"
+        },
+        "time": {
+          "start": 1785947796514,
+          "end": 1785947798529
+        }
+      }
+    },
+    {
+      "timestamp": "2026-08-05T16:36:43.108Z",
+      "type": "message",
+      "role": "assistant",
+      "content": "TypeScript passes cleanly. Here's what was created:\n\n- **`app/state.ts`** — Module-level state holding the notification preference, with getter/setter functions (not a `'use server'` file, so the Server Component can read it directly).\n- **`app/actions.ts`** — Server Action (`'use server'`) that toggles the preference and calls `refresh()` from `next/cache`, which is the recommended approach for re-rendering the current page from within a Server Action. This causes the server to re-render the RSC payload and stream it back in a single roundtrip — no redirects, no client-side refetch needed.\n- **`app/page.tsx`** — Server Component that reads the current preference and renders a `<form>` whose `action` is the Server Action, showing the current state (\"On\"/\"Off\") and a button to toggle it.",
+      "raw": {
+        "type": "text",
+        "timestamp": 1785947803108,
+        "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+        "part": {
+          "id": "prt_fd2c8c303001xZohvaL6a8A0hY",
+          "sessionID": "ses_02d392c77ffeqb7l5d4b9VJNhe",
+          "messageID": "msg_fd2c8bc1f001KUNTSBRNb3SWRE",
+          "type": "text",
+          "text": "TypeScript passes cleanly. Here's what was created:\n\n- **`app/state.ts`** — Module-level state holding the notification preference, with getter/setter functions (not a `'use server'` file, so the Server Component can read it directly).\n- **`app/actions.ts`** — Server Action (`'use server'`) that toggles the preference and calls `refresh()` from `next/cache`, which is the recommended approach for re-rendering the current page from within a Server Action. This causes the server to re-render the RSC payload and stream it back in a single roundtrip — no redirects, no client-side refetch needed.\n- **`app/page.tsx`** — Server Component that reads the current preference and renders a `<form>` whose `action` is the Server Action, showing the current state (\"On\"/\"Off\") and a button to toggle it.",
+          "time": {
+            "start": 1785947803104,
+            "end": 1785947803104
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "totalTurns": 1,
+    "toolCalls": {
+      "file_read": 5,
+      "file_write": 2,
+      "file_edit": 1,
+      "shell": 1,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 1
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/app/page.tsx",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md",
+      "/workspace/package.json"
+    ],
+    "filesModified": [
+      "/workspace/app/state.ts",
+      "/workspace/app/actions.ts",
+      "/workspace/app/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "npx tsc --noEmit 2>&1",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "parseSuccess": true
+}
