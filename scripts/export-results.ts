@@ -70,6 +70,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'glm-5.1-opencode--agents-md': 'glm-5.1-opencode',
   'glm-5.2--agents-md': 'glm-5.2',
   'grok-4.5--agents-md': 'grok-4.5',
+  'grok-4.6--agents-md': 'grok-4.6',
 };
 
 /**
@@ -203,6 +204,8 @@ const MODEL_NAMES: Record<string, string> = {
   'glm-5.2--agents-md': 'GLM 5.2 + AGENTS.md',
   'grok-4.5': 'Grok 4.5',
   'grok-4.5--agents-md': 'Grok 4.5 + AGENTS.md',
+  'grok-4.6': 'Grok 4.6',
+  'grok-4.6--agents-md': 'Grok 4.6 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
