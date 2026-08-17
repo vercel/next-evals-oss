@@ -37,6 +37,26 @@ Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens a
 
 Unit tests for the token extraction and pricing in `scripts/cost.ts`.
 
+### `npm run check-secrets`
+
+Fails if a credential is present in any tracked file, and runs in CI on every PR.
+
+This is a backstop for one specific leak: the opencode agent is configured through a
+project-local `opencode.json` that the framework writes into the sandbox with the live
+AI Gateway credential in it, so any model that decides to `read` that file — and it is
+one of the first files in `/workspace` — copies the credential into the run's
+transcript, which then gets committed. The credential is normally a Vercel OIDC token
+with a 12-hour TTL, so a leak expires on its own, but this repo is public.
+
+```bash
+npm run check-secrets            # report offenders, exit 1
+npm run check-secrets -- --write # redact them in place
+```
+
+If CI flags a run you are about to commit, redact with `--write` and commit the result.
+Rotate only if a long-lived vendor key shows up: redacting a file that was already
+pushed does not revoke the key.
+
 ## Eval structure
 
 Each eval is a self-contained Next.js project in `evals/`:
