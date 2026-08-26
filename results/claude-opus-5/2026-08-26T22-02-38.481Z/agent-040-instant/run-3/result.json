@@ -1,0 +1,94 @@
+{
+  "status": "failed",
+  "duration": 274.205,
+  "model": "claude-opus-5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 9,
+    "toolCalls": {
+      "file_read": 5,
+      "file_write": 2,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 19,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/app/product/page.tsx",
+      "/workspace/lib/data.ts",
+      "/workspace/app/page.tsx",
+      "/workspace/app/layout.tsx",
+      "/workspace/__agent_eval__/run.mjs"
+    ],
+    "filesModified": [
+      "/workspace/app/product/page.tsx",
+      "/workspace/tsconfig.json"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la && cat package.json",
+        "success": true
+      },
+      {
+        "command": "find /workspace/app /workspace/lib /workspace/__agent_eval__ -type f | head -50 && echo \"---\" && cat /workspace/next.config.ts /workspace/tsconfig.json",
+        "success": true
+      },
+      {
+        "command": "npx next build 2>&1 | tail -40",
+        "success": true
+      },
+      {
+        "command": "npx next build 2>&1 | tail -30",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3111 >/tmp/next.log 2>&1 &) && sleep 6 && echo \"=== TIME TO FIRST BYTE / FULL ===\" && curl -s -o /tmp/product.html -w \"ttfb=%{time_starttransfer}s total=%{time_total}s\\n\" http://localhost:3111/product",
+        "success": true
+      },
+      {
+        "command": "cd /tmp && echo \"=== ORDER OF APPEARANCE IN HTML ===\" && grep -o -n -E 'Premium Widget|Checking stock|in stock|Price: \\$' product.html | head && echo && echo \"=== does the FIRST flush carry the title? ===\" && curl -s --limit-rate 200000 -N http://localhost:3111/product | head -c 900 | grep -o -E 'Premium Widget|Checking stock|in stock'",
+        "success": true
+      },
+      {
+        "command": "echo \"=== prerendered shell on disk ===\" && ls .next/server/app/product* 2>/dev/null && grep -c 'Premium Widget' .next/server/app/product.html 2>/dev/null && echo \"(title present in static shell)\" && echo && echo \"=== git status ===\" && git status --short && echo && echo \"=== tsconfig diff ===\" && git diff tsconfig.json",
+        "success": true
+      },
+      {
+        "command": "cat .gitignore && echo \"=== rebuild (confirm tsconfig stays put + still PPR) ===\" && npx next build 2>&1 | tail -14 && echo \"=== tsconfig re-touched by build? ===\" && git diff --stat tsconfig.json",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3112 >/tmp/next2.log 2>&1 &) && sleep 6 && curl -s -N --no-buffer http://localhost:3112/product | python3 -c \"\nimport sys,time\nstart=time.time()\nseen={}\nbuf=''\nfor chunk in iter(lambda: sys.stdin.buffer.read(64), b''):\n    buf += chunk.decode('utf8','replace')\n    for label,needle in [('h1 \\\"Premium Widget\\\"','Premium Widget'),('fallback','Checking stock'),('inventory count','in stock'),('price','Price: \\$')]:\n        if needle in buf and label not in seen:\n            seen[label]=(time.time()-start)*1000\nfor k,v in seen.items(): print(f'  {v:7.1f} ms  {k}')\n\"",
+        "success": true
+      },
+      {
+        "command": "pkill -f \"next start\" 2>/dev/null; pkill -f \"next-server\" 2>/dev/null; sleep 1; echo \"servers stopped\"; echo \"=== final diff ===\"; git --no-pager diff -- app/product/page.tsx tsconfig.json; echo \"=== status ===\"; git status --short",
+        "success": false
+      },
+      {
+        "command": "git --no-pager diff -- app/product/page.tsx tsconfig.json; echo \"=== status ===\"; git status --short; echo \"=== leftover servers ===\"; pgrep -af \"next-server|next start\" || echo none",
+        "success": true
+      },
+      {
+        "command": "pgrep -af \"next\" | grep -v pgrep | grep -v \"bin/bash\" || echo \"no next processes running\"",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
