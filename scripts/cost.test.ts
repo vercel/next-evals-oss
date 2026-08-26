@@ -108,7 +108,3 @@ test('priceUsage: cache-heavy Claude run', () => {
   // 20000*50 + 1e6*1 + 200000*12.5 = 1e6 + 1e6 + 2.5e6 = 4.5e6 tok-$ / 1e6 = $4.50
   assert.equal(cost, 4.5);
 });
-
-test('cursor-composer-1.5 is N/A (null price)', () => {
-  assert.equal(MODEL_PRICING['cursor-composer-1.5'], null);
-});

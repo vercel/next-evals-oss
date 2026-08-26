@@ -28,8 +28,6 @@ const ACCEPTED_STALE = {
   'claude-sonnet-4.5--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'claude-sonnet-4.6': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'claude-sonnet-4.6--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
-  'cursor-composer-1.5': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
-  'cursor-composer-1.5--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'cursor-composer-2.0': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'cursor-composer-2.0--agents-md': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
   'cursor-composer-2.5': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
