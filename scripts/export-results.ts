@@ -142,10 +142,36 @@ interface ExportedData {
       // model's runs carry no usable token usage) — rendered as N/A.
       avgCostUsd?: number | null;
       docsImpact?: DocsImpact;
+      // 1 = current (fresh full run on the current eval set), 2 = previously
+      // measured. See "Model retention policy" in the README.
+      tier: 1 | 2;
     }>;
   };
   results: Record<string, AgentResult[]>;
 }
+
+/**
+ * Tier-1 experiments per the README's "Model retention policy": the latest
+ * version of each model family, plus the previous version if and only if the
+ * current one was released less than a month after it. Membership implies a
+ * commitment to keep the results fresh (rerun on eval-set/canary changes).
+ * Everything else exports as tier 2: previously measured, dated, not rerun.
+ *
+ * grok-4.6 and gemini-3.1-pro-preview qualify by the rule but are exported as
+ * tier 2 until they can actually be rerun (provider ACL / missing API key).
+ */
+const TIER_1 = new Set([
+  'claude-fable-5',
+  'claude-opus-5',
+  'claude-sonnet-5',
+  'gpt-5.6-sol-ultra',
+  'gpt-5.3-codex-xhigh',
+  'kimi-k3',
+  'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
+  'cursor-composer-2.5',
+  'glm-5.2',
+  'minimax-m3',
+]);
 
 const MODEL_NAMES: Record<string, string> = {
   'claude-fable-5': 'Claude Fable 5 (high)',
@@ -423,6 +449,9 @@ async function main(): Promise<void> {
       timestamp: parseTimestamp(latestTimestamp),
       modelName,
       agentHarness,
+      // Variants inherit the base experiment's tier so the docsImpact merge
+      // below never pairs experiments across tiers.
+      tier: TIER_1.has(AGENTS_MD_PAIRS[experiment] ?? experiment) ? 1 : 2,
     });
 
     exportedData.results[experiment] = normalized;
