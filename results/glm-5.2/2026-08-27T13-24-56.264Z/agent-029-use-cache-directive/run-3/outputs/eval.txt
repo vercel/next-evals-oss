@@ -1,0 +1,197 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 7ms
+   × Catalog is cached, tagged, and revalidated by the sync action 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  13:43:36
+   Duration  229ms (transform 41ms, setup 16ms, collect 25ms, tests 7ms, environment 0ms, prepare 65ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Admin · Product Catalog',
+  description: 'Admin product catalog with background ERP/PIM sync',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+
+import { getCachedProducts, syncCatalog } from '@/lib/db'
+import { SyncButton } from './sync-button'
+
+export const dynamic = 'force-dynamic'
+
+export default async function Page() {
+  async function syncCatalogAction() {
+    'use server'
+    after(async () => {
+      await syncCatalog()
+      revalidateTag('products', 'max')
+    })
+  }
+
+  const { products, lastSyncedAt } = await getCachedProducts()
+
+  return (
+    <main>
+      <header>
+        <div>
+          <h1>Product Catalog</h1>
+          <p className=\"muted\">
+            Reads are served from cache. Syncing refreshes the catalog in the
+            background — you can keep working while it catches up.
+          </p>
+          <p className=\"muted\">Last synced: {lastSyncedAt ?? 'never'}</p>
+        </div>
+        <form action={syncCatalogAction}>
+          <SyncButton />
+        </form>
+      </header>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((p) => (
+            <tr key={p.id}>
+              <td>{p.id}</td>
+              <td>{p.name}</td>
+              <td>${p.price}</td>
+              <td>{p.stock}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  )
+}
+
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SyncButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type=\"submit\" disabled={pending}>
+      {pending ? 'Syncing…' : 'Sync latest catalog'}
+    </button>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+let erpData = [
+  { id: 1, name: 'Laptop', price: 999, stock: 12 },
+  { id: 2, name: 'Phone', price: 699, stock: 30 },
+  { id: 3, name: 'Tablet', price: 499, stock: 18 },
+  { id: 4, name: 'Headphones', price: 199, stock: 50 },
+  { id: 5, name: 'Watch', price: 299, stock: 25 },
+]
+
+let lastSyncedAt = null
+
+export async function getAllProducts() {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return erpData.map((p) => ({ ...p }))
+}
+
+export const getCachedProducts = unstable_cache(
+  async () => {
+    const products = await getAllProducts()
+    return { products, lastSyncedAt }
+  },
+  ['products'],
+  { tags: ['products'], revalidate: false }
+)
+
+export async function syncCatalog() {
+  await new Promise((resolve) => setTimeout(resolve, 1200))
+
+  erpData = erpData.map((p) => ({
+    ...p,
+    price: Math.max(1, Math.round(p.price * (0.95 + Math.random() * 0.1))),
+    stock: Math.floor(Math.random() * 100),
+  }))
+  lastSyncedAt = new Date().toISOString()
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

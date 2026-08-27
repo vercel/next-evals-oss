@@ -1,0 +1,84 @@
+{
+  "status": "passed",
+  "duration": 320.431,
+  "model": "vercel/zai/glm-5.2",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 11,
+    "toolCalls": {
+      "file_read": 8,
+      "file_write": 1,
+      "file_edit": 0,
+      "shell": 9,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 1,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 19,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cookies.md",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/headers.md",
+      "/workspace/node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md",
+      "/workspace/app/page.tsx",
+      "/workspace/app/layout.tsx",
+      "/workspace/node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md",
+      "/workspace/tsconfig.json",
+      "/workspace/next.config.ts"
+    ],
+    "filesModified": [
+      "/workspace/app/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la /workspace && echo \"---PACKAGE---\" && cat /workspace/package.json 2>/dev/null",
+        "success": true
+      },
+      {
+        "command": "ls -la /workspace/app && echo \"---NEXT VERSION---\" && cat /workspace/node_modules/next/package.json | grep '\"version\"'",
+        "success": true
+      },
+      {
+        "command": "ls -R /workspace/node_modules/next/dist/docs 2>/dev/null || echo \"No docs dir\"; echo \"---SEARCHING---\"; find /workspace/node_modules/next -name \"*.md\" -path \"*docs*\" 2>/dev/null | head -50",
+        "success": true
+      },
+      {
+        "command": "ls -la /workspace/__agent_eval__ && echo \"---CONTENTS---\" && find /workspace/__agent_eval__ -type f -exec echo \"=== {} ===\" \\; -exec cat {} \\;",
+        "success": true
+      },
+      {
+        "command": "npx tsc --noEmit 2>&1 | head -30; echo \"EXIT: ${PIPESTATUS[0]}\"",
+        "success": true
+      },
+      {
+        "command": "npm run build 2>&1 | tail -30; echo \"EXIT: ${PIPESTATUS[0]}\"",
+        "success": true
+      },
+      {
+        "command": "npm run start -- -p 3210 > /tmp/next-start.log 2>&1 &\nsleep 6\necho \"=== No cookie (should default to light) ===\"\ncurl -s http://localhost:3210 -H 'Accept-Language: en-US,en;q=0.9' | grep -oE '<p>(Theme|Preferred Language): [^<]+</p>'\necho \"=== theme=dark cookie + fr-CH preferred ===\"\ncurl -s http://localhost:3210 -H 'Accept-Language: fr-CH, fr;q=0.9, en;q=0.8' -H 'Cookie: theme=dark' | grep -oE '<p>(Theme|Preferred Language): [^<]+</p>'\necho \"=== q-value ordering: de highest ===\"\ncurl -s http://localhost:3210 -H 'Accept-Language: en;q=0.8, de;q=1.0, fr;q=0.7' -H 'Cookie: theme=dark' | grep -oE '<p>(Theme|Preferred Language): [^<]+</p>'\nkill %1 2>/dev/null",
+        "success": true
+      },
+      {
+        "command": "cat /tmp/next-start.log; echo \"=== RAW HTML ===\"; npm run start -- -p 3211 > /tmp/next-start2.log 2>&1 &\nsleep 6\ncurl -s http://localhost:3211 -H 'Accept-Language: fr-CH, fr;q=0.9, en;q=0.8' -H 'Cookie: theme=dark' | grep -i -A1 -B1 'theme\\|language\\|prefer\\|main'\necho \"=== EXIT CHECK ===\"\nkill %1 2>/dev/null",
+        "success": true
+      },
+      {
+        "command": "npm run start -- -p 3212 > /tmp/next-start3.log 2>&1 &\nsleep 6\necho \"=== No theme cookie (default light) + en-US ===\"\ncurl -s http://localhost:3212 -H 'Accept-Language: en-US,en;q=0.9' | grep -oE 'Theme:[^<]*</p>|Theme: <[^>]*>[^<]+' | head -1\ncurl -s http://localhost:3212 -H 'Accept-Language: en-US,en;q=0.9' | grep -oE '(Theme|Preferred Language): <!-- -->[^<]+'\necho \"=== q-value ordering (de;q=1.0 should win over en;q=0.8) ===\"\ncurl -s http://localhost:3212 -H 'Accept-Language: en;q=0.8, de;q=1.0, fr;q=0.7' -H 'Cookie: theme=dark' | grep -oE '(Theme|Preferred Language): <!-- -->[^<]+'\necho \"=== wildcard * ignored, en-US wins ===\"\ncurl -s http://localhost:3212 -H 'Accept-Language: *;q=0.5, en-US;q=0.9' | grep -oE '(Theme|Preferred Language): <!-- -->[^<]+'\nkill %1 2>/dev/null",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

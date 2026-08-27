@@ -87,6 +87,24 @@ After running evals:
    ```
 3. Commit and deploy the front repo
 
+## Model retention policy
+
+The published board is two tiers:
+
+- **Tier 1 (current)**: models with a complete run of the current eval set on a
+  recent Next.js canary. Per model family, tier 1 carries the **latest version,
+  plus the previous version if and only if the current version was released
+  less than one month after it** (a just-superseded model is still what many
+  people run; an older gap means it is simply outdated). A tier-1 model that
+  goes stale — the eval set or canary moved on — gets rerun, not left to
+  coast on old measurements.
+- **Tier 2 (previously measured)**: every other model keeps its last measured
+  results for historical reference, clearly dated, and is not rerun.
+
+Models the provider no longer serves (e.g. Cursor Composer 1.5) are removed
+entirely rather than kept in tier 2 — every published experiment must be
+reproducible.
+
 ## Current evals
 
 | Eval | Tests |
