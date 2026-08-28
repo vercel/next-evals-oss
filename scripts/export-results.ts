@@ -58,6 +58,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
   'cursor-composer-2.0--agents-md': 'cursor-composer-2.0',
   'cursor-composer-2.5--agents-md': 'cursor-composer-2.5',
+  'cursor-grok-4.6-xhigh--agents-md': 'cursor-grok-4.6-xhigh',
   'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
   'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
   'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
@@ -166,6 +167,8 @@ interface ExportedData {
  *
  * grok-4.6 and gemini-3.1-pro-preview qualify by the rule but are exported as
  * tier 2 until they can actually be rerun (provider ACL / missing API key).
+ * cursor-grok-4.6-xhigh is a Cursor-harness sibling that uses CURSOR_API_KEY
+ * instead of Gateway Grok ACL; keep it off this set until a complete run exists.
  */
 const TIER_1 = new Set([
   'claude-fable-5',
@@ -202,6 +205,8 @@ const MODEL_NAMES: Record<string, string> = {
   'cursor-composer-2.0--agents-md': 'Cursor Composer 2.0 + AGENTS.md',
   'cursor-composer-2.5': 'Cursor Composer 2.5',
   'cursor-composer-2.5--agents-md': 'Cursor Composer 2.5 + AGENTS.md',
+  'cursor-grok-4.6-xhigh': 'Grok 4.6 (Cursor, xhigh)',
+  'cursor-grok-4.6-xhigh--agents-md': 'Grok 4.6 (Cursor, xhigh) + AGENTS.md',
   'gemini-3-pro-preview--agents-md': 'Gemini 3.0 Pro Preview + AGENTS.md',
   'gemini-3-pro-preview-gemini-cli': 'Gemini 3.0 Pro Preview',
   'gemini-3.1-pro-preview': 'Gemini 3.1 Pro Preview',
