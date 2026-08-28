@@ -2,49 +2,137 @@
 
 Agent evaluations for Next.js coding tasks, powered by [`@vercel/agent-eval`](https://www.npmjs.com/package/@vercel/agent-eval).
 
-## Setup
+Each eval hands a coding agent a small Next.js app and a prompt, lets it work in an
+isolated sandbox, then runs withheld assertions against what it produced.
+
+## Quick start
 
 ```bash
-npm install
-cp .env.local .env   # requires VERCEL_OIDC_TOKEN and AI_GATEWAY_API_KEY
+pnpm bootstrap                 # install, sync eval fixtures, check credentials
+cp .env.example .env.local     # then fill in the credentials it asked for
+pnpm preflight                 # confirm they resolve
+pnpm eval:smoke claude-opus-5  # one eval, one run, real sandbox
 ```
+
+`pnpm bootstrap` is not required — it just runs the three setup steps below in
+order, because the middle one is easy to miss.
+
+## Setup
+
+### 1. Install
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+pnpm only: the lockfile and `packageManager` pin are pnpm, and CI installs frozen.
+
+### 2. Sync the eval fixtures — required
+
+```bash
+pnpm sync-evals          # from vercel/next.js@canary
+pnpm sync-evals <ref>    # ...or a branch, tag, or commit SHA
+```
+
+**The evals are not in this repo.** They live in
+[`vercel/next.js`](https://github.com/vercel/next.js/tree/canary/evals/evals) and
+`evals/` is git-ignored here, so a fresh clone has no fixtures and every command
+fails with `Evals directory not found`. `sync-evals` sparse-checkouts them.
+
+Syncing from `canary` picks up whatever landed upstream since results were last
+recorded, so it usually reports evals as changed:
+
+```
+N result(s) have a changed eval and were left stale — run them to refresh.
+```
+
+That is expected, not a problem — it is the incremental workflow telling you what
+`pnpm status` will now list as work. To match CI instead, pass the SHA that
+[`.github/workflows/eval-cache-check.yml`](.github/workflows/eval-cache-check.yml)
+pins.
+
+### 3. Provide credentials
+
+Copy [`.env.example`](.env.example) to `.env.local` and fill in what you need.
+`pnpm preflight` reports exactly which variables are missing, and for which
+experiments — run it instead of guessing.
+
+**Sandbox.** Every experiment sets `sandbox: "vercel"`, so runs need Vercel
+Sandbox credentials by one of two paths:
+
+| Path | Variables | Notes |
+|------|-----------|-------|
+| OIDC | `VERCEL_OIDC_TOKEN` | `npx vercel link && npx vercel env pull .env.local`. Short-lived — re-pull when it expires. Also authenticates the AI Gateway. |
+| Access token | `VERCEL_TOKEN` **and** `VERCEL_TEAM_ID` **and** `VERCEL_PROJECT_ID` | All three or none. |
+
+A partial token triple is the real trap here: `@vercel/sandbox` only treats the
+three as credentials when all three are set, so one or two silently falls back to
+the OIDC path and fails with `Could not get credentials from OIDC context` — which
+names neither the variable you forgot nor the path you meant. `pnpm preflight`
+calls this out.
+
+**Agents.** Each experiment names an `agent`, and the agent decides which key it
+reads. `VERCEL_OIDC_TOKEN` is the fallback for all of them, so the OIDC path above
+can cover this whole table on its own.
+
+| Agent | Key |
+|-------|-----|
+| `vercel-ai-gateway/*` (most experiments) | `AI_GATEWAY_API_KEY` |
+| `claude-code` | `CLAUDE_CODE_OAUTH_TOKEN` if set, else `ANTHROPIC_API_KEY` |
+| `codex` | `OPENAI_API_KEY` |
+| `gemini` | `GEMINI_API_KEY` |
+| `cursor` | `CURSOR_API_KEY` |
+
+Missing an agent's key is not fatal: the runner prints `… not set, skipping
+<experiment>` and moves on. That line is easy to lose in a long run, so
+`pnpm preflight <experiment>` fails outright when you name an experiment you
+cannot actually run.
 
 ## Scripts
 
-### `npm run eval`
+| Script | What it does |
+|--------|--------------|
+| `pnpm bootstrap [ref]` | Install, sync fixtures, run preflight. |
+| `pnpm preflight [experiment...]` | Check toolchain, fixtures, sandbox auth, and agent keys. Read-only. Names or globs narrow it; naming an experiment makes a missing key an error rather than a warning. |
+| `pnpm status [experiment...]` | What is new or changed, per experiment, and the work that implies. Read-only. |
+| `pnpm eval:dry <experiment>` | Print the plan — evals, runs, model, sandbox backend — without executing. |
+| `pnpm eval:smoke <experiment...>` | One eval, one run each. The cheapest thing that proves credentials and sandbox actually work. |
+| `pnpm eval:run <experiment...>` | Run the new/changed evals for those experiments. |
+| `pnpm eval` | Interactive: show status, then pick. |
+| `pnpm playground` | Web UI for browsing results in `results/`. |
+| `pnpm sync-evals [ref]` | Re-sync fixtures from `vercel/next.js`. |
+| `pnpm export-results` | Write `agent-results.json` for nextjs.org/evals. |
+| `pnpm typecheck` | `tsc --noEmit` over `experiments/`. |
+| `pnpm test:cost` | Unit tests for token extraction and pricing in `scripts/cost.ts`. |
 
-Runs agent evaluations with memoization. Only runs (model, eval) pairs that haven't been completed yet.
+Anything that runs an eval takes experiment names or globs — `pnpm eval:run
+'claude-*'`. Some experiments also honour `EVAL_FILTER` (an eval name, a glob, or a
+comma-separated list) to narrow which evals run; that is per-config, so check the
+experiment before relying on it.
 
-```bash
-npm run eval              # Run only missing pairs
-npm run eval:dry          # Preview what would run
-npm run eval -- --force   # Re-run everything
-npm run eval:smoke        # Run 1 eval per experiment (sanity check)
-```
+Results are memoized by a fingerprint of the eval content plus the experiment
+config, so a re-run only covers what actually changed. `--force` ignores the cache.
 
-The runner automatically detects:
-- **New model added** → runs all evals for that model
-- **New eval added** → runs that eval for all models
-- **Already completed** → skips
+### `pnpm export-results`
 
-### `npm run export-results`
+Exports clean results to `agent-results.json`. Non-model failures (infra/timeout)
+are automatically deleted during eval runs, so only valid model results are
+exported.
 
-Exports clean results to `agent-results.json`. Non-model failures (infra/timeout) are automatically deleted during eval runs, so only valid model results are exported.
-
-Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens are read from each run's `transcript-raw.jsonl` (handled per harness in `scripts/cost.ts`) and multiplied by the list prices in `MODEL_PRICING`. A model with no price entry, or whose runs carry no token usage, exports `null` and renders as N/A. Prices are a snapshot, so re-run the export to refresh them.
-
-### `npm run test:cost`
-
-Unit tests for the token extraction and pricing in `scripts/cost.ts`.
+Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens are
+read from each run's `transcript-raw.jsonl` (handled per harness in
+`scripts/cost.ts`) and multiplied by the list prices in `MODEL_PRICING`. A model
+with no price entry, or whose runs carry no token usage, exports `null` and renders
+as N/A. Prices are a snapshot, so re-run the export to refresh them.
 
 ## Eval structure
 
-Each eval is a self-contained Next.js project in `evals/`:
+Each eval is a self-contained Next.js project:
 
 ```
 evals/agent-031-proxy-middleware/
 ├── PROMPT.md        # task given to the agent
-├── EVAL.ts          # vitest assertions (withheld from the agent)
+├── EVAL.ts          # assertions (withheld from the agent)
 ├── package.json     # Next.js project manifest
 ├── tsconfig.json
 ├── next.config.ts
@@ -62,25 +150,41 @@ evals/agent-031-proxy-middleware/
 
 ## Adding a new eval
 
-1. Create a directory under `evals/` (e.g., `evals/agent-040-my-eval/`)
-2. Add `PROMPT.md` with the task description
-3. Add `EVAL.ts` with vitest assertions
-4. Add `package.json` with `"type": "module"` and `"build": "next build"`
-5. Add the Next.js source files the agent starts with
-6. Run `npm run eval` — it will automatically run the new eval for all models
+Evals are authored in
+[`vercel/next.js`](https://github.com/vercel/next.js/tree/canary/evals/evals), not
+here — `evals/` in this repo is a synced copy and is git-ignored, so anything you
+add to it locally is overwritten by the next `pnpm sync-evals`.
+
+1. Add the eval upstream, under `evals/evals/` in `vercel/next.js`.
+2. Here: `pnpm sync-evals` to pull it in.
+3. `pnpm status` — it shows up as `new` for every experiment.
+4. `pnpm eval:run <experiment>` to record results.
 
 ## Adding a new model
 
 1. Create a config in `experiments/` (e.g., `experiments/gpt-5.ts`)
 2. Add the display name to `MODEL_NAMES` in `scripts/export-results.ts`
 3. Add the list price to `MODEL_PRICING` in `scripts/cost.ts` (or the cost column shows N/A)
-4. Run `npm run eval` — it will automatically run all evals for the new model
+4. `pnpm eval:run <experiment>` — every eval is new for it
+
+Editing an existing experiment config changes its fingerprint, which makes its
+cached results stale. That is the intended signal, but it means config churn costs
+real re-runs.
+
+## CI
+
+[`eval-cache-check.yml`](.github/workflows/eval-cache-check.yml) syncs fixtures at
+a pinned `vercel/next.js` SHA and runs `scripts/check-stale.mjs`, which fails on any
+new or changed eval that is not listed in that script's `ACCEPTED_STALE`. CI never
+runs an eval — it only checks that the cache is fresh or explicitly accepted as
+stale. To adopt upstream changes: bump the SHA, re-run the experiments you are
+refreshing, and record the rest in `ACCEPTED_STALE`.
 
 ## Publishing to nextjs.org/evals
 
 After running evals:
 
-1. Export results: `npm run export-results`
+1. Export results: `pnpm export-results`
 2. Copy to front repo:
    ```bash
    cp agent-results.json <path-to-front>/apps/next-site/app/\(next-site\)/evals/agent-results.json
@@ -127,6 +231,9 @@ excluded from cost averages.
 
 ## Current evals
 
+As synced from `vercel/next.js@canary`. Upstream is the source of truth — after a
+sync, `ls evals/` is authoritative.
+
 | Eval | Tests |
 |------|-------|
 | agent-000 | Pages Router → App Router migration (simple) |
@@ -149,6 +256,10 @@ excluded from cost averages.
 | agent-037 | updateTag() for read-your-own-writes |
 | agent-038 | Refresh page via revalidatePath |
 | agent-039 | Indirect proxy (request logging) |
+| agent-040 | Instant navigation |
+| agent-041 | Optimize the PPR shell |
+| agent-042 | Enable PPR |
+| agent-043 | View transitions with shared elements |
 
 ## License
 

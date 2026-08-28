@@ -22,12 +22,22 @@ async function main(): Promise<void> {
   const evalsDir = join(process.cwd(), 'evals');
   const tmpDir = join(process.cwd(), '.sync-tmp');
 
+  // A ref is never a flag. Catching this here keeps a stray `pnpm sync-evals
+  // --foo` from reaching git as a ref (and, before the fetch-first order below,
+  // from deleting evals/ on the way to failing).
+  if (ref.startsWith('-')) {
+    throw new Error(`"${ref}" is not a ref. Usage: pnpm sync-evals [branch|tag|sha]`);
+  }
+
   console.log(`Syncing evals from vercel/next.js@${ref}...\n`);
 
-  // Clean slate
-  if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
   if (existsSync(tmpDir)) rmSync(tmpDir, { recursive: true });
 
+  // Fetch BEFORE touching evals/. A bad ref (typo, deleted branch, network
+  // blip) used to fail after the delete, leaving no fixtures at all — every
+  // later command then died in the framework's loader with an error that says
+  // nothing about the sync that caused it.
+  //
   // Sparse fetch. Use fetch + checkout (not clone --branch) so `ref` may be a
   // branch/tag OR a pinned commit SHA — clone --branch rejects raw SHAs.
   const repoDir = `${tmpDir}/next.js`;
@@ -41,7 +51,8 @@ async function main(): Promise<void> {
   );
   execSync(`git -C "${repoDir}" checkout -q FETCH_HEAD`, { stdio: 'inherit' });
 
-  // Copy evals into place
+  // Swap the fetched tree into place: only now is the old one expendable.
+  if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
   execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);
   rmSync(tmpDir, { recursive: true, force: true });
 
