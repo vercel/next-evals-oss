@@ -205,7 +205,10 @@ The published board is two tiers:
   model that goes stale — the eval set or canary moved on — gets rerun, not
   left to coast on old measurements.
 - **Tier 2 (previously measured)**: every other model keeps its last measured
-  results for historical reference, clearly dated, and is not rerun.
+  results for historical reference, clearly dated, and is not rerun. Grok 4.6
+  qualifies as the latest Grok family member but stays tier 2 until it can
+  actually be rerun (Vercel AI Gateway provider ACL). `cursor-grok-4.6-xhigh`
+  is the Cursor-harness sibling that uses `CURSOR_API_KEY` instead.
 
 Models the provider no longer serves (e.g. Cursor Composer 1.5) are removed
 entirely rather than kept in tier 2 — every published experiment must be

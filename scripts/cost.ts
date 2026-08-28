@@ -50,6 +50,8 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'claude-sonnet-4.6': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   'cursor-composer-2.0': { input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0 }, // cursor.com, Standard
   'cursor-composer-2.5': { input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0 }, // cursor.com, Standard
+  // cursor.com/docs/models/grok-4-6 — Standard (non-fast) on-demand list rates
+  'cursor-grok-4.6-xhigh': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
   'gemini-3-pro-preview-gemini-cli': { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
   'gemini-3.1-pro-preview': { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
   'gpt-5.2-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
