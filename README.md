@@ -95,9 +95,11 @@ The published board is two tiers:
   recent Next.js canary. Per model family, tier 1 carries the **latest version,
   plus the previous version if and only if the current version was released
   less than one month after it** (a just-superseded model is still what many
-  people run; an older gap means it is simply outdated). A tier-1 model that
-  goes stale — the eval set or canary moved on — gets rerun, not left to
-  coast on old measurements.
+  people run; an older gap means it is simply outdated). A variant line the
+  vendor stopped shipping (e.g. the codex-branded GPTs after 5.3-codex) is
+  superseded by the vendor's main line, not kept as its own family. A tier-1
+  model that goes stale — the eval set or canary moved on — gets rerun, not
+  left to coast on old measurements.
 - **Tier 2 (previously measured)**: every other model keeps its last measured
   results for historical reference, clearly dated, and is not rerun.
 

@@ -164,8 +164,9 @@ const TIER_1 = new Set([
   'claude-fable-5',
   'claude-opus-5',
   'claude-sonnet-5',
+  // gpt-5.6-sol supersedes the whole GPT line, including the codex-branded
+  // models (OpenAI folded codex into the unified releases after 5.3-codex).
   'gpt-5.6-sol-ultra',
-  'gpt-5.3-codex-xhigh',
   'kimi-k3',
   'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
   'cursor-composer-2.5',
