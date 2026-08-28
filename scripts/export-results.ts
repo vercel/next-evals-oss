@@ -14,7 +14,12 @@
 import { execSync } from 'node:child_process';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { MODEL_PRICING, extractRunTokens, priceUsage } from './cost.js';
+import {
+  MODEL_PRICING,
+  extractRunTokens,
+  estimateUsageFromTranscript,
+  priceUsage,
+} from './cost.js';
 
 interface SummaryJson {
   totalRuns: number;
@@ -98,7 +103,9 @@ async function meanEvalCostUsd(
     if (!entry.startsWith('run-')) continue;
     try {
       const raw = await readFile(join(evalDir, entry, 'transcript-raw.jsonl'), 'utf-8');
-      const usage = extractRunTokens(raw);
+      // Provider-reported token counts first; canonical chars/4 estimate for
+      // the rare transcript that carries none (see cost.ts).
+      const usage = extractRunTokens(raw) ?? estimateUsageFromTranscript(raw);
       if (usage) costs.push(priceUsage(usage, pricing));
     } catch {
       // No transcript for this run (e.g. timeout) — skip it.

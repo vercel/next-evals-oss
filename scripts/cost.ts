@@ -193,3 +193,62 @@ export function extractRunTokens(raw: string): Usage | null {
 
   return got ? u : null;
 }
+
+/**
+ * Fallback for the rare run whose transcript carries no provider-reported
+ * usage. Mirrors the Artificial Analysis methodology — provider token counts
+ * where available, a canonical estimate otherwise — approximating tokens as
+ * text length / 4 (no tokenizer dependency), with assistant-authored text
+ * priced as output and everything else as input. Cache traffic is unknowable
+ * here, so it prices as uncached — a conservative over-estimate.
+ *
+ * Callers should always prefer extractRunTokens and only fall back:
+ *   extractRunTokens(raw) ?? estimateUsageFromTranscript(raw)
+ * Runs with no transcript at all (e.g. timeouts) stay excluded entirely.
+ */
+export function estimateUsageFromTranscript(raw: string): Usage | null {
+  const events = parseLines(raw);
+  if (events.length === 0) return null;
+
+  // Sum the lengths of human-visible string fields. Only strings sitting
+  // directly under a text-bearing key count (arrays pass the key through;
+  // objects reset it), so metadata like role/id/type never inflates the
+  // estimate.
+  const TEXT_KEYS = new Set(['text', 'content', 'thinking', 'output', 'message']);
+  function textLength(v: unknown, keyed: boolean): number {
+    if (typeof v === 'string') return keyed ? v.length : 0;
+    if (Array.isArray(v)) return v.reduce((n: number, x) => n + textLength(x, keyed), 0);
+    if (v && typeof v === 'object') {
+      let n = 0;
+      for (const [k, x] of Object.entries(v)) {
+        n += textLength(x, TEXT_KEYS.has(k));
+      }
+      return n;
+    }
+    return 0;
+  }
+
+  function isAssistant(d: Record<string, unknown>): boolean {
+    if (d.role === 'assistant' || d.type === 'assistant') return true;
+    const msg = obj(d.message);
+    if (msg.role === 'assistant') return true;
+    const part = obj(d.part);
+    return part.role === 'assistant';
+  }
+
+  let inputChars = 0;
+  let outputChars = 0;
+  for (const d of events) {
+    const len = textLength(d, false);
+    if (isAssistant(d)) outputChars += len;
+    else inputChars += len;
+  }
+
+  if (inputChars + outputChars === 0) return null;
+  return {
+    input: Math.ceil(inputChars / 4),
+    output: Math.ceil(outputChars / 4),
+    cacheRead: 0,
+    cacheWrite: 0,
+  };
+}

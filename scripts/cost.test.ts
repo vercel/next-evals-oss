@@ -8,7 +8,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractRunTokens, priceUsage, MODEL_PRICING } from './cost.ts';
+import {
+  extractRunTokens,
+  estimateUsageFromTranscript,
+  priceUsage,
+  MODEL_PRICING,
+} from './cost.ts';
 
 const jsonl = (...events: unknown[]): string =>
   events.map((e) => JSON.stringify(e)).join('\n');
@@ -97,6 +102,22 @@ test('cursor: result.usage, inputTokens is uncached', () => {
 test('no usage (e.g. timeout) returns null', () => {
   assert.equal(extractRunTokens(''), null);
   assert.equal(extractRunTokens(jsonl({ type: 'result', subtype: 'success', is_error: false })), null);
+});
+
+test('fallback: estimates chars/4 by role when a transcript has no usage', () => {
+  const raw = jsonl(
+    { role: 'user', content: 'a'.repeat(400) },
+    { type: 'assistant', message: { role: 'assistant', content: [{ text: 'b'.repeat(200) }] } },
+  );
+  // No provider usage events → extractRunTokens declines, fallback estimates.
+  assert.equal(extractRunTokens(raw), null);
+  const est = estimateUsageFromTranscript(raw);
+  assert.deepEqual(est, { input: 100, output: 50, cacheRead: 0, cacheWrite: 0 });
+});
+
+test('fallback: null for an empty or textless transcript', () => {
+  assert.equal(estimateUsageFromTranscript(''), null);
+  assert.equal(estimateUsageFromTranscript(jsonl({ type: 'init', turns: 3 })), null);
 });
 
 test('priceUsage: cache-heavy Claude run', () => {

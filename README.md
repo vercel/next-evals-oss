@@ -107,6 +107,24 @@ Models the provider no longer serves (e.g. Cursor Composer 1.5) are removed
 entirely rather than kept in tier 2 — every published experiment must be
 reproducible.
 
+## Scoring and cost methodology
+
+**Scoring is pass@4.** Each eval runs up to four attempts (`runs: 4`,
+`earlyExit: true`): the eval passes if any attempt passes, and remaining
+attempts abort on the first pass. A published failure means four genuine model
+failures — attempts that die on infrastructure (rate limits, sandbox faults,
+auth) are classified by the failure classifier, deleted, and rerun rather than
+counted against the model.
+
+**Costs use provider-reported token counts.** Each run's usage (input, output,
+cache read/write) comes from the token counts the model's own API reported in
+the transcript, priced at the list rates in `scripts/cost.ts` (snapshotted
+from the AI Gateway / models.dev `vercel` entries). For the rare transcript
+that carries no usage, `estimateUsageFromTranscript` falls back to a canonical
+approximation — visible text length / 4, assistant text priced as output,
+cache traffic assumed zero. Runs with no transcript at all (e.g. timeouts) are
+excluded from cost averages.
+
 ## Current evals
 
 | Eval | Tests |
