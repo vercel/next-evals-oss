@@ -1,0 +1,70 @@
+{
+  "status": "failed",
+  "duration": 223.212,
+  "model": "vercel/moonshotai/kimi-k3",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 3,
+    "toolCalls": {
+      "file_read": 2,
+      "file_write": 4,
+      "file_edit": 1,
+      "shell": 6,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 4
+    },
+    "totalToolCalls": 17,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/.gitignore"
+    ],
+    "filesModified": [
+      "/workspace/lib/store.js",
+      "/workspace/server.js",
+      "/workspace/lib/views.js",
+      "/workspace/public/style.css",
+      "/workspace/package.json"
+    ],
+    "shellCommands": [
+      {
+        "command": "node --version && npm --version && ls -la /workspace",
+        "success": true
+      },
+      {
+        "command": "node server.js & sleep 1; echo \"--- add book 1 ---\"; curl -si -X POST localhost:3000/books -d 'title=The+Left+Hand+of+Darkness&author=Ursula+K.+Le+Guin&notes=Great+so+far' | head -5; echo \"--- add book 2 ---\"; curl -si -X POST localhost:3000/books -d 'title=Piranesi&author=Susanna+Clarke' | head -3",
+        "success": true
+      },
+      {
+        "command": "echo \"--- finish book 2 ---\"; curl -s -o /dev/null -w \"%{http_code}\\n\" -X POST localhost:3000/books/d2ab2e6c-06c7-496e-bb82-f57ba69445ae/finish; echo \"--- home page ---\"; curl -s localhost:3000/ | grep -E \"Left Hand|Piranesi|Mark finished|finished 20\" ; echo \"--- detail page ---\"; curl -s localhost:3000/books/7699c65b-3b4d-43a0-b145-8f3519d41cbd | grep -E \"Ursula|Great so far|Currently reading\"; echo \"--- update notes ---\"; curl -s -o /dev/null -w \"%{http_code}\\n\" -X POST localhost:3000/books/7699c65b-3b4d-43a0-b145-8f3519d41cbd/notes --data-urlencode \"notes=Updated: mind-blowing worldbuilding\"; echo \"--- 404 ---\"; curl -s -o /dev/null -w \"%{http_code}\\n\" localhost:3000/books/00000000-0000-0000-0000-000000000000",
+        "success": true
+      },
+      {
+        "command": "kill %1; sleep 0.5; node server.js & sleep 1; curl -s localhost:3000/ | grep -cE \"Left Hand|Piranesi\"; curl -s localhost:3000/books/7699c65b-3b4d-43a0-b145-8f3519d41cbd | grep -o \"Updated: mind-blowing worldbuilding\"; kill %1; cat data/books.json | head -20",
+        "success": true
+      },
+      {
+        "command": "pkill -f \"node server.js\"; sleep 0.5; node server.js & sleep 1; echo \"books on home after restart: $(curl -s localhost:3000/ | grep -cE 'Left Hand|Piranesi')\"; pkill -f \"node server.js\"",
+        "success": false
+      },
+      {
+        "command": "node server.js > /tmp/bt.log 2>&1 & sleep 1; echo \"books on home after fresh restart: $(curl -s localhost:3000/ | grep -cE 'Left Hand|Piranesi')\"; curl -s -o /dev/null -w \"detail page: %{http_code}\\n\" localhost:3000/books/d2ab2e6c-06c7-496e-bb82-f57ba69445ae; pkill -f \"node server.js\"",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

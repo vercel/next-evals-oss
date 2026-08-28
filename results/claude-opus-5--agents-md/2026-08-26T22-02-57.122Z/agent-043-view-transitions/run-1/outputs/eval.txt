@@ -1,0 +1,630 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (8 tests | 3 failed) 13ms
+   × next.config enables viewTransition 7ms
+     → expected 'import type { NextConfig } from \'nex…' to match /viewTransition\s*:\s*true/
+   ✓ ViewTransition is imported from react 1ms
+   ✓ Shared element transitions use named ViewTransition 1ms
+   ✓ Link uses transitionTypes for directional navigation 0ms
+   × Suspense content uses ViewTransition with enter or exit 1ms
+     → expected 'import { ViewTransition } from \'reac…' to match /<ViewTransition[^>]*\b(enter|exit)\s*=/
+   × default="none" prevents unintended animations 1ms
+     → expected 'import { ViewTransition } from \'reac…' to match /default\s*=\s*["']none["']/
+   ✓ CSS handles prefers-reduced-motion 0ms
+   ✓ CSS defines view transition animations 0ms
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 5 passed (8)
+   Start at  22:09:44
+   Duration  258ms (transform 49ms, setup 18ms, collect 29ms, tests 13ms, environment 0ms, prepare 72ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > next.config enables viewTransition
+AssertionError: expected 'import type { NextConfig } from \'nex…' to match /viewTransition\s*:\s*true/
+
+[32m- Expected:[39m 
+/viewTransition\s*:\s*true/
+
+[31m+ Received:[39m 
+"import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+"
+
+ ❯ EVAL.ts:84:19
+     82|   )
+     83| 
+     84|   expect(content).toMatch(/viewTransition\s*:\s*true/)
+       |                   ^
+     85| })
+     86| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > Suspense content uses ViewTransition with enter or exit
+AssertionError: expected 'import { ViewTransition } from \'reac…' to match /<ViewTransition[^>]*\b(enter|exit)\s*=/
+
+[32m- Expected:[39m 
+/<ViewTransition[^>]*\b(enter|exit)\s*=/
+
+[31m+ Received:[39m 
+"import { ViewTransition } from 'react'
+import Link from 'next/link'
+import { products } from '@/lib/products'
+import { FORWARD_NAV, morphTransition, productImageName } from './transitions'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <Link
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+          transitionTypes={FORWARD_NAV}
+        >
+          <ViewTransition name={productImageName(product.slug)} {...morphTransition}>
+            <div
+              className=\"product-image\"
+              style={{ backgroundColor: product.color }}
+            />
+          </ViewTransition>
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense, ViewTransition } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+import {
+  pageTransition,
+  revealContentTransition,
+  revealFallbackTransition,
+} from './transitions'
+
+export default function Home() {
+  return (
+    <ViewTransition {...pageTransition}>
+      <main>
+        <h1>Products</h1>
+        <Suspense
+          fallback={
+            <ViewTransition {...revealFallbackTransition}>
+              <ProductGridSkeleton />
+            </ViewTransition>
+          }
+        >
+          <ViewTransition {...revealContentTransition}>
+            <ProductGrid />
+          </ViewTransition>
+        </Suspense>
+      </main>
+    </ViewTransition>
+  )
+}
+
+---FILE---
+import { Suspense, ViewTransition } from 'react'
+import Link from 'next/link'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+import {
+  BACK_NAV,
+  morphTransition,
+  pageTransition,
+  productImageName,
+  revealContentTransition,
+  revealFallbackTransition,
+} from '@/app/transitions'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <ViewTransition {...pageTransition}>
+      <div>
+        <Link href=\"/\" className=\"back-link\" transitionTypes={BACK_NAV}>
+          ← Back to products
+        </Link>
+        <div className=\"product-detail\">
+          {}
+          <ViewTransition name={productImageName(product.slug)} {...morphTransition}>
+            <div
+              className=\"product-hero\"
+              style={{ backgroundColor: product.color }}
+            />
+          </ViewTransition>
+          <Suspense
+            fallback={
+              <ViewTransition {...revealFallbackTransition}>
+                <DetailsSkeleton />
+              </ViewTransition>
+            }
+          >
+            <ViewTransition {...revealContentTransition}>
+              <ProductDetails slug={slug} />
+            </ViewTransition>
+          </Suspense>
+        </div>
+      </div>
+    </ViewTransition>
+  )
+}
+
+---FILE---
+import type { ViewTransitionProps } from 'react'
+
+
+export const NAV_FORWARD = 'nav-forward'
+export const NAV_BACK = 'nav-back'
+
+export const FORWARD_NAV: string[] = [NAV_FORWARD]
+export const BACK_NAV: string[] = [NAV_BACK]
+
+
+export function productImageName(slug: string) {
+  return `product-image-${slug}`
+}
+
+
+export const morphTransition = {
+  share: 'morph',
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+const directionalSlide: ViewTransitionProps['enter'] = {
+  [NAV_FORWARD]: 'nav-forward',
+  [NAV_BACK]: 'nav-back',
+  
+  
+  default: 'none',
+}
+
+
+export const pageTransition = {
+  enter: directionalSlide,
+  exit: directionalSlide,
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+
+export const revealContentTransition = {
+  enter: {
+    [NAV_FORWARD]: 'none',
+    [NAV_BACK]: 'none',
+    default: 'slide-up',
+  },
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+export const revealFallbackTransition = {
+  exit: {
+    [NAV_FORWARD]: 'none',
+    [NAV_BACK]: 'none',
+    default: 'slide-down',
+  },
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:112:21
+    110|   const allSource = readAllSourceFiles()
+    111| 
+    112|   expect(allSource).toMatch(/<ViewTransition[^>]*\b(enter|exit)\s*=/)
+       |                     ^
+    113| })
+    114| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > default="none" prevents unintended animations
+AssertionError: expected 'import { ViewTransition } from \'reac…' to match /default\s*=\s*["']none["']/
+
+[32m- Expected:[39m 
+/default\s*=\s*["']none["']/
+
+[31m+ Received:[39m 
+"import { ViewTransition } from 'react'
+import Link from 'next/link'
+import { products } from '@/lib/products'
+import { FORWARD_NAV, morphTransition, productImageName } from './transitions'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <Link
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+          transitionTypes={FORWARD_NAV}
+        >
+          <ViewTransition name={productImageName(product.slug)} {...morphTransition}>
+            <div
+              className=\"product-image\"
+              style={{ backgroundColor: product.color }}
+            />
+          </ViewTransition>
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense, ViewTransition } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+import {
+  pageTransition,
+  revealContentTransition,
+  revealFallbackTransition,
+} from './transitions'
+
+export default function Home() {
+  return (
+    <ViewTransition {...pageTransition}>
+      <main>
+        <h1>Products</h1>
+        <Suspense
+          fallback={
+            <ViewTransition {...revealFallbackTransition}>
+              <ProductGridSkeleton />
+            </ViewTransition>
+          }
+        >
+          <ViewTransition {...revealContentTransition}>
+            <ProductGrid />
+          </ViewTransition>
+        </Suspense>
+      </main>
+    </ViewTransition>
+  )
+}
+
+---FILE---
+import { Suspense, ViewTransition } from 'react'
+import Link from 'next/link'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+import {
+  BACK_NAV,
+  morphTransition,
+  pageTransition,
+  productImageName,
+  revealContentTransition,
+  revealFallbackTransition,
+} from '@/app/transitions'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <ViewTransition {...pageTransition}>
+      <div>
+        <Link href=\"/\" className=\"back-link\" transitionTypes={BACK_NAV}>
+          ← Back to products
+        </Link>
+        <div className=\"product-detail\">
+          {}
+          <ViewTransition name={productImageName(product.slug)} {...morphTransition}>
+            <div
+              className=\"product-hero\"
+              style={{ backgroundColor: product.color }}
+            />
+          </ViewTransition>
+          <Suspense
+            fallback={
+              <ViewTransition {...revealFallbackTransition}>
+                <DetailsSkeleton />
+              </ViewTransition>
+            }
+          >
+            <ViewTransition {...revealContentTransition}>
+              <ProductDetails slug={slug} />
+            </ViewTransition>
+          </Suspense>
+        </div>
+      </div>
+    </ViewTransition>
+  )
+}
+
+---FILE---
+import type { ViewTransitionProps } from 'react'
+
+
+export const NAV_FORWARD = 'nav-forward'
+export const NAV_BACK = 'nav-back'
+
+export const FORWARD_NAV: string[] = [NAV_FORWARD]
+export const BACK_NAV: string[] = [NAV_BACK]
+
+
+export function productImageName(slug: string) {
+  return `product-image-${slug}`
+}
+
+
+export const morphTransition = {
+  share: 'morph',
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+const directionalSlide: ViewTransitionProps['enter'] = {
+  [NAV_FORWARD]: 'nav-forward',
+  [NAV_BACK]: 'nav-back',
+  
+  
+  default: 'none',
+}
+
+
+export const pageTransition = {
+  enter: directionalSlide,
+  exit: directionalSlide,
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+
+export const revealContentTransition = {
+  enter: {
+    [NAV_FORWARD]: 'none',
+    [NAV_BACK]: 'none',
+    default: 'slide-up',
+  },
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+export const revealFallbackTransition = {
+  exit: {
+    [NAV_FORWARD]: 'none',
+    [NAV_BACK]: 'none',
+    default: 'slide-down',
+  },
+  default: 'none',
+} satisfies Partial<ViewTransitionProps>
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:118:21
+    116|   const allSource = readAllSourceFiles()
+    117| 
+    118|   expect(allSource).toMatch(/default\s*=\s*["']none["']/)
+       |                     ^
+    119| })
+    120| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

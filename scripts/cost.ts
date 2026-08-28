@@ -34,9 +34,7 @@ export interface Pricing {
  * snapshot of models.dev. Cursor Composer is not on models.dev; its rates come
  * from cursor.com/docs/models-and-pricing (Standard tier).
  *
- * null = do not estimate a cost (rendered as N/A). cursor-composer-1.5 is null
- * because its February CLI wrote no token usage to the transcript, so there is
- * nothing to price.
+ * null = do not estimate a cost (rendered as N/A).
  *
  * When adding a model, add its price here or /evals shows N/A for that row.
  */
@@ -50,7 +48,6 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'claude-opus-4.8': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-sonnet-4.5': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
   'claude-sonnet-4.6': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
-  'cursor-composer-1.5': null, // Feb CLI emitted no token usage
   'cursor-composer-2.0': { input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0 }, // cursor.com, Standard
   'cursor-composer-2.5': { input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0 }, // cursor.com, Standard
   'gemini-3-pro-preview-gemini-cli': { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
@@ -59,13 +56,18 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'gpt-5.3-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.4-xhigh': { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
   'gpt-5.5-pro': { input: 30, output: 180, cacheRead: 0, cacheWrite: 0 }, // never caches; cacheRead moot
-  'gpt-5.6-sol-ultra': { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 6.25 },
+  // Cut from 5/30/0.5/6.25; gateway and models.dev vercel entry agree as of
+  // 2026-08-26. OpenAI-direct lists 4/20/0.4/5 (8/30 over 200k context), but
+  // these runs bill at the gateway rate.
+  'gpt-5.6-sol-ultra': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
   'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },
   'kimi-k3': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
   'glm-5.1-opencode': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
-  'glm-5.2': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
+  // Cut from 1.4/4.4/0.26 (zai's own rate); gateway and models.dev vercel
+  // entry agree as of 2026-08-26.
+  'glm-5.2': { input: 0.8, output: 2.55, cacheRead: 0.16, cacheWrite: 0 },
   'grok-4.5': { input: 2, output: 6, cacheRead: 0.3, cacheWrite: 0 },
   'grok-4.6': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 }, // same in/out as 4.5, pricier cache reads
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
@@ -190,4 +192,63 @@ export function extractRunTokens(raw: string): Usage | null {
   }
 
   return got ? u : null;
+}
+
+/**
+ * Fallback for the rare run whose transcript carries no provider-reported
+ * usage. Mirrors the Artificial Analysis methodology — provider token counts
+ * where available, a canonical estimate otherwise — approximating tokens as
+ * text length / 4 (no tokenizer dependency), with assistant-authored text
+ * priced as output and everything else as input. Cache traffic is unknowable
+ * here, so it prices as uncached — a conservative over-estimate.
+ *
+ * Callers should always prefer extractRunTokens and only fall back:
+ *   extractRunTokens(raw) ?? estimateUsageFromTranscript(raw)
+ * Runs with no transcript at all (e.g. timeouts) stay excluded entirely.
+ */
+export function estimateUsageFromTranscript(raw: string): Usage | null {
+  const events = parseLines(raw);
+  if (events.length === 0) return null;
+
+  // Sum the lengths of human-visible string fields. Only strings sitting
+  // directly under a text-bearing key count (arrays pass the key through;
+  // objects reset it), so metadata like role/id/type never inflates the
+  // estimate.
+  const TEXT_KEYS = new Set(['text', 'content', 'thinking', 'output', 'message']);
+  function textLength(v: unknown, keyed: boolean): number {
+    if (typeof v === 'string') return keyed ? v.length : 0;
+    if (Array.isArray(v)) return v.reduce((n: number, x) => n + textLength(x, keyed), 0);
+    if (v && typeof v === 'object') {
+      let n = 0;
+      for (const [k, x] of Object.entries(v)) {
+        n += textLength(x, TEXT_KEYS.has(k));
+      }
+      return n;
+    }
+    return 0;
+  }
+
+  function isAssistant(d: Record<string, unknown>): boolean {
+    if (d.role === 'assistant' || d.type === 'assistant') return true;
+    const msg = obj(d.message);
+    if (msg.role === 'assistant') return true;
+    const part = obj(d.part);
+    return part.role === 'assistant';
+  }
+
+  let inputChars = 0;
+  let outputChars = 0;
+  for (const d of events) {
+    const len = textLength(d, false);
+    if (isAssistant(d)) outputChars += len;
+    else inputChars += len;
+  }
+
+  if (inputChars + outputChars === 0) return null;
+  return {
+    input: Math.ceil(inputChars / 4),
+    output: Math.ceil(outputChars / 4),
+    cacheRead: 0,
+    cacheWrite: 0,
+  };
 }

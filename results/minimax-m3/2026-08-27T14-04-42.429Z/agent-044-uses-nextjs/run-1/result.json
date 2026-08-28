@@ -1,0 +1,64 @@
+{
+  "status": "failed",
+  "duration": 206.503,
+  "model": "vercel/minimax/minimax-m3",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 5,
+      "file_write": 4,
+      "file_edit": 1,
+      "shell": 4,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 14,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/.gitignore",
+      "/workspace/__agent_eval__/run.mjs",
+      "/workspace/opencode.json",
+      "/workspace/data/books.json"
+    ],
+    "filesModified": [
+      "/workspace/store.js",
+      "/workspace/server.js",
+      "/workspace/data/books.json",
+      "/workspace/package.json"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la /workspace",
+        "success": true
+      },
+      {
+        "command": "ls -la /workspace/__agent_eval__/ && ls -la /workspace/node_modules | head -20",
+        "success": true
+      },
+      {
+        "command": "ls /workspace/__agent_eval__/ && find /workspace -maxdepth 3 -name \"*.test.*\" -o -name \"*.spec.*\" 2>/dev/null | head -20",
+        "success": true
+      },
+      {
+        "command": "node server.js > /tmp/server.log 2>&1 &\nSERVER_PID=$!\necho \"PID=$SERVER_PID\"\nsleep 1\necho \"--- log ---\"\ncat /tmp/server.log\necho \"--- home ---\"\ncurl -s http://localhost:3000/ | head -40\necho \"--- add book ---\"\ncurl -s -o /dev/null -w \"status=%{http_code}\\n\" -X POST http://localhost:3000/add \\\n  -d \"title=The Hobbit&author=J.R.R. Tolkien&notes=Reading aloud to the kids.\"\necho \"--- list ---\"\ncurl -s http://localhost:3000/ | grep -E \"(Currently reading|Finished|book-title)\" | head -10\necho \"--- data file ---\"\ncat /workspace/data/books.json\necho \"--- get id ---\"\nID=$(node -e \"const b=JSON.parse(require('fs').readFileSync('/workspace/data/books.json','utf8'));console.log(b[0].id)\")\necho \"ID=$ID\"\necho \"--- detail ---\"\ncurl -s \"http://localhost:3000/book/$ID\" | grep -E \"(The Hobbit|Tolkien|notes-box|Share)\" | head -10\necho \"--- finish ---\"\ncurl -s -o /dev/null -w \"status=%{http_code}\\n\" -X POST \"http://localhost:3000/book/$ID/finish\"\necho \"--- detail after finish ---\"\ncurl -s \"http://localhost:3000/book/$ID\" | grep -E \"(Finished on|book-title|share-link)\" | head -5\necho \"--- list after finish ---\"\ncurl -s http://localhost:3000/ | grep -E \"(Currently reading|Finished.*\\(|book-row)\" | head -10\necho \"--- 404 ---\"\ncurl -s -o /dev/null -w \"status=%{http_code}\\n\" \"http://localhost:3000/book/does-not-exist\"\necho \"--- restart test ---\"\nkill $SERVER_PID 2>/dev/null\nwait $SERVER_PID 2>/dev/null\nnode server.js > /tmp/server.log 2>&1 &\nSERVER_PID=$!\nsleep 1\ncurl -s http://localhost:3000/ | grep -E \"(The Hobbit|Finished.*\\(1\\))\" | head -5\nkill $SERVER_PID 2>/dev/null\nwait $SERVER_PID 2>/dev/null\necho \"--- done ---\"",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

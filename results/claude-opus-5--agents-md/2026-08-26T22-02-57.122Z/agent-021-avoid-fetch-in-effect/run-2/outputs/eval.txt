@@ -1,0 +1,156 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 2 failed) 9ms
+   ✓ Page is an async server component 1ms
+   × UserProfile component is a server component 5ms
+     → expected '\'use client\'\n\n// Route Handlers a…' not to match /['"]use client['"];?/
+   × UserProfile component uses async/await pattern 1ms
+     → expected '\'use client\'\n\n// Route Handlers a…' to match /async\s+function|export\s+default\s+a…/
+   ✓ UserProfile component fetches from correct endpoint 0ms
+   ✓ UserProfile component displays user data 0ms
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  22:06:51
+   Duration  246ms (transform 45ms, setup 19ms, collect 26ms, tests 9ms, environment 0ms, prepare 65ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > UserProfile component is a server component
+AssertionError: expected '\'use client\'\n\n// Route Handlers a…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+// Route Handlers are reached from Client Components: the relative URL
+// '/api/users/profile' only resolves in the browser, and calling a Route Handler
+// from a Server Component would cost an extra server request.
+import { useEffect, useState } from 'react'
+
+interface Profile {
+  name: string
+  email: string
+}
+
+export default function UserProfile() {
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    fetch('/api/users/profile', { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
+        return res.json()
+      })
+      .then((data: Profile) => setProfile(data))
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      })
+
+    return () => controller.abort()
+  }, [])
+
+  if (error) {
+    return <div>Could not load profile: {error}</div>
+  }
+
+  if (!profile) {
+    return <div>Loading profile...</div>
+  }
+
+  return (
+    <div>
+      <h2>Profile</h2>
+      <div>{profile.name}</div>
+      <div>{profile.email}</div>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:35:34
+     33| 
+     34|   // Should NOT have 'use client' directive
+     35|   expect(userProfileContent).not.toMatch(/['"]use client['"];?/)
+       |                                  ^
+     36| 
+     37|   // Should NOT use useEffect
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > UserProfile component uses async/await pattern
+AssertionError: expected '\'use client\'\n\n// Route Handlers a…' to match /async\s+function|export\s+default\s+a…/
+
+[32m- Expected:[39m 
+/async\s+function|export\s+default\s+async/
+
+[31m+ Received:[39m 
+"'use client'
+
+// Route Handlers are reached from Client Components: the relative URL
+// '/api/users/profile' only resolves in the browser, and calling a Route Handler
+// from a Server Component would cost an extra server request.
+import { useEffect, useState } from 'react'
+
+interface Profile {
+  name: string
+  email: string
+}
+
+export default function UserProfile() {
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    fetch('/api/users/profile', { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
+        return res.json()
+      })
+      .then((data: Profile) => setProfile(data))
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      })
+
+    return () => controller.abort()
+  }, [])
+
+  if (error) {
+    return <div>Could not load profile: {error}</div>
+  }
+
+  if (!profile) {
+    return <div>Loading profile...</div>
+  }
+
+  return (
+    <div>
+      <h2>Profile</h2>
+      <div>{profile.name}</div>
+      <div>{profile.email}</div>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:51:30
+     49| 
+     50|   // Should be an async function for server component
+     51|   expect(userProfileContent).toMatch(
+       |                              ^
+     52|     /async\s+function|export\s+default\s+async/
+     53|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

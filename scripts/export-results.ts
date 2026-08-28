@@ -14,7 +14,12 @@
 import { execSync } from 'node:child_process';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { MODEL_PRICING, extractRunTokens, priceUsage } from './cost.js';
+import {
+  MODEL_PRICING,
+  extractRunTokens,
+  estimateUsageFromTranscript,
+  priceUsage,
+} from './cost.js';
 
 interface SummaryJson {
   totalRuns: number;
@@ -51,7 +56,6 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'claude-opus-4.8--agents-md': 'claude-opus-4.8',
   'claude-sonnet-4.5--agents-md': 'claude-sonnet-4.5',
   'claude-sonnet-4.6--agents-md': 'claude-sonnet-4.6',
-  'cursor-composer-1.5--agents-md': 'cursor-composer-1.5',
   'cursor-composer-2.0--agents-md': 'cursor-composer-2.0',
   'cursor-composer-2.5--agents-md': 'cursor-composer-2.5',
   'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
@@ -99,7 +103,9 @@ async function meanEvalCostUsd(
     if (!entry.startsWith('run-')) continue;
     try {
       const raw = await readFile(join(evalDir, entry, 'transcript-raw.jsonl'), 'utf-8');
-      const usage = extractRunTokens(raw);
+      // Provider-reported token counts first; canonical chars/4 estimate for
+      // the rare transcript that carries none (see cost.ts).
+      const usage = extractRunTokens(raw) ?? estimateUsageFromTranscript(raw);
       if (usage) costs.push(priceUsage(usage, pricing));
     } catch {
       // No transcript for this run (e.g. timeout) — skip it.
@@ -143,10 +149,37 @@ interface ExportedData {
       // model's runs carry no usable token usage) — rendered as N/A.
       avgCostUsd?: number | null;
       docsImpact?: DocsImpact;
+      // 1 = current (fresh full run on the current eval set), 2 = previously
+      // measured. See "Model retention policy" in the README.
+      tier: 1 | 2;
     }>;
   };
   results: Record<string, AgentResult[]>;
 }
+
+/**
+ * Tier-1 experiments per the README's "Model retention policy": the latest
+ * version of each model family, plus the previous version if and only if the
+ * current one was released less than a month after it. Membership implies a
+ * commitment to keep the results fresh (rerun on eval-set/canary changes).
+ * Everything else exports as tier 2: previously measured, dated, not rerun.
+ *
+ * grok-4.6 and gemini-3.1-pro-preview qualify by the rule but are exported as
+ * tier 2 until they can actually be rerun (provider ACL / missing API key).
+ */
+const TIER_1 = new Set([
+  'claude-fable-5',
+  'claude-opus-5',
+  'claude-sonnet-5',
+  // gpt-5.6-sol supersedes the whole GPT line, including the codex-branded
+  // models (OpenAI folded codex into the unified releases after 5.3-codex).
+  'gpt-5.6-sol-ultra',
+  'kimi-k3',
+  'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
+  'cursor-composer-2.5',
+  'glm-5.2',
+  'minimax-m3',
+]);
 
 const MODEL_NAMES: Record<string, string> = {
   'claude-fable-5': 'Claude Fable 5 (high)',
@@ -165,8 +198,6 @@ const MODEL_NAMES: Record<string, string> = {
   'claude-sonnet-4.5--agents-md': 'Claude Sonnet 4.5 + AGENTS.md',
   'claude-sonnet-4.6': 'Claude Sonnet 4.6',
   'claude-sonnet-4.6--agents-md': 'Claude Sonnet 4.6 + AGENTS.md',
-  'cursor-composer-1.5': 'Cursor Composer 1.5',
-  'cursor-composer-1.5--agents-md': 'Cursor Composer 1.5 + AGENTS.md',
   'cursor-composer-2.0': 'Cursor Composer 2.0',
   'cursor-composer-2.0--agents-md': 'Cursor Composer 2.0 + AGENTS.md',
   'cursor-composer-2.5': 'Cursor Composer 2.5',
@@ -426,6 +457,9 @@ async function main(): Promise<void> {
       timestamp: parseTimestamp(latestTimestamp),
       modelName,
       agentHarness,
+      // Variants inherit the base experiment's tier so the docsImpact merge
+      // below never pairs experiments across tiers.
+      tier: TIER_1.has(AGENTS_MD_PAIRS[experiment] ?? experiment) ? 1 : 2,
     });
 
     exportedData.results[experiment] = normalized;

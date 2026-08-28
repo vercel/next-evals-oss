@@ -1,0 +1,73 @@
+{
+  "status": "failed",
+  "duration": 166.319,
+  "model": "claude-sonnet-5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 9,
+    "toolCalls": {
+      "file_read": 2,
+      "file_write": 6,
+      "file_edit": 3,
+      "shell": 6,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 17,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/.gitignore"
+    ],
+    "filesModified": [
+      "/workspace/lib/store.mjs",
+      "/workspace/server.mjs",
+      "/workspace/public/index.html",
+      "/workspace/public/style.css",
+      "/workspace/public/app.js",
+      "/workspace/package.json",
+      "/workspace/.gitignore",
+      "/workspace/lib/store.test.mjs"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la /workspace",
+        "success": true
+      },
+      {
+        "command": "cat /workspace/.gitignore; echo ---; ls /workspace/__agent_eval__; echo ---; ls /workspace/node_modules | head -50",
+        "success": true
+      },
+      {
+        "command": "mkdir -p /workspace/lib /workspace/public /workspace/data",
+        "success": true
+      },
+      {
+        "command": "npx vitest run 2>&1 | tail -60",
+        "success": true
+      },
+      {
+        "command": "rm -rf data && BOOKS_DATA_FILE=/tmp/smoketest-books.json PORT=3999 node server.mjs &\nsleep 1\necho \"--- add book ---\"\ncurl -s -X POST localhost:3999/api/books -H 'Content-Type: application/json' -d '{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"notes\":\"gripping so far\"}'\necho\necho \"--- list ---\"\ncurl -s localhost:3999/api/books\necho\nBOOK_ID=$(curl -s localhost:3999/api/books | node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c);process.stdin.on(\"end\",()=>console.log(JSON.parse(d)[0].id))')\necho \"id=$BOOK_ID\"\necho \"--- get single book ---\"\ncurl -s localhost:3999/api/books/$BOOK_ID\necho\necho \"--- mark finished ---\"\ncurl -s -X PATCH localhost:3999/api/books/$BOOK_ID -H 'Content-Type: application/json' -d '{\"status\":\"finished\"}'\necho\necho \"--- shareable page HTML (should be index.html) ---\"\ncurl -s localhost:3999/book/$BOOK_ID | head -5\necho \"--- 404 for missing book ---\"\ncurl -s -o /dev/null -w \"%{http_code}\\n\" localhost:3999/api/books/nope\nkill %1\n",
+        "success": true
+      },
+      {
+        "command": "rm -f /tmp/smoketest-books.json; git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
