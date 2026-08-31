@@ -1,0 +1,1417 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (7 tests | 5 failed) 12ms
+   × ViewTransition is imported from react 7ms
+     → expected 'import { TransitionLink } from \'./Tr…' to match /import\s+\{[^}]*ViewTransition[^}]*\}…/
+   × Shared element transitions use named ViewTransition 1ms
+     → expected null not to be null
+   × Link uses transitionTypes for directional navigation 1ms
+     → expected 'import { TransitionLink } from \'./Tr…' to match /transitionTypes/
+   × Suspense content uses ViewTransition with enter or exit 1ms
+     → expected 'import { TransitionLink } from \'./Tr…' to match /<ViewTransition[^>]*\b(enter|exit)\s*=/
+   × default="none" prevents unintended animations 1ms
+     → expected 'import { TransitionLink } from \'./Tr…' to match /default\s*=\s*["']none["']/
+   ✓ CSS handles prefers-reduced-motion 1ms
+   ✓ CSS defines view transition animations 0ms
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 2 passed (7)
+   Start at  17:59:50
+   Duration  255ms (transform 48ms, setup 20ms, collect 26ms, tests 12ms, environment 0ms, prepare 69ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > ViewTransition is imported from react
+AssertionError: expected 'import { TransitionLink } from \'./Tr…' to match /import\s+\{[^}]*ViewTransition[^}]*\}…/
+
+[32m- Expected:[39m 
+/import\s+\{[^}]*ViewTransition[^}]*\}\s+from\s+['"]react['"]/
+
+[31m+ Received:[39m 
+"import { TransitionLink } from './TransitionLink'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <TransitionLink
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`,
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </TransitionLink>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+'use client'
+
+import Link from 'next/link'
+import { useTransitionNavigation } from './TransitionProvider'
+import type { ComponentPropsWithoutRef } from 'react'
+
+type TransitionLinkProps = ComponentPropsWithoutRef<typeof Link> & {
+  direction?: 'forward' | 'backward'
+}
+
+export function TransitionLink({
+  href,
+  direction,
+  onClick,
+  ...props
+}: TransitionLinkProps) {
+  const { navigate } = useTransitionNavigation()
+
+  return (
+    <Link
+      href={href}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick?.(e)
+        navigate(typeof href === 'string' ? href : href.toString(), direction)
+      }}
+      {...props}
+    />
+  )
+}
+
+---FILE---
+'use client'
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+
+type Direction = 'forward' | 'backward'
+
+interface TransitionContextValue {
+  direction: Direction | null
+  navigate: (href: string, direction?: Direction) => void
+}
+
+const TransitionContext = createContext<TransitionContextValue | null>(null)
+
+function getDirection(from: string, to: string): Direction | null {
+  if (from === '/' && to.startsWith('/product/')) return 'forward'
+  if (from.startsWith('/product/') && to === '/') return 'backward'
+  return null
+}
+
+export function useTransitionNavigation() {
+  const ctx = useContext(TransitionContext)
+  if (!ctx) {
+    throw new Error(
+      'useTransitionNavigation must be used within a TransitionProvider'
+    )
+  }
+  return ctx
+}
+
+export function TransitionProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const previousPathRef = useRef(pathname)
+  const [direction, setDirection] = useState<Direction | null>(null)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    previousPathRef.current = pathname
+  }, [pathname])
+
+  const navigate = useCallback(
+    (href: string, explicitDirection?: Direction) => {
+      const dir = explicitDirection ?? getDirection(previousPathRef.current, href)
+      setDirection(dir)
+
+      if (
+        reducedMotion ||
+        typeof document === 'undefined' ||
+        !('startViewTransition' in document)
+      ) {
+        router.push(href)
+        return
+      }
+
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+      document.startViewTransition(() => router.push(href))
+    },
+    [reducedMotion, router]
+  )
+
+  useEffect(() => {
+    const onPopState = () => {
+      const to = window.location.pathname
+      const dir = getDirection(previousPathRef.current, to)
+      setDirection(dir)
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  return (
+    <TransitionContext.Provider value={{ direction, navigate }}>
+      {children}
+    </TransitionContext.Provider>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import { TransitionProvider } from './TransitionProvider'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>
+        <TransitionProvider>{children}</TransitionProvider>
+      </body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <div className=\"fade-in\">
+          <ProductGrid />
+        </div>
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { TransitionLink } from '@/app/TransitionLink'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info fade-in\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <TransitionLink
+        href=\"/\"
+        direction=\"backward\"
+        className=\"back-link\"
+      >
+        ← Back to products
+      </TransitionLink>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`,
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:82:21
+     80|   const allSource = readAllSourceFiles()
+     81| 
+     82|   expect(allSource).toMatch(
+       |                     ^
+     83|     /import\s+\{[^}]*ViewTransition[^}]*\}\s+from\s+['"]react['"]/
+     84|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  EVAL.ts > Shared element transitions use named ViewTransition
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:91:27
+     89| 
+     90|   const nameMatches = allSource.match(/<ViewTransition[^>]*\bname\s*=/…
+     91|   expect(nameMatches).not.toBeNull()
+       |                           ^
+     92|   expect(nameMatches!.length).toBeGreaterThanOrEqual(2)
+     93| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  EVAL.ts > Link uses transitionTypes for directional navigation
+AssertionError: expected 'import { TransitionLink } from \'./Tr…' to match /transitionTypes/
+
+[32m- Expected:[39m 
+/transitionTypes/
+
+[31m+ Received:[39m 
+"import { TransitionLink } from './TransitionLink'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <TransitionLink
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`,
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </TransitionLink>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+'use client'
+
+import Link from 'next/link'
+import { useTransitionNavigation } from './TransitionProvider'
+import type { ComponentPropsWithoutRef } from 'react'
+
+type TransitionLinkProps = ComponentPropsWithoutRef<typeof Link> & {
+  direction?: 'forward' | 'backward'
+}
+
+export function TransitionLink({
+  href,
+  direction,
+  onClick,
+  ...props
+}: TransitionLinkProps) {
+  const { navigate } = useTransitionNavigation()
+
+  return (
+    <Link
+      href={href}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick?.(e)
+        navigate(typeof href === 'string' ? href : href.toString(), direction)
+      }}
+      {...props}
+    />
+  )
+}
+
+---FILE---
+'use client'
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+
+type Direction = 'forward' | 'backward'
+
+interface TransitionContextValue {
+  direction: Direction | null
+  navigate: (href: string, direction?: Direction) => void
+}
+
+const TransitionContext = createContext<TransitionContextValue | null>(null)
+
+function getDirection(from: string, to: string): Direction | null {
+  if (from === '/' && to.startsWith('/product/')) return 'forward'
+  if (from.startsWith('/product/') && to === '/') return 'backward'
+  return null
+}
+
+export function useTransitionNavigation() {
+  const ctx = useContext(TransitionContext)
+  if (!ctx) {
+    throw new Error(
+      'useTransitionNavigation must be used within a TransitionProvider'
+    )
+  }
+  return ctx
+}
+
+export function TransitionProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const previousPathRef = useRef(pathname)
+  const [direction, setDirection] = useState<Direction | null>(null)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    previousPathRef.current = pathname
+  }, [pathname])
+
+  const navigate = useCallback(
+    (href: string, explicitDirection?: Direction) => {
+      const dir = explicitDirection ?? getDirection(previousPathRef.current, href)
+      setDirection(dir)
+
+      if (
+        reducedMotion ||
+        typeof document === 'undefined' ||
+        !('startViewTransition' in document)
+      ) {
+        router.push(href)
+        return
+      }
+
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+      document.startViewTransition(() => router.push(href))
+    },
+    [reducedMotion, router]
+  )
+
+  useEffect(() => {
+    const onPopState = () => {
+      const to = window.location.pathname
+      const dir = getDirection(previousPathRef.current, to)
+      setDirection(dir)
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  return (
+    <TransitionContext.Provider value={{ direction, navigate }}>
+      {children}
+    </TransitionContext.Provider>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import { TransitionProvider } from './TransitionProvider'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>
+        <TransitionProvider>{children}</TransitionProvider>
+      </body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <div className=\"fade-in\">
+          <ProductGrid />
+        </div>
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { TransitionLink } from '@/app/TransitionLink'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info fade-in\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <TransitionLink
+        href=\"/\"
+        direction=\"backward\"
+        className=\"back-link\"
+      >
+        ← Back to products
+      </TransitionLink>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`,
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:98:21
+     96|   const allSource = readAllSourceFiles()
+     97| 
+     98|   expect(allSource).toMatch(/transitionTypes/)
+       |                     ^
+     99| })
+    100| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  EVAL.ts > Suspense content uses ViewTransition with enter or exit
+AssertionError: expected 'import { TransitionLink } from \'./Tr…' to match /<ViewTransition[^>]*\b(enter|exit)\s*=/
+
+[32m- Expected:[39m 
+/<ViewTransition[^>]*\b(enter|exit)\s*=/
+
+[31m+ Received:[39m 
+"import { TransitionLink } from './TransitionLink'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <TransitionLink
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`,
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </TransitionLink>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+'use client'
+
+import Link from 'next/link'
+import { useTransitionNavigation } from './TransitionProvider'
+import type { ComponentPropsWithoutRef } from 'react'
+
+type TransitionLinkProps = ComponentPropsWithoutRef<typeof Link> & {
+  direction?: 'forward' | 'backward'
+}
+
+export function TransitionLink({
+  href,
+  direction,
+  onClick,
+  ...props
+}: TransitionLinkProps) {
+  const { navigate } = useTransitionNavigation()
+
+  return (
+    <Link
+      href={href}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick?.(e)
+        navigate(typeof href === 'string' ? href : href.toString(), direction)
+      }}
+      {...props}
+    />
+  )
+}
+
+---FILE---
+'use client'
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+
+type Direction = 'forward' | 'backward'
+
+interface TransitionContextValue {
+  direction: Direction | null
+  navigate: (href: string, direction?: Direction) => void
+}
+
+const TransitionContext = createContext<TransitionContextValue | null>(null)
+
+function getDirection(from: string, to: string): Direction | null {
+  if (from === '/' && to.startsWith('/product/')) return 'forward'
+  if (from.startsWith('/product/') && to === '/') return 'backward'
+  return null
+}
+
+export function useTransitionNavigation() {
+  const ctx = useContext(TransitionContext)
+  if (!ctx) {
+    throw new Error(
+      'useTransitionNavigation must be used within a TransitionProvider'
+    )
+  }
+  return ctx
+}
+
+export function TransitionProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const previousPathRef = useRef(pathname)
+  const [direction, setDirection] = useState<Direction | null>(null)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    previousPathRef.current = pathname
+  }, [pathname])
+
+  const navigate = useCallback(
+    (href: string, explicitDirection?: Direction) => {
+      const dir = explicitDirection ?? getDirection(previousPathRef.current, href)
+      setDirection(dir)
+
+      if (
+        reducedMotion ||
+        typeof document === 'undefined' ||
+        !('startViewTransition' in document)
+      ) {
+        router.push(href)
+        return
+      }
+
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+      document.startViewTransition(() => router.push(href))
+    },
+    [reducedMotion, router]
+  )
+
+  useEffect(() => {
+    const onPopState = () => {
+      const to = window.location.pathname
+      const dir = getDirection(previousPathRef.current, to)
+      setDirection(dir)
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  return (
+    <TransitionContext.Provider value={{ direction, navigate }}>
+      {children}
+    </TransitionContext.Provider>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import { TransitionProvider } from './TransitionProvider'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>
+        <TransitionProvider>{children}</TransitionProvider>
+      </body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <div className=\"fade-in\">
+          <ProductGrid />
+        </div>
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { TransitionLink } from '@/app/TransitionLink'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info fade-in\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <TransitionLink
+        href=\"/\"
+        direction=\"backward\"
+        className=\"back-link\"
+      >
+        ← Back to products
+      </TransitionLink>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`,
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:104:21
+    102|   const allSource = readAllSourceFiles()
+    103| 
+    104|   expect(allSource).toMatch(/<ViewTransition[^>]*\b(enter|exit)\s*=/)
+       |                     ^
+    105| })
+    106| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  EVAL.ts > default="none" prevents unintended animations
+AssertionError: expected 'import { TransitionLink } from \'./Tr…' to match /default\s*=\s*["']none["']/
+
+[32m- Expected:[39m 
+/default\s*=\s*["']none["']/
+
+[31m+ Received:[39m 
+"import { TransitionLink } from './TransitionLink'
+import { products } from '@/lib/products'
+
+export function ProductGrid() {
+  return (
+    <div className=\"product-grid\">
+      {products.map((product) => (
+        <TransitionLink
+          key={product.slug}
+          href={`/product/${product.slug}`}
+          className=\"product-card\"
+        >
+          <div
+            className=\"product-image\"
+            style={{
+              backgroundColor: product.color,
+              viewTransitionName: `product-image-${product.slug}`,
+            }}
+          />
+          <h2>{product.name}</h2>
+          <p>${product.price}</p>
+        </TransitionLink>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+export function ProductGridSkeleton() {
+  return (
+    <div className=\"product-grid\">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className=\"product-card\">
+          <div className=\"product-image skeleton-image\" />
+          <div className=\"skeleton-text\" />
+          <div className=\"skeleton-text short\" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+---FILE---
+'use client'
+
+import Link from 'next/link'
+import { useTransitionNavigation } from './TransitionProvider'
+import type { ComponentPropsWithoutRef } from 'react'
+
+type TransitionLinkProps = ComponentPropsWithoutRef<typeof Link> & {
+  direction?: 'forward' | 'backward'
+}
+
+export function TransitionLink({
+  href,
+  direction,
+  onClick,
+  ...props
+}: TransitionLinkProps) {
+  const { navigate } = useTransitionNavigation()
+
+  return (
+    <Link
+      href={href}
+      onClick={(e) => {
+        e.preventDefault()
+        onClick?.(e)
+        navigate(typeof href === 'string' ? href : href.toString(), direction)
+      }}
+      {...props}
+    />
+  )
+}
+
+---FILE---
+'use client'
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+
+type Direction = 'forward' | 'backward'
+
+interface TransitionContextValue {
+  direction: Direction | null
+  navigate: (href: string, direction?: Direction) => void
+}
+
+const TransitionContext = createContext<TransitionContextValue | null>(null)
+
+function getDirection(from: string, to: string): Direction | null {
+  if (from === '/' && to.startsWith('/product/')) return 'forward'
+  if (from.startsWith('/product/') && to === '/') return 'backward'
+  return null
+}
+
+export function useTransitionNavigation() {
+  const ctx = useContext(TransitionContext)
+  if (!ctx) {
+    throw new Error(
+      'useTransitionNavigation must be used within a TransitionProvider'
+    )
+  }
+  return ctx
+}
+
+export function TransitionProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const previousPathRef = useRef(pathname)
+  const [direction, setDirection] = useState<Direction | null>(null)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    previousPathRef.current = pathname
+  }, [pathname])
+
+  const navigate = useCallback(
+    (href: string, explicitDirection?: Direction) => {
+      const dir = explicitDirection ?? getDirection(previousPathRef.current, href)
+      setDirection(dir)
+
+      if (
+        reducedMotion ||
+        typeof document === 'undefined' ||
+        !('startViewTransition' in document)
+      ) {
+        router.push(href)
+        return
+      }
+
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+      document.startViewTransition(() => router.push(href))
+    },
+    [reducedMotion, router]
+  )
+
+  useEffect(() => {
+    const onPopState = () => {
+      const to = window.location.pathname
+      const dir = getDirection(previousPathRef.current, to)
+      setDirection(dir)
+      document.documentElement.setAttribute(
+        'data-transition-direction',
+        dir ?? ''
+      )
+    }
+
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  return (
+    <TransitionContext.Provider value={{ direction, navigate }}>
+      {children}
+    </TransitionContext.Provider>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+import { TransitionProvider } from './TransitionProvider'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Gallery',
+  description: 'A simple product gallery',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>
+        <TransitionProvider>{children}</TransitionProvider>
+      </body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { ProductGrid } from './ProductGrid'
+import { ProductGridSkeleton } from './ProductSkeleton'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Products</h1>
+      <Suspense fallback={<ProductGridSkeleton />}>
+        <div className=\"fade-in\">
+          <ProductGrid />
+        </div>
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { TransitionLink } from '@/app/TransitionLink'
+import { getProduct, products } from '@/lib/products'
+import { notFound } from 'next/navigation'
+
+async function ProductDetails({ slug }: { slug: string }) {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const product = getProduct(slug)
+  if (!product) notFound()
+
+  return (
+    <div className=\"product-info fade-in\">
+      <h1>{product.name}</h1>
+      <p className=\"product-price\">${product.price}</p>
+      <p className=\"product-description\">{product.description}</p>
+    </div>
+  )
+}
+
+function DetailsSkeleton() {
+  return (
+    <div className=\"product-info\">
+      <div className=\"skeleton-text large\" />
+      <div className=\"skeleton-text short\" />
+      <div className=\"skeleton-text\" />
+    </div>
+  )
+}
+
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = products.find((p) => p.slug === slug)
+  if (!product) notFound()
+
+  return (
+    <div>
+      <TransitionLink
+        href=\"/\"
+        direction=\"backward\"
+        className=\"back-link\"
+      >
+        ← Back to products
+      </TransitionLink>
+      <div className=\"product-detail\">
+        <div
+          className=\"product-hero\"
+          style={{
+            backgroundColor: product.color,
+            viewTransitionName: `product-image-${product.slug}`,
+          }}
+        />
+        <Suspense fallback={<DetailsSkeleton />}>
+          <ProductDetails slug={slug} />
+        </Suspense>
+      </div>
+    </div>
+  )
+}
+
+---FILE---
+export type Product = {
+  slug: string
+  name: string
+  description: string
+  price: number
+  color: string
+}
+
+export const products: Product[] = [
+  {
+    slug: 'classic-sneakers',
+    name: 'Classic Sneakers',
+    description: 'Timeless design meets everyday comfort.',
+    price: 89,
+    color: '#4F46E5',
+  },
+  {
+    slug: 'leather-backpack',
+    name: 'Leather Backpack',
+    description: 'Handcrafted from premium full-grain leather.',
+    price: 129,
+    color: '#059669',
+  },
+  {
+    slug: 'wireless-headphones',
+    name: 'Wireless Headphones',
+    description: 'Crystal-clear audio with active noise cancellation.',
+    price: 199,
+    color: '#DC2626',
+  },
+  {
+    slug: 'cotton-hoodie',
+    name: 'Cotton Hoodie',
+    description: 'Ultra-soft organic cotton blend for all-day wear.',
+    price: 65,
+    color: '#D97706',
+  },
+]
+
+export function getProduct(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug)
+}
+"
+
+ ❯ EVAL.ts:110:21
+    108|   const allSource = readAllSourceFiles()
+    109| 
+    110|   expect(allSource).toMatch(/default\s*=\s*["']none["']/)
+       |                     ^
+    111| })
+    112| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
