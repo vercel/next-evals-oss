@@ -63,7 +63,7 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // openai/gpt-6-astra's base context tier; the gateway catalog and models.dev
   // vercel entry agree as of 2026-09-08. Over 272k context it doubles to
   // 20/75/2/25 — this table has no tiers, and eval runs stay far below that.
-  'gpt-6-astra-max': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  'gpt-6-astra-high': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
   'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
   'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },

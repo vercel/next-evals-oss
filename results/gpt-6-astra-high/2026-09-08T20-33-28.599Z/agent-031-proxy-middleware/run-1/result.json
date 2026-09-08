@@ -1,0 +1,65 @@
+{
+  "status": "failed",
+  "duration": 158.751,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 2,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 6,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 6,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*middleware*' -g '*proxy*' -g 'next.config.*' -g 'tsconfig.json' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && cat tsconfig.json && cat next.config.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"ls -la && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' | head -60; for path in /AGENTS.md /workspace/AGENTS.md; do if [ -f \\\"\"'$path\" ]; then cat \"$path\"; fi; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit --incremental false'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=commonjs <<'NODE'\nconst assert = require('node:assert/strict')\nconst fs = require('node:fs')\nconst ts = require('typescript')\nconst { NextRequest } = require('next/server')\nconst source = fs.readFileSync('middleware.ts', 'utf8')\nconst compiled = ts.transpileModule(source, {\n  compilerOptions: { module: ts.ModuleKind.CommonJS },\n}).outputText\nconst middlewareModule = { exports: {} }\nnew Function('require', 'module', 'exports', compiled)(require, middlewareModule, middlewareModule.exports)\nconst { middleware } = middlewareModule.exports\nconst originalLog = console.log\nconst logs = []\nconsole.log = (...args) => logs.push(args)\ntry {\n  const paths = ['/', '/api/example', '/_next/static/example.js', '/missing']\n  const responses = paths.map((path) => middleware(new NextRequest(\"'`https://example.com${path}?query=ignored`)))\n  const ids = responses.map((response) => response.headers.get('\"'X-Request-Id'))\n  for (const id of ids) {\n    assert.match(id, /\"'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)\n  }\n  assert.equal(new Set(ids).size, ids.length)\n  assert.deepEqual(logs, paths.map((path) => [path]))\n  for (const response of responses) {\n    assert.equal(response.headers.get('\"'x-middleware-next'), '1')\n  }\n} finally {\n  console.log = originalLog\n}\nconsole.log('Middleware checks passed: unique UUID headers, pathname logs, and request continuation.')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff --check'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

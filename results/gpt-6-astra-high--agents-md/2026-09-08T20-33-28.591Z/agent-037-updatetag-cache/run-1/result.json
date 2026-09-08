@@ -1,0 +1,108 @@
+{
+  "status": "passed",
+  "duration": 159.061,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*post*' -g '*action*' -g 'next.config.*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs | head -60'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md node_modules/next/dist/docs/01-app/02-guides/server-actions.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat AGENTS.md package.json && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/unstable_cache.md node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md'"
+      },
+      {
+        "command": "/bin/bash -lc 'cat app/page.tsx app/layout.tsx next.config.ts tsconfig.json && ls -a'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheTag.md node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md && sed -n '1,160p' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat .gitignore && node --version && rg --files node_modules | rg '/(playwright|tsx)/package.json\"'$'\"' | head -10\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff --stat'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- tsconfig.json && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nimport json\nimport uuid\nfrom html.parser import HTMLParser\nfrom pathlib import Path\nfrom urllib.error import HTTPError\nfrom urllib.request import Request, build_opener, HTTPRedirectHandler, urlopen\n\nbase = 'http://localhost:3000'\nclass FormParser(HTMLParser):\n    action = None\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        if tag == 'input' and attrs.get('name', '').startswith('\"'$ACTION_ID_'\"'):\n            self.action = attrs['name']\n\nclass NoRedirect(HTTPRedirectHandler):\n    def redirect_request(self, *args):\n        return None\n\nopener = build_opener(NoRedirect)\nmarker = 'Fresh post ' + str(uuid.uuid4())\ncreated_files = []\ntry:\n    for _ in range(2):\n        with urlopen(base) as response:\n            initial = response.read().decode()\n    parser = FormParser()\n    parser.feed(initial)\n    assert parser.action, 'Server Action form missing'\n    assert marker not in initial\n\n    boundary = 'Boundary' + uuid.uuid4().hex\n    fields = {parser.action: '', 'title': marker, 'content': 'Created through the real Server Action.'}\n    body = ''.join(f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{name}\\\"\\\\r\\\\n\\\\r\\\\n{value}\\\\r\\\\n' for name, value in fields.items()) + f'--{boundary}--\\\\r\\\\n'\n    request = Request(base, data=body.encode(), headers={'Content-Type': f'multipart/form-data; boundary={boundary}', 'Origin': base})\n    try:\n        opener.open(request)\n        raise AssertionError('Expected redirect after creating post')\n    except HTTPError as response:\n        assert response.code == 303, (response.code, response.read().decode())\n        assert response.headers['Location'] == '/'\n\n    with urlopen(base) as response:\n        first_load = response.read().decode()\n    assert f'<h2>{marker}</h2>' in first_load, 'First page load served stale posts'\n    assert 'Created through the real Server Action.' in first_load\n    for file in Path('.data/posts').glob('*.json'):\n        if json.loads(file.read_text())['title'] == marker:\n            created_files.append(file)\n    assert len(created_files) == 1, 'Expected exactly one saved post'\n    print('PASS: Warmed posts cache, submitted Server Action, received 303, and the very first GET rendered the saved post.')\n\n    fields['title'] = '   '\n    body = ''.join(f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{name}\\\"\\\\r\\\\n\\\\r\\\\n{value}\\\\r\\\\n' for name, value in fields.items()) + f'--{boundary}--\\\\r\\\\n'\n    request = Request(base, data=body.encode(), headers={'Content-Type': f'multipart/form-data; boundary={boundary}', 'Origin': base})\n    before = set(Path('.data/posts').glob('*.json'))\n    try:\n        opener.open(request)\n        raise AssertionError('Expected invalid post rejection')\n    except HTTPError as response:\n        assert response.code == 500, response.code\n    assert set(Path('.data/posts').glob('*.json')) == before\n    print('PASS: Blank title was rejected without saving a post.')\nfinally:\n    for file in created_files:\n        file.unlink()\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff -- app/page.tsx next.config.ts tsconfig.json .gitignore && nl -ba app/actions.ts && nl -ba lib/posts.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\n# Remove generated cache artifacts so the smoke-test post cannot be served later.\nshutil.rmtree('.next')\nfor directory in (Path('.data/posts'), Path('.data')):\n    if directory.exists() and not any(directory.iterdir()):\n        directory.rmdir()\nPY\n\ngit diff --check\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

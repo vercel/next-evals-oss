@@ -1,0 +1,105 @@
+{
+  "status": "passed",
+  "duration": 189.518,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 14,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 14,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g '\"'!package-lock.json'\"' -g '\"'!node_modules'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' -g '\"'!*lock*'\"' -g '\"'!'\"\\\\.git' | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls node_modules/next/dist/docs && cat package.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md app/page.tsx tsconfig.json && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'refresh\\\\(|export.*refresh|cookies\\\\(\\\\)' node_modules/next/dist/docs/01-app/03-api-reference/02-functions/refresh.mdx node_modules/next/dist/docs/01-app/03-api-reference/02-functions/cookies.mdx && rg --files node_modules/next/dist/docs/01-app | rg 'updating-data|server-actions|layouts-and-pages|installation'\"",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs/01-app | rg '/(refresh|cookies|updating-data|layouts-and-pages|installation)|server-actions'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/refresh.md && sed -n '1,240p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cookies.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs/01-app/01-getting-started && cat node_modules/next/dist/docs/01-app/02-guides/server-actions.md && ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,180p' node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md && sed -n '65,125p' node_modules/next/dist/docs/01-app/01-getting-started/03-layouts-and-pages.md && cat .gitignore\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --stat && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- tsconfig.json && cat next-env.d.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\n\nconst url = 'http://127.0.0.1:3000/?tab=notifications'\nconst initialResponse = await fetch(url)\nassert.equal(initialResponse.status, 200)\nconst initialHtml = await initialResponse.text()\nassert.match(initialHtml, /Notifications: <\"'!-- -->Off/)\nconst actionId = initialHtml.match(/name=\"'\"\\\\\"'$ACTION_ID_([''^\"]+)\"/)?.[1]\nassert.ok(actionId, '\"'Rendered form exposes its Server Action')\n\nlet cookie = ''\nfor (const expected of ['On', 'Off']) {\n  const response = await fetch(url, {\n    method: 'POST',\n    redirect: 'manual',\n    headers: {\n      'Next-Action': actionId,\n      Accept: 'text/x-component',\n      'Content-Type': 'text/plain;charset=UTF-8',\n      Origin: 'http://127.0.0.1:3000',\n      Cookie: cookie,\n    },\n    body: '[]',\n  })\n  assert.equal(response.status, 200)\n  assert.equal(response.headers.get('location'), null)\n  assert.equal(response.headers.get('x-action-redirect'), null)\n  assert.equal(response.url, url)\n  const payload = await response.text()\n  assert.ok(payload.includes(\"'`\"Notifications: \",\"${expected}\"`), `Action response renders ${expected}`)\n  cookie = response.headers.get('\"'set-cookie')?.split(';')[0]\n  assert.equal(cookie, \"'`notifications-enabled=${expected === '\"'On'}\"'`)\n  const pageResponse = await fetch(url, { headers: { Cookie: cookie } })\n  assert.match(await pageResponse.text(), new RegExp(`Notifications: <!-- -->${expected}`))\n  console.log(`PASS: toggle to ${expected}, updated Server Component response, persisted preference, same URL, no redirect`)\n}\nconst separateBrowser = await fetch(url)\nassert.match(await separateBrowser.text(), /Notifications: <!-- -->Off/)\nconsole.log('\"'PASS: a browser without the preference cookie defaults to Off')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\n\n# Remove only artifacts generated by this verification run.\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nPath('next-env.d.ts').unlink()\nshutil.rmtree('.next')\nPY\n\ngit diff --check && git diff -- app/page.tsx && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "status": "passed",
+  "duration": 195.491,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'tsconfig.json' -g '\"'!*lock*'\"' -g '\"'!node_modules'\"' -g '\"'!'\"\\\\.git' | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && rg --files -g '\"'!node_modules'\"' -g '\"'!'\"\\\\.git' | head -160\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md package.json tsconfig.json && cat app/page.tsx app/layout.tsx app/UserProfile.tsx app/ProductList.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | head -65 && rg -n \\\"fetch\\\\(|useEffect|server components|Client Components\\\" node_modules/next/dist/docs/01-app/02-guides node_modules/next/dist/docs/01-app/01-getting-started -g '*.mdx' -g '*.md' | head -85\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,115p' node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md && sed -n '1,95p' node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md && cat next.config.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'absolute|Route Handlers|build time' node_modules/next/dist/docs/01-app/02-guides/backend-for-frontend.md && sed -n '1,150p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/headers.md && sed -n '1,100p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/fetch.md && cat .gitignore\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\nimport { createRequire } from 'node:module'\nimport ts from 'typescript'\nimport { renderToStaticMarkup } from 'react-dom/server'\n\nconst requestHeaders = new Headers({\n  host: 'example.test',\n  'x-forwarded-proto': 'https',\n  cookie: 'session=test-session',\n  authorization: 'Bearer test-token',\n})\nconst require = createRequire(import.meta.url)\nconst source = readFileSync('app/UserProfile.tsx', 'utf8')\nconst { outputText } = ts.transpileModule(source, {\n  compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },\n})\nconst module = { exports: {} }\nnew Function('require', 'module', 'exports', outputText)(\n  (name) => name === 'next/headers' ? { headers: async () => requestHeaders } : require(name),\n  module,\n  module.exports,\n)\nconst UserProfile = module.exports.default\nconst originalFetch = globalThis.fetch\ntry {\n  let requests = 0\n  globalThis.fetch = async (url, options) => {\n    requests++\n    assert.equal(url, 'https://example.test/api/users/profile')\n    assert.equal(options.cache, 'no-store')\n    assert.equal(options.headers.get('cookie'), 'session=test-session')\n    assert.equal(options.headers.get('authorization'), 'Bearer test-token')\n    return Response.json({ name: 'Alex Smith', email: 'alex@example.test' })\n  }\n  let html = renderToStaticMarkup(await UserProfile())\n  assert.equal(requests, 1)\n  assert.match(html, /Name: Alex Smith/)\n  assert.match(html, /Email: alex@example.test/)\n  console.log('PASS: profile renders name and email using the current session')\n\n  for (const [label, fetchResult] of [\n    ['HTTP error', async () => new Response(null, { status: 401 })],\n    ['network error', async () => { throw new Error('unavailable') }],\n    ['invalid JSON', async () => new Response('invalid')],\n    ['missing profile fields', async () => Response.json({ name: 'Alex' })],\n  ]) {\n    globalThis.fetch = fetchResult\n    html = renderToStaticMarkup(await UserProfile())\n    assert.match(html, /Unable to load user profile/)\n    console.log(\"'`PASS: ${label} renders the fallback`)\n  }\n} finally {\n  globalThis.fetch = originalFetch\n}\nNODE'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && git diff -- app/UserProfile.tsx tsconfig.json && rg --files -g '*.tsbuildinfo' -g 'next-env.d.ts' -g '\"'!node_modules'\"' -g '\"'!'\"\\\\.next'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git restore -- tsconfig.json && rm -r .next && rm next-env.d.ts && git diff --check && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

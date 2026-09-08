@@ -1,0 +1,90 @@
+{
+  "status": "failed",
+  "duration": 183.7,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 11,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 11,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'pages/**' -g 'README*' -g 'tsconfig.json' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la && cat package.json && cat app/page.tsx && cat app/layout.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'for p in /AGENTS.md /workspace/AGENTS.md; do if [ -f \"$p\" ]; then cat \"$p\"; fi; done\nrg --files -g '\"'\"'!node_modules'\"' -g '\"'!'\"\\\\.git' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\ncat next.config.ts && cat tsconfig.json\ngit status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat lib/db.js\ncat .gitignore\nnode -p \\\"require('next/package.json').version\\\"\nrg -n 'export declare function revalidateTag|function revalidateTag|stale-while-revalidate|function unstable_cache' node_modules/next/dist/server/web/spec-extension/revalidate.* node_modules/next/dist/server/web/spec-extension/unstable-cache.*\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && git diff --stat\nrg -n 'products|revalidateTag' app lib\nnode -p \\\"try { require.resolve('playwright') } catch { 'playwright not installed' }\\\"\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short\ncat tsconfig.json\nrg --files .next/cache/fetch-cache'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nfrom urllib.request import Request, urlopen\nfrom html.parser import HTMLParser\nimport json\nimport time\n\nbase = 'http://127.0.0.1:3000'\nclass FormParser(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.action = None\n        self.form = None\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        if tag == 'form':\n            self.form = attrs\n        if tag == 'input' and attrs.get('name', '').startswith('\"'$ACTION_ID_'\"'):\n            self.action = attrs['name']\n\ndef request(req):\n    with urlopen(req) as response:\n        return response.status, response.read().decode(), dict(response.headers)\n\nstatus, html, headers = request(base)\nassert status == 200\nassert all(name in html for name in ['Laptop', 'Phone', 'Tablet', 'Headphones', 'Watch'])\nparser = FormParser()\nparser.feed(html)\nassert parser.action, 'Server Action field missing'\nassert parser.form['method'].lower() == 'post'\nassert parser.form['encType'] == 'multipart/form-data'\nentries = list(Path('.next/cache/fetch-cache').iterdir())\nassert len(entries) == 1\nentry = entries[0]\nassert json.loads(entry.read_text())['tags'] == ['products']\ninitial_mtime = entry.stat().st_mtime_ns\nfor _ in range(3):\n    assert request(base)[0] == 200\nassert entry.stat().st_mtime_ns == initial_mtime, 'Reads rewrote the product cache'\n\nboundary = 'catalog-smoke-test-boundary'\nbody = (f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{parser.action}\\\"\\\\r\\\\n\\\\r\\\\n\\\\r\\\\n--{boundary}--\\\\r\\\\n').encode()\nstarted = time.monotonic()\nstatus, submitted_html, _ = request(Request(base, data=body, headers={\n    'Content-Type': f'multipart/form-data; boundary={boundary}',\n    'Origin': base,\n}))\nassert status == 200\nassert 'Product catalog' in submitted_html\nassert 'Laptop' in submitted_html\nfor _ in range(40):\n    request(base)\n    if entry.stat().st_mtime_ns > initial_mtime:\n        break\n    time.sleep(0.1)\nassert entry.stat().st_mtime_ns > initial_mtime, 'Tagged product cache did not refresh'\nprint('PASS: all five products render; form uses an inline Server Action with native multipart POST.')\nprint('PASS: three repeated reads reuse the same products cache entry.')\nprint('PASS: form submission succeeds and the products cache refreshes after invalidation.')\nPY\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nfrom urllib.request import Request, urlopen\nfrom html.parser import HTMLParser\nimport json\nimport time\n\nbase = 'http://127.0.0.1:3000'\nclass FormParser(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.action = None\n        self.form = None\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        if tag == 'form':\n            self.form = attrs\n        if tag == 'input' and attrs.get('name', '').startswith('\"'$ACTION_ID_'\"'):\n            self.action = attrs['name']\n\ndef request(req):\n    with urlopen(req) as response:\n        return response.status, response.read().decode(), dict(response.headers)\n\nstatus, html, headers = request(base)\nassert status == 200\nassert all(name in html for name in ['Laptop', 'Phone', 'Tablet', 'Headphones', 'Watch'])\nparser = FormParser()\nparser.feed(html)\nassert parser.action, 'Server Action field missing'\nassert parser.form['method'].lower() == 'post'\nassert parser.form['enctype'] == 'multipart/form-data'\nentries = list(Path('.next/cache/fetch-cache').iterdir())\nassert len(entries) == 1\nentry = entries[0]\nassert json.loads(entry.read_text())['tags'] == ['products']\ninitial_mtime = entry.stat().st_mtime_ns\nfor _ in range(3):\n    assert request(base)[0] == 200\nassert entry.stat().st_mtime_ns == initial_mtime, 'Reads rewrote the product cache'\n\nboundary = 'catalog-smoke-test-boundary'\nbody = (f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{parser.action}\\\"\\\\r\\\\n\\\\r\\\\n\\\\r\\\\n--{boundary}--\\\\r\\\\n').encode()\nstatus, submitted_html, _ = request(Request(base, data=body, headers={\n    'Content-Type': f'multipart/form-data; boundary={boundary}',\n    'Origin': base,\n}))\nassert status == 200\nassert 'Product catalog' in submitted_html\nassert 'Laptop' in submitted_html\nfor _ in range(40):\n    request(base)\n    if entry.stat().st_mtime_ns > initial_mtime:\n        break\n    time.sleep(0.1)\nassert entry.stat().st_mtime_ns > initial_mtime, 'Tagged product cache did not refresh'\nprint('PASS: all five products render; form uses an inline Server Action with native multipart POST.')\nprint('PASS: three repeated reads reuse the same products cache entry.')\nprint('PASS: form submission succeeds and the products cache refreshes after invalidation.')\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git status --short && git diff -- app/page.tsx lib/products.ts app/layout.tsx .gitignore tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

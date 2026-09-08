@@ -1,0 +1,95 @@
+{
+  "status": "failed",
+  "duration": 189.3,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 3,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'pages/**' -g 'components/**' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md package.json next.config.ts app/layout.tsx app/page.tsx app/product/page.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | head -70 && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat lib/data.ts tsconfig.json && cat node_modules/next/dist/docs/01-app/01-getting-started/04-linking-and-navigating.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | rg 'cache-components|partial-prerender|suspense' && cat node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'Suspense|connection\\\\(|static shell|prefetch|runtime data' node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md && sed -n '1,195p' node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md && cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/connection.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- app/product/page.tsx tsconfig.json && git status --short && rg --files .next/server/app | rg 'product|home'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\nconst html = readFileSync('.next/server/app/product.html', 'utf8')\nassert.ok(html.includes('<h1>Premium Widget</h1>'), 'Title must be in prerendered HTML')\nassert.ok(html.includes('Loading inventory...'), 'Inventory loading state must be in prerendered HTML')\nassert.ok(\"'!html.includes('\"' in stock'), 'Live inventory must be deferred until request time')\nconsole.log('Prerender check passed: title and loading state are present; live inventory is deferred.')\nJS\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport assert from 'node:assert/strict'\nconst home = await fetch('http://localhost:3000')\nassert.equal(home.status, 200)\nassert.ok((await home.text()).includes('href=\\\"/product\\\"'))\nconst product = await fetch('http://localhost:3000/product')\nassert.equal(product.status, 200)\nconst html = await product.text()\nassert.ok(html.includes('<h1>Premium Widget</h1>'))\nassert.match(html, /\\\\d+<\"'!-- --> in stock/)\nassert.match(html, /Price: '\"\\\\\"'$<!-- -->'\"\\\\d+\\\\.\\\\d{2}/)\nassert.ok(html.indexOf('<h1>Premium Widget</h1>') < html.indexOf(' in stock'))\nconsole.log('Production smoke check passed: home links to product; product serves the title and live stock/price.')\nJS\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\nimport tempfile\n\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nbuild_artifacts = Path(tempfile.mkdtemp(prefix='product-navigation-build-'))\nfor name in ('.next', 'next-env.d.ts'):\n    shutil.move(name, build_artifacts / name)\nprint(f'Build artifacts moved to {build_artifacts}')\nPY\ngit diff --check && git diff --stat && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

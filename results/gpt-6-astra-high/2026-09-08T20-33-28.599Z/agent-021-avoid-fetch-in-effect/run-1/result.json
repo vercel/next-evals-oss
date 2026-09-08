@@ -1,0 +1,83 @@
+{
+  "status": "passed",
+  "duration": 190.782,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"git status --short && rg --files -g '\"'!node_modules'\"' -g '\"'!vendor'\"' | head -100\""
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'README*' -g 'tsconfig.json' -g 'vite.config.*' -g 'next.config.*' -g '\"'!node_modules'\"' -g '\"'!vendor'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'for f in /AGENTS.md /workspace/AGENTS.md; do if [ -f \"$f\" ]; then cat \"$f\"; fi; done\ncat package.json tsconfig.json next.config.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat app/page.tsx app/layout.tsx app/UserProfile.tsx app/ProductList.tsx\nrg --files -uu -g 'AGENTS.md' -g '\"'!node_modules'\"' -g '\"'!.git'\"'\ngit diff -- package.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -d node_modules node_modules/.bin/tsc node_modules/.bin/vitest 2>/dev/null\ngit status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit --incremental false && npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff -- app/UserProfile.tsx\ngit status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\nimport { createRequire } from 'node:module'\nimport ts from 'typescript'\nimport { renderToStaticMarkup } from 'react-dom/server'\n\nconst require = createRequire(import.meta.url)\nlet requestHeaders = new Headers({ host: 'localhost:3000', cookie: 'session=test', authorization: 'Bearer test' })\nconst source = readFileSync('app/UserProfile.tsx', 'utf8')\nconst { outputText } = ts.transpileModule(source, {\n  compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2017 },\n})\nconst componentModule = { exports: {} }\nnew Function('require', 'module', 'exports', outputText)(\n  (name) => name === 'next/headers' ? { headers: async () => requestHeaders } : require(name),\n  componentModule,\n  componentModule.exports,\n)\nconst UserProfile = componentModule.exports.default\nlet requestedUrl\nlet requestedOptions\nconst render = async () => renderToStaticMarkup(await UserProfile())\nglobalThis.fetch = async (url, options) => {\n  requestedUrl = url.href\n  requestedOptions = options\n  return Response.json({ name: 'Ada Lovelace', email: 'ada@example.com' })\n}\nconst markup = await render()\nassert.match(markup, /Name: Ada Lovelace/)\nassert.match(markup, /Email: ada@example.com/)\nassert.equal(requestedUrl, 'http://localhost:3000/api/users/profile')\nassert.equal(requestedOptions.headers.get('cookie'), 'session=test')\nassert.equal(requestedOptions.headers.get('authorization'), 'Bearer test')\nassert.equal(requestedOptions.cache, 'no-store')\nrequestHeaders = new Headers({ 'x-forwarded-host': 'example.com', 'x-forwarded-proto': 'https' })\nawait render()\nassert.equal(requestedUrl, 'https://example.com/api/users/profile')\nglobalThis.fetch = async () => new Response('Unauthorized', { status: 401 })\nassert.match(await render(), /Unable to load user profile\\\\./)\nglobalThis.fetch = async () => { throw new Error('Network unavailable') }\nassert.match(await render(), /Unable to load user profile\\\\./)\nglobalThis.fetch = async () => new Response('invalid JSON')\nassert.match(await render(), /Unable to load user profile\\\\./)\nrequestHeaders = new Headers()\nassert.match(await render(), /Unable to load user profile\\\\./)\nconsole.log('Profile rendering checks passed: success, session forwarding, proxy URL, HTTP error, network error, invalid JSON, and missing host.')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git show HEAD:tsconfig.json > tsconfig.json\nrm -r .next next-env.d.ts\ngit diff --check && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

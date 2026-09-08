@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "duration": 166.018,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*post*' -g '*action*' -g '*page*' -g 'next.config.*' -g 'tsconfig.json' -g 'README*' -g '*lock*' .\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'for f in /AGENTS.md /workspace/AGENTS.md; do if [ -f \"$f\" ]; then cat \"$f\"; fi; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"ls -la && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!.next'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json app/page.tsx tsconfig.json next.config.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat app/layout.tsx .gitignore && node --version && rg -n 'function updateTag|function revalidateTag|expire: 0|read-your-own-writes' node_modules/next/dist/server/web/spec-extension/revalidate.js node_modules/next/cache.d.ts node_modules/next/dist/server/web/spec-extension/revalidate.d.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next -g '*unstable-cache*' -g '*incremental-cache*' && git diff -- package.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx vitest run app/actions.test.ts'"
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && sed -n '45,90p' node_modules/next/dist/server/web/spec-extension/revalidate.js && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFile, writeFile, unlink } from 'node:fs/promises'\n\nconst url = 'http://127.0.0.1:3000'\nconst file = '.data/posts.jsonl'\nlet original\ntry {\n  original = await readFile(file)\n} catch (error) {\n  if (error.code \"'!== '\"'ENOENT') throw error\n}\n\ntry {\n  const initial = await fetch(url)\n  assert.equal(initial.status, 200)\n  const html = await initial.text()\n  const action = html.match(/name=\\\"(\\\\\"'$ACTION_ID_[''^\"]+)\"/)\n  assert.ok(action, '\"'The page must render a Server Action form')\n\n  const warm = await fetch(url)\n  assert.equal(warm.status, 200)\n  await warm.text()\n\n  const title = \"'`Cache freshness check ${crypto.randomUUID()}`\n  assert.ok(!html.includes(title))\n  const form = new FormData()\n  form.set(action[1], '\"'')\n  form.set('title', title)\n  form.set('content', 'This post must appear on the first read after creation.')\n  const response = await fetch(url, {\n    method: 'POST',\n    headers: { Origin: url },\n    body: form,\n  })\n  assert.equal(response.status, 200)\n  assert.ok((await response.text()).includes(\"'`<h2>${title}</h2>`),\n    '\"'The action response must render the new post immediately')\n\n  const nextPage = await fetch(url)\n  assert.equal(nextPage.status, 200)\n  assert.ok((await nextPage.text()).includes(\"'`<h2>${title}</h2>`),\n    '\"'The first page load after creation must render the new post')\n  console.log('PASS: warmed cache, submitted the Server Action, and confirmed the new post in both the action response and the first subsequent page load.')\n} finally {\n  if (original \"'!== undefined) await writeFile(file, original)\n  else await unlink(file).catch((error) => {\n    if (error.code !== '\"'ENOENT') throw error\n  })\n}\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport { rm, rmdir } from 'node:fs/promises'\n// Remove generated build output containing the temporary integration-test post.\nawait rm('.next', { recursive: true, force: true })\nawait rmdir('.data').catch((error) => {\n  if (error.code \"'!== '\"'ENOENT' && error.code \"'!== '\"'ENOTEMPTY') throw error\n})\nNODE\n\ngit diff --check && git diff --stat && git diff -- tsconfig.json && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

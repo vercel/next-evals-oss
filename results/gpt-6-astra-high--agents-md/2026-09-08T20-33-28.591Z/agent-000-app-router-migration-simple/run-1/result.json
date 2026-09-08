@@ -1,0 +1,95 @@
+{
+  "status": "passed",
+  "duration": 123.405,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'next.config.*' -g 'tsconfig.json' -g 'pages/**' -g 'src/**' -g 'app/**' -g 'styles/**' -g 'components/**' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!yarn.lock'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && ls -la && ls node_modules/next/dist/docs'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs/01-app | rg '(migrating|layouts-and-pages|metadata|page\\\\.md|layout\\\\.md|linking-and-navigating)'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md package.json tsconfig.json next.config.ts pages/index.tsx pages/about.tsx pages/_app.tsx pages/_document.tsx .gitignore'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,320p' node_modules/next/dist/docs/01-app/02-guides/migrating/app-router-migration.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/01-getting-started/03-layouts-and-pages.md && sed -n '1,180p' node_modules/next/dist/docs/01-app/01-getting-started/14-metadata-and-og-images.md && sed -n '1,110p' node_modules/next/dist/docs/01-app/01-getting-started/04-linking-and-navigating.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rmdir pages && npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && git diff --stat && git status --short && rg -n 'next/(head|app|document|router)|getServerSideProps|getStaticProps|getStaticPaths' app next.config.ts tsconfig.json package.json\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- tsconfig.json .gitignore && cat app/layout.tsx app/page.tsx app/about/page.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom html.parser import HTMLParser\nfrom urllib.request import Request, urlopen\nfrom urllib.error import HTTPError\n\nclass PageParser(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.tags = []\n        self.text = {'title': '', 'h1': '', 'p': ''}\n        self.active = None\n        self.links = []\n        self.meta = {}\n        self.icons = []\n        self.lang = None\n\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        self.tags.append(tag)\n        if tag in self.text:\n            self.active = tag\n        if tag == 'html':\n            self.lang = attrs.get('lang')\n        if tag == 'a':\n            self.links.append(attrs.get('href'))\n        if tag == 'meta':\n            self.meta[attrs.get('name')] = attrs.get('content')\n        if tag == 'link' and attrs.get('rel') == 'icon':\n            self.icons.append(attrs.get('href'))\n\n    def handle_endtag(self, tag):\n        if self.active == tag:\n            self.active = None\n\n    def handle_data(self, data):\n        if self.active:\n            self.text[self.active] += data\n\nbase = 'http://127.0.0.1:3100'\nfor path, title, heading, paragraph, description, links in [\n    ('/', 'Home Page', 'Home', 'Welcome to our Next.js application\"'!'\"', 'Welcome to our Next.js app', ['/about', '/contact']),\n    ('/about', 'About Us', 'About', 'This is the about page of our Next.js application.', 'Learn more about us', ['/', '/contact']),\n]:\n    with urlopen(base + path) as response:\n        assert response.status == 200\n        parser = PageParser()\n        parser.feed(response.read().decode())\n    assert parser.text == {'title': title, 'h1': heading, 'p': paragraph}, parser.text\n    assert parser.lang == 'en'\n    assert parser.meta['description'] == description\n    assert parser.meta['viewport'] == 'width=device-width, initial-scale=1'\n    assert parser.icons == ['/favicon.ico']\n    assert parser.links == links\n    for tag in ['html', 'head', 'body', 'main', 'title']:\n        assert parser.tags.count(tag) == 1, (tag, parser.tags.count(tag))\n    with urlopen(Request(base + path, headers={'RSC': '1'})) as response:\n        assert response.status == 200\n        assert 'text/x-component' in response.headers['Content-Type']\n        assert paragraph in response.read().decode()\n    print(f'PASS {path}: HTML, content, metadata, links, and App Router RSC response')\n\ntry:\n    urlopen(base + '/contact')\n    raise AssertionError('Expected existing /contact link to remain a 404')\nexcept HTTPError as error:\n    assert error.code == 404, error.code\n    print('PASS /contact: existing 404 behavior preserved')\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && test ! -d pages && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "status": "failed",
+  "duration": 164.201,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 11,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 11,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'app/**' -g 'src/**' -g 'pages/**' -g 'next.config.*' -g 'tsconfig.json' -g 'README*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json app/page.tsx app/layout.tsx next.config.ts tsconfig.json && for f in /AGENTS.md /workspace/AGENTS.md; do if [ -f \"$f\" ]; then cat \"$f\"; fi; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"ls -la && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' -g '\"'!'\"\\\\.git'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat lib/db.js && git status --short && rg --files app lib -g AGENTS.md && true'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --stat && git diff -- app/page.tsx app/layout.tsx && rg -n 'revalidateTag|function unstable_cache|revalidate' node_modules/next/dist/server/web/spec-extension/revalidate.d.ts node_modules/next/dist/server/web/spec-extension/unstable-cache.d.ts && cat .gitignore\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git show HEAD:tsconfig.json > tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport { readdir, readFile, stat } from 'node:fs/promises';\nconst response = await fetch('http://localhost:3000');\nconst html = await response.text();\nconsole.log(JSON.stringify({ status: response.status, catalog: html.includes('Product catalog'), products: ['Laptop', 'Phone', 'Tablet', 'Headphones', 'Watch'].every(name => html.includes(name)), form: html.match(/<form[\\\\s\\\\S]*?<\\\\/form>/)?.[0] }));\nfor (const name of await readdir('.next/cache/fetch-cache')) {\n  const path = \"'`.next/cache/fetch-cache/${name}`;\n  const info = await stat(path);\n  if (info.isFile()) console.log(JSON.stringify({ path, mtime: info.mtimeMs, cache: JSON.parse(await readFile(path, '\"'utf8')) }));\n}\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict';\nimport { readdir, readFile, stat } from 'node:fs/promises';\nconst base = 'http://localhost:3000';\nconst files = await readdir('.next/cache/fetch-cache');\nlet cachePath;\nfor (const name of files) {\n  const path = \"'`.next/cache/fetch-cache/${name}`;\n  if ((await stat(path)).isFile()) {\n    const value = JSON.parse(await readFile(path, '\"'utf8'));\n    if (value.tags?.includes('products')) cachePath = path;\n  }\n}\nassert.ok(cachePath, 'products-tagged cache entry exists');\nconst initialTime = (await stat(cachePath)).mtimeMs;\nlet html;\nfor (let i = 0; i < 3; i++) {\n  const response = await fetch(base);\n  assert.equal(response.status, 200);\n  html = await response.text();\n  assert.ok(html.includes('Laptop'));\n}\nassert.equal((await stat(cachePath)).mtimeMs, initialTime, 'browsing reuses cached products');\nconst actionName = html.match(/name=\\\"(\\\\\"'$ACTION_ID_[''^\"]+)\"/)?.[1];\nassert.ok(actionName, '\"'regular HTML form contains a Server Action');\nconst form = new FormData();\nform.set(actionName, '');\nconst response = await fetch(base, { method: 'POST', headers: { Origin: base }, body: form });\nassert.equal(response.status, 200);\nassert.ok((await response.text()).includes('Product catalog'));\nlet refreshed = false;\nfor (let i = 0; i < 20; i++) {\n  await (await fetch(base)).text();\n  if ((await stat(cachePath)).mtimeMs > initialTime) {\n    refreshed = true;\n    break;\n  }\n  await new Promise(resolve => setTimeout(resolve, 100));\n}\nassert.ok(refreshed, 'form submission causes tagged data to refresh');\nawait new Promise(resolve => setTimeout(resolve, 200));\nconst refreshedTime = (await stat(cachePath)).mtimeMs;\nfor (let i = 0; i < 3; i++) await (await fetch(base)).text();\nassert.equal((await stat(cachePath)).mtimeMs, refreshedTime, 'refreshed products are cached again');\nconsole.log('PASS: tagged cache is reused across reads, native form POST succeeds, products refresh after invalidation, and subsequent reads reuse refreshed data.');\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

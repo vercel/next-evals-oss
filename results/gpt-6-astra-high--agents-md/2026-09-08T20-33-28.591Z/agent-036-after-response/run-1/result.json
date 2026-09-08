@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "duration": 159.66,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 11,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 11,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'page.*' -g 'layout.*' -g '*analytics*' -g 'next.config.*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' -g '\"'!bun.lockb'\"' -g '\"'!bun.lock'\"' .\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | rg '/(after|server-components|server-and-client-components|environment-variables|page|route-segment-config|testing)[\"'^/]*'\"\\\\.'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat AGENTS.md package.json app/page.tsx app/layout.tsx next.config.ts && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' -g '\"'!bun.lock*'\"' -g '\"'!public/**'\"' -g '\"'!'\"\\\\.git/**' .\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md && git status --short && rg --files node_modules/next/dist/docs/01-app | rg 'server-and-client|server-components'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/connection.md && sed -n '1,100p' node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat tsconfig.json && ls -a && cat node_modules/next/dist/docs/01-app/02-guides/environment-variables.md | head -n 100'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/page.tsx tsconfig.json && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport http from 'node:http'\nimport { spawn } from 'node:child_process'\nimport { once } from 'node:events'\nimport { setTimeout as delay } from 'node:timers/promises'\n\nconst pending = []\nconst analytics = http.createServer(async (req, res) => {\n  let body = ''\n  for await (const chunk of req) body += chunk\n  pending.push({ method: req.method, payload: JSON.parse(body), res })\n})\nanalytics.listen(0, '127.0.0.1')\nawait once(analytics, 'listening')\nconst endpoint = \"'`http://127.0.0.1:${analytics.address().port}/events`\nconst child = spawn(process.execPath, ['\"'node_modules/next/dist/bin/next', 'start', '--port', '3217'], {\n  env: { ...process.env, ANALYTICS_ENDPOINT: endpoint },\n  stdio: ['ignore', 'pipe', 'pipe'],\n})\nlet logs = ''\nchild.stdout.on('data', chunk => { logs += chunk })\nchild.stderr.on('data', chunk => { logs += chunk })\nasync function waitFor(predicate) {\n  const deadline = Date.now() + 5000\n  while (\"'!predicate()) {\n    assert.ok(Date.now() < deadline, `Timed out. Server output: ${logs}`)\n    await delay(20)\n  }\n}\ntry {\n  await waitFor(() => logs.includes('\"'Ready in'))\n  for (let i = 0; i < 2; i++) {\n    const start = Date.now()\n    const response = await fetch('http://127.0.0.1:3217', { signal: AbortSignal.timeout(2500) })\n    const html = await response.text()\n    assert.equal(response.status, 200)\n    assert.match(html, /<h1>Welcome<\\\\/h1>/)\n    await waitFor(() => pending.length === i + 1)\n    const event = pending[i]\n    assert.equal(event.method, 'POST')\n    assert.equal(event.payload.event, 'page_view')\n    assert.equal(event.payload.path, '/')\n    assert.ok(Number.isFinite(Date.parse(event.payload.timestamp)))\n    assert.equal(event.res.writableEnded, false)\n    console.log(\"'`Request ${i + 1}: welcome response completed in ${Date.now() - start}ms while analytics response remained pending`)\n    event.res.writeHead(i === 0 ? 204 : 503).end()\n  }\n  await waitFor(() => logs.includes('\"'Analytics service returned 503'))\n  assert.equal(pending.length, 2)\n  console.log('PASS: one analytics POST per request; analytics failure caught after successful welcome response')\n} finally {\n  const exited = once(child, 'exit')\n  child.kill('SIGTERM')\n  analytics.closeAllConnections()\n  analytics.close()\n  await exited\n}\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git show HEAD:tsconfig.json > tsconfig.json\npython - <<'PY'\nimport shutil\nfrom pathlib import Path\nshutil.rmtree('.next')\nPath('next-env.d.ts').unlink()\nPY\n git diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport { rmSync } from 'node:fs'\nrmSync('.next', { recursive: true })\nrmSync('next-env.d.ts')\nNODE\n git diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "status": "passed",
+  "duration": 159.001,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 3,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'app/**' -g 'src/**' -g 'pages/**' -g 'next.config.*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs | head -70'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md package.json app/page.tsx app/layout.tsx next.config.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/connection.md && cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/unstable_noStore.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/page.tsx app/layout.tsx tsconfig.json next-env.d.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\n\nasync function getTimestamp() {\n  const response = await fetch('http://127.0.0.1:3100')\n  assert.equal(response.status, 200)\n  const html = await response.text()\n  const match = html.match(/<time dateTime=\\\"([\"'^\"]+)\">([''^<]+)<'\"\\\\/time>/)\n  assert.ok(match, 'Expected a server-rendered timestamp')\n  assert.equal(match[1], match[2])\n  assert.ok(Math.abs(Date.now() - Date.parse(match[2])) < 5000, 'Timestamp must be current')\n  return match[2]\n}\n\nconst first = await getTimestamp()\nawait new Promise(resolve => setTimeout(resolve, 50))\nconst second = await getTimestamp()\nassert.notEqual(first, second, 'Each request must produce a fresh timestamp')\nconsole.log({ first, second, result: 'Production responses contain fresh server timestamps' })\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\n\n# Remove only artifacts and configuration rewrites produced by this verification build.\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nPath('next-env.d.ts').unlink()\nshutil.rmtree('.next')\nPY\n\ngit diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport { writeFileSync, unlinkSync, rmSync } from 'node:fs'\nimport { execFileSync } from 'node:child_process'\n\n// Remove only artifacts and configuration rewrites produced by this verification build.\nwriteFileSync('tsconfig.json', execFileSync('git', ['show', 'HEAD:tsconfig.json']))\nunlinkSync('next-env.d.ts')\nrmSync('.next', { recursive: true })\nNODE\n\ngit diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

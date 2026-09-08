@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "duration": 253.069,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g '*lock*' -g 'README*' -g 'src/**' -g 'app/**' -g 'pages/**' -g 'components/**' -g 'lib/**' -g 'tsconfig.json' -g 'public/**' -g '\"'!node_modules'\"' -g '\"'!.next'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && rg --files -g 'AGENTS.md' -g '\"'!node_modules'\"' -g '\"'!.next'\"' /workspace /home/vercel-sandbox 2>/dev/null\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la && cat package.json && cat next.config.ts && cat tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"for path in app/*; do printf '\\\\n%s\\\\n' \\\"\"'$path\"; cat \"$path\"; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --stat && git diff -- app tsconfig.json && cat .gitignore'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport { readFileSync } from 'node:fs'\nimport assert from 'node:assert/strict'\nconst shell = readFileSync('.next/server/app/index.html', 'utf8')\nfor (const heading of ['<h1>Dashboard</h1>', '<h2>Total Revenue</h2>', '<h2>Total Invoices</h2>', '<h2>Revenue</h2>', '<h2>Latest Invoices</h2>']) {\n  assert.ok(shell.includes(heading), \"'`Missing static heading: ${heading}`)\n}\nfor (const label of ['\"'Loading total revenue...', 'Loading total invoices...', 'Loading revenue...', 'Loading latest invoices...']) {\n  assert.ok(shell.includes(label), \"'`Missing local fallback: ${label}`)\n}\nassert.ok(!shell.includes('\"'Loading dashboard...'), 'Route fallback replaced the dashboard shell')\nconsole.log('PASS: prerendered HTML contains the full dashboard structure and all four local fallbacks.')\nJS\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > /tmp/dashboard-ppr-fetch.cjs <<'JS'\nconst originalFetch = globalThis.fetch\nlet dashboardRequests = 0\nglobalThis.fetch = async function (input, init) {\n  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url\n  if (url \"'!== '\"'https://api.example.com/dashboard') return originalFetch(input, init)\n  dashboardRequests += 1\n  console.log(\"'`DASHBOARD_MOCK_REQUEST:${dashboardRequests}`)\n  await new Promise(resolve => setTimeout(resolve, 1500))\n  return Response.json({\n    totalRevenue: 123456,\n    totalInvoices: 42,\n    revenue: [{ month: '\"'September', amount: 15000 }],\n    invoices: [{ id: 'invoice-1', name: 'PPR Test Customer', amount: 1200 }],\n  })\n}\nJS\nNODE_OPTIONS=--require=/tmp/dashboard-ppr-fetch.cjs npm run start -- --hostname 127.0.0.1 --port 3100\""
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport assert from 'node:assert/strict'\nfor (let request = 1; request <= 2; request++) {\n  const started = performance.now()\n  const response = await fetch('http://127.0.0.1:3100')\n  assert.equal(response.status, 200)\n  const reader = response.body.getReader()\n  const decoder = new TextDecoder()\n  let body = ''\n  let shellTime\n  let dataTime\n  while (true) {\n    const { done, value } = await reader.read()\n    if (done) break\n    body += decoder.decode(value, { stream: true })\n    if (shellTime === undefined && body.includes('Loading latest invoices...')) {\n      shellTime = performance.now() - started\n      for (const heading of ['<h1>Dashboard</h1>', '<h2>Total Revenue</h2>', '<h2>Total Invoices</h2>', '<h2>Revenue</h2>', '<h2>Latest Invoices</h2>']) {\n        assert.ok(body.includes(heading), \"'`Missing initial heading: ${heading}`)\n      }\n      assert.ok(!body.includes('\"'PPR Test Customer'), 'API result arrived before shell check')\n    }\n    if (dataTime === undefined && body.includes('PPR Test Customer')) dataTime = performance.now() - started\n  }\n  assert.ok(shellTime \"'!== undefined, '\"'No dashboard shell streamed')\n  assert.ok(dataTime \"'!== undefined, '\"'No invoice data streamed')\n  assert.ok(dataTime - shellTime > 1000, 'Shell did not arrive ahead of slow data')\n  for (const value of ['123,456', '42', 'September', '15,000', 'PPR Test Customer', '1,200']) {\n    assert.ok(body.includes(value), \"'`Missing rendered data: ${value}`)\n  }\n  assert.ok(!body.includes('\"'data-dgst='), 'Unexpected server rendering error')\n  console.log(\"'`PASS request ${request}: shell ${Math.round(shellTime)}ms, data ${Math.round(dataTime)}ms; all dashboard values streamed.`)\n}\nJS'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff --check'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\nworkspace = Path('/workspace')\n(workspace / 'tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json'], cwd=workspace))\nbuild_dir = workspace / '.next'\nif build_dir.is_dir() and not build_dir.is_symlink():\n    shutil.rmtree(build_dir)\n(workspace / 'next-env.d.ts').unlink(missing_ok=True)\nPath('/tmp/dashboard-ppr-fetch.cjs').unlink(missing_ok=True)\nPY\ngit diff --check\ngit status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

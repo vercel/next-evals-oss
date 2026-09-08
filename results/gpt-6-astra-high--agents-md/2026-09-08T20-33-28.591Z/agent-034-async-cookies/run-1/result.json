@@ -1,0 +1,108 @@
+{
+  "status": "passed",
+  "duration": 188.801,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 3,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'page.*' -g 'layout.*' -g 'tsconfig.json' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs | head -60'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/02-components/headers.md'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"cat AGENTS.md package.json app/page.tsx app/layout.tsx && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' -g '\"'!public/**'\"' -g '\"'!'\"\\\\.git/**' && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | rg '(cookies|headers|server-components|suspense|cache-components|server-and-client-components)'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/headers.md && sed -n '1,160p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cookies.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat next.config.ts tsconfig.json && sed -n '1,155p' node_modules/next/dist/docs/01-app/01-getting-started/05-server-and-client-components.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/page.tsx tsconfig.json && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\n\nconst cases = [\n  { name: 'missing cookie and language', headers: {}, theme: 'light', language: 'Not specified' },\n  { name: 'dark theme and language preferences', headers: { Cookie: 'theme=dark', 'Accept-Language': 'fr-CA,fr;q=0.9,en;q=0.8' }, theme: 'dark', language: 'fr-CA,fr;q=0.9,en;q=0.8' },\n  { name: 'missing theme with language present', headers: { Cookie: 'session=example', 'Accept-Language': 'de' }, theme: 'light', language: 'de' },\n]\n\nfor (const test of cases) {\n  const response = await fetch('http://127.0.0.1:3100', { headers: test.headers })\n  assert.equal(response.status, 200)\n  const html = await response.text()\n  const text = html.replace(/<\"'!--.*?-->/g, '\"'')\n  assert.ok(text.includes(\"'`<p>Current theme: ${test.theme}</p>`), test.name)\n  assert.ok(text.includes(`<p>Preferred language: ${test.language}</p>`), test.name)\n  console.log(`PASS: ${test.name}`)\n}\nNODE'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\n\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nPath('next-env.d.ts').unlink()\nshutil.rmtree('.next')\nPY\n\ngit diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run dev -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { get } from 'node:http'\n\nconst cases = [\n  { name: 'missing cookie and language', headers: {}, theme: 'light', language: 'Not specified' },\n  { name: 'dark theme and language preferences', headers: { Cookie: 'theme=dark', 'Accept-Language': 'fr-CA,fr;q=0.9,en;q=0.8' }, theme: 'dark', language: 'fr-CA,fr;q=0.9,en;q=0.8' },\n  { name: 'missing theme with language present', headers: { Cookie: 'session=example', 'Accept-Language': 'de' }, theme: 'light', language: 'de' },\n]\n\nfor (const test of cases) {\n  const { status, html } = await new Promise((resolve, reject) => {\n    get('http://127.0.0.1:3100', { headers: test.headers }, (response) => {\n      let html = ''\n      response.setEncoding('utf8')\n      response.on('data', chunk => { html += chunk })\n      response.on('end', () => resolve({ status: response.statusCode, html }))\n      response.on('error', reject)\n    }).on('error', reject)\n  })\n  assert.equal(status, 200)\n  const text = html.replace(/<\"'!--.*?-->/g, '\"'')\n  assert.ok(text.includes(\"'`<p>Current theme: ${test.theme}</p>`), `${test.name}: theme`)\n  assert.ok(text.includes(`<p>Preferred language: ${test.language}</p>`), `${test.name}: language`)\n  console.log(`PASS: ${test.name}`)\n}\nNODE'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\n\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nPath('next-env.d.ts').unlink()\nshutil.rmtree('.next')\nPY\n\ngit diff --check && git status --short && cat AGENTS.md && cat app/page.tsx\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
