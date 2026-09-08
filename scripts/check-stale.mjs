@@ -21,6 +21,18 @@ import { execSync } from 'node:child_process';
 // the pin does not include yet. Those pairs are noted individually below and
 // come back out when the pin is bumped past the fix.
 const ACCEPTED_STALE = {
+  // Historical agent-030 results retained while the Astra pair is refreshed.
+  // These have NOT been rejudged with the semantic error-boundary assertion.
+  // Remove each exception when its experiment is rerun.
+  'claude-fable-5--agents-md': ['agent-030-app-router-migration-hard'],
+  'claude-fable-5': ['agent-030-app-router-migration-hard'],
+  'claude-opus-5': ['agent-030-app-router-migration-hard'],
+  'claude-sonnet-5--agents-md': ['agent-030-app-router-migration-hard'],
+  'claude-sonnet-5': ['agent-030-app-router-migration-hard'],
+  'gpt-5.6-sol-ultra--agents-md': ['agent-030-app-router-migration-hard'],
+  'gpt-5.6-sol-ultra': ['agent-030-app-router-migration-hard'],
+  'kimi-k3--agents-md': ['agent-030-app-router-migration-hard'],
+  'kimi-k3': ['agent-030-app-router-migration-hard'],
   'claude-melon-eap': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-melon-eap--agents-md': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-opus-4.6': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
@@ -29,11 +41,9 @@ const ACCEPTED_STALE = {
   'claude-opus-4.7--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-opus-4.8': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-opus-4.8--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
-  // Newer than the pin, not older: agent-030 was rerun against the corrected
-  // root-layout assertion from vercel/next.js#98365 (it now accepts the
-  // generated LayoutProps helper as well as an inline ReactNode annotation).
-  // The pinned SHA below predates that fix, so the fresh result reads as
-  // changed. Drop this entry when the pin is bumped past 4a34974ec2.
+  // Retains the measured LayoutProps rerun from #117. It predates the
+  // semantic error-boundary assertion applied by patch-agent-030.mjs.
+  // Remove when this experiment is rerun against that assertion.
   'claude-opus-5--agents-md': ['agent-030-app-router-migration-hard'],
   'claude-opus-5-control': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-sonnet-4.5': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
@@ -63,10 +73,10 @@ const ACCEPTED_STALE = {
   'gpt-5.4-xhigh--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'gpt-5.5-pro': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'gpt-5.5-pro--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
-  'grok-4.5': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
-  'grok-4.5--agents-md': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
-  'grok-4.6': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
-  'grok-4.6--agents-md': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
+  'grok-4.5': ['agent-030-app-router-migration-hard', 'agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
+  'grok-4.5--agents-md': ['agent-030-app-router-migration-hard', 'agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
+  'grok-4.6': ['agent-030-app-router-migration-hard', 'agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
+  'grok-4.6--agents-md': ['agent-030-app-router-migration-hard', 'agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'kimi-k2.5': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'kimi-k2.5--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'kimi-k2.6': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
