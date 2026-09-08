@@ -207,6 +207,15 @@ The published board is two tiers:
 - **Tier 2 (previously measured)**: every other model keeps its last measured
   results for historical reference, clearly dated, and is not rerun.
 
+A model can also be *registered but unmeasured*: an experiment config, a
+display name and a list price exist, but no run does. It is in neither tier and
+does not reach the board at all, because `export-results` only exports
+experiments that have results. `gpt-6-astra-max` is in that state — run
+`pnpm eval:run gpt-6-astra-max gpt-6-astra-max--agents-md`, then
+`pnpm export-results`, and tier it in that PR. GPT 6 Astra shipped 2026-09-04,
+57 days after gpt-5.6-sol, so it takes the GPT line's tier-1 slot outright
+rather than sharing it under the under-a-month rule.
+
 Models the provider no longer serves (e.g. Cursor Composer 1.5) are removed
 entirely rather than kept in tier 2 — every published experiment must be
 reproducible.
