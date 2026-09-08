@@ -21,14 +21,21 @@ const fixedError = `  // Follow the exported component instead of requiring its 
   await expect(environment).toSatisfyCriterion(
     \`app/error.tsx exports a working App Router error boundary Client Component.
 Follow its default export, including local imports, re-exports, and wrapper
-components. The exported component must accept Next.js's error and reset props,
-render an error fallback, and provide a retry action that calls reset. An inline
-implementation, a re-export of a shared component, and a wrapper forwarding the
-props are equally valid. Type annotations can be inline or imported.
+components. First read the installed Next.js error-file reference under
+node_modules/next/dist/docs and check the installed version's supported props;
+do not assume a recovery callback name from older Next.js versions. The current
+canary documents retry as the recommended recovery callback and also supports
+reset. Either supported callback is valid; do not require both.
+
+The exported component must accept the framework-provided error, render an error
+fallback, and wire its recovery action to a supported framework callback. An
+inline implementation, a re-export of a shared component, and a wrapper
+forwarding the props are equally valid. Type annotations may be inline or imported.
 
 Reject a missing or unresolved export, a non-component export, a wrapper that
-drops the error/reset props, or a fallback whose retry action never calls reset.
-Judge the actual implementation, not filenames, comments, or type names.\`
+drops required props, or a recovery action that calls an undefined callback.
+Follow the actual implementation and the installed framework contract, not
+filenames, comments, type names, or assumptions about older framework APIs.\`
   )`;
 const syncErrorTest = `test('Error handling migrated to error.js and not-found.js', () => {`;
 const asyncErrorTest = `test('Error handling migrated to error.js and not-found.js', async () => {`;
