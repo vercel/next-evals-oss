@@ -1,0 +1,126 @@
+{
+  "status": "passed",
+  "duration": 366.347,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 6,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 19,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 19,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*config*' -g 'tsconfig.json' -g 'next-env.d.ts' -g 'pages/**' -g 'src/pages/**' -g 'app/**' -g 'src/app/**' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!yarn.lock'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g 'AGENTS.md' -g '\"'!node_modules'\"' /workspace /home/vercel-sandbox 2>/dev/null\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!yarn.lock'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!.git'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat package.json tsconfig.json next.config.ts && for file in pages/_app.js pages/_document.js pages/_error.js pages/404.js pages/index.js pages/blog/index.js 'pages/blog/[id].js' pages/api/posts/index.js 'pages/api/posts/[id].js'; do printf '\\\\n%s\\\\n' \\\"\"'$file\"; cat \"$file\"; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat components/AppProvider.js styles/globals.css && git diff -- package.json && rg --files --hidden -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!package-lock.json'\"' -g '\"'!yarn.lock'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'node --version && npm --version && npm ls next react typescript vitest --depth=0 && ls -la /workspace /AGENTS.md /workspace/AGENTS.md 2>/dev/null'",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc 'rmdir pages/api/posts pages/api pages/blog pages && npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && rg -n 'next/(router|head|document)|getServerSideProps|getStaticProps|getStaticPaths|getInitialProps|isFallback|req\\\\.query|req\\\\.body|NextApi(Request|Response)' app components lib types && true\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat .gitignore && rg --files app components lib types && curl -I --max-time 20 'https://jsonplaceholder.typicode.com/posts?_limit=5'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\n\nconst baseUrl = 'http://127.0.0.1:3000'\nconst request = (path, options) => fetch(\"'`${baseUrl}${path}`, options)\nconst jsonRequest = (method, body) => ({ method, headers: { '\"'Content-Type': 'application/json' }, body: JSON.stringify(body) })\n\nconst home = await request('/', { headers: { 'User-Agent': 'AppRouterSmokeTest' } })\nassert.equal(home.status, 200)\nconst homeHtml = await home.text()\nassert.match(homeHtml, /<title>Home - My Blog<\\\\/title>/)\nassert.match(homeHtml, /AppRouterSmokeTest/)\nassert.match(homeHtml, /Welcome to My Blog/)\nassert.match(homeHtml, /<html lang=\\\"en\\\">/)\nassert.match(home.headers.get('cache-control'), /no-store/)\nconsole.log('PASS: dynamic homepage, request headers, metadata, root layout')\n\nfor (const [path, expectedTitle, expectedContent] of [\n  ['/blog', 'Blog - My Blog', 'All Blog Posts'],\n  ['/blog/1', 'sunt aut facere repellat provident occaecati excepturi optio reprehenderit - My Blog', 'Comments ('],\n  ['/blog/11', 'et ea vero quia laudantium autem - My Blog', 'Comments ('],\n]) {\n  const response = await request(path)\n  assert.equal(response.status, 200, path)\n  const html = await response.text()\n  assert.ok(html.includes(\"'`<title>${expectedTitle}</title>`), `${path} title`)\n  assert.ok(html.includes(expectedContent), `${path} content`)\n  console.log(`PASS: ${path}, content and metadata; cache=${response.headers.get('\"'cache-control')}\"'`)\n}\n\nfor (const path of ['\"'/does-not-exist', '/blog/999999']) {\n  const response = await request(path)\n  const html = await response.text()\n  assert.equal(response.status, 404, path)\n  assert.match(html, /404 - Page Not Found/)\n  assert.match(html, /Go Back Home/)\n  console.log(\"'`PASS: ${path} returns custom 404`)\n}\n\nconst posts = await request('\"'/api/posts')\nassert.equal(posts.status, 200)\nassert.equal((await posts.json()).length, 2)\nconst created = await request('/api/posts', jsonRequest('POST', { title: 'New title', content: 'New content' }))\nassert.equal(created.status, 201)\nassert.equal((await created.json()).title, 'New title')\nfor (const body of [{ title: 'Missing content' }, null, { title: 2, content: 'Invalid title type' }]) {\n  assert.equal((await request('/api/posts', jsonRequest('POST', body))).status, 400)\n}\nconst malformed = await request('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' })\nassert.equal(malformed.status, 400)\nconst post = await request('/api/posts/7')\nassert.equal(post.status, 200)\nassert.equal((await post.json()).id, 7)\nconst updated = await request('/api/posts/7', jsonRequest('PUT', { title: 'Updated title', content: 'Updated content' }))\nassert.equal(updated.status, 200)\nassert.equal((await updated.json()).title, 'Updated title')\nconst defaultUpdate = await request('/api/posts/7', jsonRequest('PUT', {}))\nassert.equal((await defaultUpdate.json()).title, 'Post 7')\nconst deleted = await request('/api/posts/7', { method: 'DELETE' })\nassert.equal(deleted.status, 200)\nassert.deepEqual(await deleted.json(), { message: 'Post 7 deleted successfully' })\nassert.equal((await request('/api/posts', { method: 'PATCH' })).status, 405)\nassert.equal((await request('/api/posts/7', jsonRequest('POST', {}))).status, 405)\nconst options = await request('/api/posts', { method: 'OPTIONS' })\nassert.equal(options.status, 204)\nassert.match(options.headers.get('allow'), /GET/)\nassert.match(options.headers.get('allow'), /POST/)\nconsole.log('PASS: API GET/POST/PUT/DELETE, validation, automatic 405 and OPTIONS')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && git diff --stat && cat tsconfig.json next-env.d.ts && rg -n '\\\"/blog(/(1|11))?\\\"|initialRevalidateSeconds|fallback' .next/prerender-manifest.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'next/(router|head|document)([\\\\x27\\\\x22])|getServerSideProps|getStaticProps|getStaticPaths|getInitialProps|isFallback|req\\\\.query|req\\\\.body|NextApi(Request|Response)' app components lib types; test \"'! -d pages && test ! -d src/pages && git diff --check'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx vitest run tests/api-posts.test.ts tests/blog.test.ts'"
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit && git diff --check'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nfor (const path of ['/does-not-exist', '/blog/999999']) {\n  const response = await fetch(\"'`http://127.0.0.1:3000${path}`)\n  const html = await response.text()\n  assert.match(html, /<title>404 - Page Not Found<'\"\\\\/title>/)\n  assert.match(html, /name=\\\"description\\\" content=\\\"The page you&#x27;re looking for doesn&#x27;t exist\\\"/)\n  console.log(\"'`PASS: ${path} has 404 metadata`)\n}\nNODE'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- .gitignore tsconfig.json && git status --short && rg --files app components lib types tests && test ! -d pages && git diff --check'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && test ! -d pages && git diff -- tsconfig.json && ps -eo pid,ppid,args | rg '\"'next start|next-server|npm run start'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'kill -TERM 425 414'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

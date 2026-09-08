@@ -1,0 +1,176 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 9ms
+   × Catalog is cached, tagged, and revalidated by the sync action 8ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  20:36:27
+   Duration  317ms (transform 64ms, setup 29ms, collect 37ms, tests 9ms, environment 0ms, prepare 88ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product catalog | Store administration',
+  description: 'Browse and refresh the store product catalog.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { getProducts } from '@/lib/products'
+
+const priceFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+})
+
+export default async function Page() {
+  const products = await getProducts()
+
+  async function syncLatestCatalog() {
+    'use server'
+
+    // Mark shared catalog data stale; the next read refreshes it in the
+    // background while admins can continue using the cached catalog.
+    revalidateTag('products', 'max')
+  }
+
+  return (
+    <main>
+      <header className=\"catalog-header\">
+        <div>
+          <p className=\"eyebrow\">Store administration</p>
+          <h1>Product catalog</h1>
+          <p className=\"description\">
+            Browse products and sync the latest changes from your catalog source.
+          </p>
+        </div>
+        <form action={syncLatestCatalog}>
+          <button type=\"submit\" aria-describedby=\"sync-description\">
+            Sync latest catalog
+          </button>
+          <p id=\"sync-description\" className=\"sync-description\">
+            Refreshes in the background. You can keep working while updates appear.
+          </p>
+        </form>
+      </header>
+
+      <section aria-labelledby=\"products-heading\" className=\"catalog\">
+        <h2 id=\"products-heading\">Products ({products.length})</h2>
+        {products.length === 0 ? (
+          <p className=\"empty-state\">No products are available in the catalog yet.</p>
+        ) : (
+          <table>
+            <caption className=\"visually-hidden\">Current product catalog</caption>
+            <thead>
+              <tr>
+                <th scope=\"col\">Product ID</th>
+                <th scope=\"col\">Product</th>
+                <th scope=\"col\" className=\"price\">Price (USD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => (
+                <tr key={product.id}>
+                  <td className=\"product-id\">{product.id}</td>
+                  <th scope=\"row\">{product.name}</th>
+                  <td className=\"price\">{priceFormatter.format(product.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </main>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db'
+
+// Reuse this reader in catalog views so they share caching and invalidation.
+export const getProducts = unstable_cache(getAllProducts, ['products'], {
+  tags: ['products'],
+  revalidate: false,
+})
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

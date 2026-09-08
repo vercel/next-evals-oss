@@ -1,0 +1,77 @@
+{
+  "status": "passed",
+  "duration": 123.854,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 8,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 8,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'next.config.*' -g 'page.*' -g '*analytics*' -g 'tsconfig.json' -g 'README*'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la && cat package.json && cat app/page.tsx && cat next.config.ts && cat tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g '\"'!package-lock.json'\"' -g '\"'!node_modules/**'\"' -g '\"'!'\"\\\\.git/**' && git status --short && for path in /AGENTS.md /workspace/AGENTS.md; do if [ -f \\\"\"'$path\" ]; then cat \"$path\"; fi; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff -- app/page.tsx && cat app/layout.tsx && cat .gitignore'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport http from 'node:http'\nimport net from 'node:net'\nimport { spawn } from 'node:child_process'\nimport { once } from 'node:events'\n\nconst pending = []\nconst events = []\nconst analytics = http.createServer(async (req, res) => {\n  let body = ''\n  for await (const chunk of req) body += chunk\n  events.push({ method: req.method, body: JSON.parse(body) })\n  pending.push(res)\n})\nawait new Promise(resolve => analytics.listen(0, '127.0.0.1', resolve))\nconst portProbe = net.createServer()\nawait new Promise(resolve => portProbe.listen(0, '127.0.0.1', resolve))\nconst appPort = portProbe.address().port\nawait new Promise(resolve => portProbe.close(resolve))\nconst app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', String(appPort), '-H', '127.0.0.1'], {\n  env: { ...process.env, NEXT_TELEMETRY_DISABLED: '1', ANALYTICS_ENDPOINT: \"'`http://127.0.0.1:${analytics.address().port}/events` },\n  stdio: ['\"'ignore', 'pipe', 'pipe'],\n})\nlet output = ''\napp.stdout.on('data', chunk => { output += chunk })\napp.stderr.on('data', chunk => { output += chunk })\nasync function until(check, description) {\n  const deadline = Date.now() + 10000\n  while (\"'!check()) {\n    if (Date.now() > deadline) throw new Error(`Timed out: ${description}'\"\\\\n\"'${output}`)\n    await new Promise(resolve => setTimeout(resolve, 25))\n  }\n}\ntry {\n  await until(() => output.includes('\"'Ready in'), 'app startup')\n  for (let i = 0; i < 2; i++) {\n    const response = await fetch(\"'`http://127.0.0.1:${appPort}`, { signal: AbortSignal.timeout(3000) })\n    const html = await response.text()\n    assert.equal(response.status, 200)\n    assert.match(html, /<h1>Welcome<'\"\\\\/h1>/)\n    await until(() => events.length === i + 1, 'analytics request')\n    assert.equal(pending[i].writableEnded, false, 'Page must arrive before analytics finishes')\n    assert.equal(events[i].method, 'POST')\n    assert.equal(events[i].body.event, 'page_view')\n    assert.equal(events[i].body.path, '/')\n    assert.ok(Number.isFinite(Date.parse(events[i].body.timestamp)))\n    pending[i].writeHead(i === 0 ? 204 : 500)\n    pending[i].end()\n  }\n  await until(() => output.includes('Failed to log page view:') && output.includes('Analytics service returned 500'), 'analytics error handling')\n  console.log('PASS: Both visits return welcome HTML before analytics completes; each sends a page_view event; analytics failures are caught and logged.')\n} finally {\n  for (const res of pending) if (\"'!res.writableEnded) res.end()\n  app.kill('\"'SIGTERM')\n  await once(app, 'exit')\n  analytics.closeAllConnections()\n  await new Promise(resolve => analytics.close(resolve))\n}\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- tsconfig.json && cat next-env.d.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff --stat && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

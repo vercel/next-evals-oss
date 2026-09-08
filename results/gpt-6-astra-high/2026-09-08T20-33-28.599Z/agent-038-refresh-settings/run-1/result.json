@@ -1,0 +1,78 @@
+{
+  "status": "passed",
+  "duration": 123.52,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 9,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 9,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' -g '\"'!*lock*'\"' -g 'AGENTS.md' -g 'package.json' -g '*action*' -g '*notification*' -g '*preference*' -g 'page.*' -g 'schema.*' -g 'README*' -g 'next.config.*'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"ls -la && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"' && cat package.json && cat app/page.tsx\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat tsconfig.json && cat .gitignore && git status --short'"
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'export.*refresh|function refresh' node_modules/next/cache.* node_modules/next/dist/server/web/spec-extension/revalidate.* && rg --files /workspace /home/vercel-sandbox -g AGENTS.md -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!__agent_eval__'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --stat && git diff -- tsconfig.json && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\n\nconst url = 'http://localhost:3100/'\nconst initial = await fetch(url)\nconst html = await initial.text()\nassert.match(html, /Notifications: (?:<\"'!-- -->)?Off/)\nconst actionId = html.match(/name=\"'\"\\\\\"'$ACTION_ID_([''^\"]+)\"/)?.[1]\nassert.ok(actionId, '\"'Page must render the Server Action form')\nlet cookie = ''\nfor (const enabled of [true, false]) {\n  const response = await fetch(url, {\n    method: 'POST',\n    redirect: 'manual',\n    headers: {\n      'Content-Type': 'text/plain;charset=UTF-8',\n      Accept: 'text/x-component',\n      'Next-Action': actionId,\n      Origin: 'http://localhost:3100',\n      ...(cookie ? { Cookie: cookie } : {}),\n    },\n    body: '[]',\n  })\n  const body = await response.text()\n  assert.equal(response.status, 200, body)\n  assert.equal(response.headers.get('location'), null)\n  assert.equal(response.headers.get('x-action-redirect'), null)\n  assert.match(body, new RegExp('\\\"Notifications: \\\",\\\"' + (enabled ? 'On' : 'Off') + '\\\"'))\n  cookie = response.headers.get('set-cookie')?.split(';')[0]\n  assert.equal(cookie, 'notifications-enabled=' + enabled)\n  const persisted = await fetch(url, { headers: { Cookie: cookie } })\n  assert.match(await persisted.text(), new RegExp('Notifications: (?:<\"'!-- -->)?'\"' + (enabled ? 'On' : 'Off')))\n  console.log('PASS: toggled ' + (enabled ? 'on' : 'off') + ', returned updated page data without redirect, and persisted preference')\n}\nconst separateBrowser = await fetch(url)\nassert.match(await separateBrowser.text(), /Notifications: (?:<\"'!-- -->)?Off/)\nconsole.log('\"'PASS: preference is scoped to the browser cookie')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff -- app/page.tsx .gitignore tsconfig.json && cat app/actions.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

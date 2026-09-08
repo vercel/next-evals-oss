@@ -171,6 +171,38 @@ Editing an existing experiment config changes its fingerprint, which makes its
 cached results stale. That is the intended signal, but it means config churn costs
 real re-runs.
 
+### Reasoning effort
+
+Models that expose a reasoning-effort ladder get published at a **reasonable
+effort, not their ceiling** — `high` where a low→max ladder exists. The board is
+meant to tell someone what a model does on their Next.js work, and almost nobody
+runs day-to-day coding at top effort: it costs disproportionately more for a
+marginal gain, and it flatters models whose ceiling is mostly a pricing tier. A
+model measured at a rung nobody pays for is not a useful data point.
+
+So pick the rung by what people run, not by what the vendor offers:
+
+- Default to `high`. Encode the effort in the experiment slug and the
+  `MODEL_NAMES` label — `gpt-6-astra-high`, `GPT 6 Astra (high)` — so the board
+  never shows a score without saying what produced it.
+- Going above `high` needs a reason in the config comment, not just headroom.
+- **Confirm the rung exists before running.** Sending an effort the model does
+  not accept is a whole wasted matrix. The gateway is the source of truth and it
+  validates: a bad value returns HTTP 400 whose message enumerates the real set,
+  which is worth more than any catalog.
+
+  ```bash
+  curl -s https://ai-gateway.vercel.sh/v1/chat/completions \
+    -H "Authorization: Bearer $AI_GATEWAY_API_KEY" \
+    -H 'Content-Type: application/json' \
+    -d '{"model":"<id>","reasoning_effort":"<rung>",
+         "messages":[{"role":"user","content":"ok"}],"max_tokens":2000}'
+  ```
+
+  Catalogs disagree with the API and with each other — `openai/gpt-6-astra`
+  accepts `minimal`, which neither the gateway's own `/v1/models` nor models.dev
+  lists. Trust the 400.
+
 ## CI
 
 [`eval-cache-check.yml`](.github/workflows/eval-cache-check.yml) syncs fixtures at
@@ -206,6 +238,13 @@ The published board is two tiers:
   left to coast on old measurements.
 - **Tier 2 (previously measured)**: every other model keeps its last measured
   results for historical reference, clearly dated, and is not rerun.
+
+A model can also be *registered but unmeasured*: an experiment config, a
+display name and a list price exist, but no run does. It is in neither tier and
+does not reach the board at all, because `export-results` only exports
+experiments that have results. That state is a staging post, not a
+destination — land the run and tier the model in the same PR, or drop the
+config.
 
 Models the provider no longer serves (e.g. Cursor Composer 1.5) are removed
 entirely rather than kept in tier 2 — every published experiment must be
