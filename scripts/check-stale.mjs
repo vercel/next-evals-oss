@@ -13,7 +13,13 @@ import { execSync } from 'node:child_process';
 // The accepted set follows the README's model retention policy: tier-2
 // (previously measured) experiments keep their last results and are not rerun
 // as evals change, so every eval that drifts past a tier-2 model's final run
-// lands here. Tier-1 experiments must NOT appear — they get rerun instead.
+// lands here. Tier-1 experiments must NOT appear for that reason — they get
+// rerun instead.
+//
+// `changed` is direction-blind: it also fires when a result is NEWER than the
+// pinned fixture, i.e. a tier-1 model was rerun against an upstream eval fix
+// the pin does not include yet. Those pairs are noted individually below and
+// come back out when the pin is bumped past the fix.
 const ACCEPTED_STALE = {
   'claude-melon-eap': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-melon-eap--agents-md': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
@@ -23,6 +29,12 @@ const ACCEPTED_STALE = {
   'claude-opus-4.7--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-opus-4.8': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-opus-4.8--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
+  // Newer than the pin, not older: agent-030 was rerun against the corrected
+  // root-layout assertion from vercel/next.js#98365 (it now accepts the
+  // generated LayoutProps helper as well as an inline ReactNode annotation).
+  // The pinned SHA below predates that fix, so the fresh result reads as
+  // changed. Drop this entry when the pin is bumped past 4a34974ec2.
+  'claude-opus-5--agents-md': ['agent-030-app-router-migration-hard'],
   'claude-opus-5-control': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-sonnet-4.5': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
   'claude-sonnet-4.5--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
