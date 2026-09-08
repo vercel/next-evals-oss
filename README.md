@@ -39,6 +39,18 @@ pnpm sync-evals <ref>    # ...or a branch, tag, or commit SHA
 `evals/` is git-ignored here, so a fresh clone has no fixtures and every command
 fails with `Evals directory not found`. `sync-evals` sparse-checkouts them.
 
+`sync-evals` applies the tracked `scripts/patch-agent-030.mjs` correction before
+fingerprinting: it backports the LayoutProps fix from next.js#98365 and replaces
+the error-boundary source regex with a semantic check that follows imports,
+re-exports, and prop-forwarding wrappers. This keeps the pinned 26-eval set while
+fixing assertions that reject valid component organization. Unexpected upstream
+changes fail before replacing the existing fixtures; review the patch when that
+happens. Remove this backport once the upstream fixture includes both fixes.
+
+This changes the eval content fingerprint. Previous results are not relabeled as
+passes: rerun the affected experiment/eval pairs before exporting new scores.
+
+
 Syncing from `canary` picks up whatever landed upstream since results were last
 recorded, so it usually reports evals as changed:
 

@@ -14,6 +14,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { patchAgent030File } from './patch-agent-030.mjs';
 
 const REPO_URL = 'https://github.com/vercel/next.js.git';
 
@@ -50,6 +51,10 @@ async function main(): Promise<void> {
     { stdio: 'inherit' }
   );
   execSync(`git -C "${repoDir}" checkout -q FETCH_HEAD`, { stdio: 'inherit' });
+
+  // Validate and patch before replacing the existing fixtures. These assertion
+  // changes must happen before refingerprinting so old results stay stale.
+  patchAgent030File(join(repoDir, 'evals', 'evals'));
 
   // Swap the fetched tree into place: only now is the old one expendable.
   if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
