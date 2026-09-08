@@ -65,6 +65,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
   'gpt-5.5-pro--agents-md': 'gpt-5.5-pro',
   'gpt-5.6-sol-ultra--agents-md': 'gpt-5.6-sol-ultra',
+  'gpt-6-astra-max--agents-md': 'gpt-6-astra-max',
   'kimi-k2.5--agents-md': 'kimi-k2.5',
   'kimi-k2.6--agents-md': 'kimi-k2.6',
   'kimi-k2.7-code--agents-md': 'kimi-k2.7-code',
@@ -166,6 +167,10 @@ interface ExportedData {
  *
  * grok-4.6 and gemini-3.1-pro-preview qualify by the rule but are exported as
  * tier 2 until they can actually be rerun (provider ACL / missing API key).
+ *
+ * gpt-6-astra-max is registered but not here: it has no measurements yet, and
+ * an experiment with no results is not exported at all, so the tier it would
+ * take is decided in the PR that lands its run.
  */
 const TIER_1 = new Set([
   'claude-fable-5',
@@ -173,6 +178,8 @@ const TIER_1 = new Set([
   'claude-sonnet-5',
   // gpt-5.6-sol supersedes the whole GPT line, including the codex-branded
   // models (OpenAI folded codex into the unified releases after 5.3-codex).
+  // GPT 6 Astra takes this slot outright once measured — it shipped 57 days
+  // after gpt-5.6-sol, too long for the under-a-month carve-out to keep sol.
   'gpt-5.6-sol-ultra',
   'kimi-k3',
   'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
@@ -216,6 +223,8 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.5-pro--agents-md': 'GPT 5.5 Pro + AGENTS.md',
   'gpt-5.6-sol-ultra': 'GPT 5.6 Sol (ultra)',
   'gpt-5.6-sol-ultra--agents-md': 'GPT 5.6 Sol (ultra) + AGENTS.md',
+  'gpt-6-astra-max': 'GPT 6 Astra (max)',
+  'gpt-6-astra-max--agents-md': 'GPT 6 Astra (max) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
   'kimi-k2.6': 'Kimi K2.6',
