@@ -132,8 +132,8 @@ are automatically deleted during eval runs, so only valid model results are
 exported.
 
 `pnpm export-results --check` verifies that the committed JSON matches a full
-export, ignoring only `metadata.exportedAt`. Run this check before publishing;
-it does not change the file. Export errors exit nonzero and an empty export is rejected.
+export, ignoring only `metadata.exportedAt`. CI runs this check without changing
+the file. Export errors exit nonzero and an empty export is rejected.
 
 Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens are
 read from each run's `transcript-raw.jsonl` (handled per harness in
