@@ -39,17 +39,17 @@ pnpm sync-evals <ref>    # ...or a branch, tag, or commit SHA
 `evals/` is git-ignored here, so a fresh clone has no fixtures and every command
 fails with `Evals directory not found`. `sync-evals` sparse-checkouts them.
 
-`sync-evals` applies the tracked `scripts/patch-agent-030.mjs` correction before
-fingerprinting: it backports the LayoutProps fix from next.js#98365 and replaces
-the error-boundary source regex with a semantic check that follows imports,
-re-exports, and prop-forwarding wrappers. This keeps the pinned 26-eval set while
-fixing assertions that reject valid component organization. Unexpected upstream
-changes fail before replacing the existing fixtures; review the patch when that
-happens. Remove this backport once the upstream fixture includes both fixes.
+`sync-evals` imports the complete `agent-030-app-router-migration-hard` fixture
+from [next.js#98387](https://github.com/vercel/next.js/pull/98387), pinned at
+`d4edf394ea4423a673cb08ed04a1c27eab1c210e`. This includes the LayoutProps and
+version-aware error-boundary assertions without locally rewriting upstream code.
+The other 25 fixtures still come from the requested suite ref. The imported
+fixture is byte-identical to the one used for Astra's results in #119.
 
-This changes the eval content fingerprint. Previous results are not relabeled as
-passes: rerun the affected experiment/eval pairs before exporting new scores.
-
+The override accepts only the two known older fixture trees and the corrected
+one; an unfamiliar upstream tree fails before replacing the existing fixtures.
+Remove the override when the suite pin includes the upstream fix. Syncing never
+relabels old results as passes: content changes stay stale until rerun.
 
 Syncing from `canary` picks up whatever landed upstream since results were last
 recorded, so it usually reports evals as changed:
