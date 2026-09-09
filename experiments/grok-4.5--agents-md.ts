@@ -1,6 +1,7 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 
 const config: ExperimentConfig = {
+  evals: process.env.EVAL_FILTER ?? '*',
   agent: 'vercel-ai-gateway/opencode',
   model: 'vercel/xai/grok-4.5',
   agentOptions: {
