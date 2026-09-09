@@ -5,15 +5,17 @@
  * exports clean results to agent-results.json.
  *
  * Usage:
- *   npx tsx scripts/export-results.ts [experiments...]
- *   npx tsx scripts/export-results.ts  # exports from all experiments
+ *   pnpm export-results [experiments...]
+ *   pnpm export-results  # exports from all experiments
  *
- * Output: agent-results.json (copy this to front repo)
+ * Output: agent-results.json (published from main to nextjs.org/evals)
+ * Use --check to verify the committed export without writing it.
  */
 
 import { execSync } from 'node:child_process';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   MODEL_PRICING,
   extractRunTokens,
@@ -300,7 +302,7 @@ async function main(): Promise<void> {
   // whose content changed keep their last measured result until the model
   // is rerun — the board shows the previous measurement, not a hole.
   const missingByExperiment = new Map<string, Set<string>>();
-  const statusRaw = execSync('npx agent-eval status --json', {
+  const statusRaw = execSync('pnpm exec agent-eval status --json', {
     encoding: 'utf-8',
     maxBuffer: 64 * 1024 * 1024,
   });
@@ -311,11 +313,18 @@ async function main(): Promise<void> {
     missingByExperiment.set(w.experiment, new Set(w.new));
   }
 
-  let experiments = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const check = args.includes('--check');
+  let experiments = args.filter((arg) => arg !== '--check');
+  if (check && experiments.length > 0) {
+    throw new Error('--check verifies the full export; do not specify experiments');
+  }
 
   if (experiments.length === 0) {
     // Auto-discover all experiments with results
-    const allDirs = (await readdir(resultsDir)).filter((d) => !d.startsWith('.'));
+    const allDirs = (await readdir(resultsDir))
+      .filter((d) => !d.startsWith('.'))
+      .sort();
     const withResults: string[] = [];
     async function hasSummaryJson(dir: string): Promise<boolean> {
       const entries = (await readdir(dir).catch(() => [] as string[])).filter((e) => !e.startsWith('.'));
@@ -598,14 +607,29 @@ async function main(): Promise<void> {
   }
 
   const outputPath = join(process.cwd(), 'agent-results.json');
-  await writeFile(outputPath, JSON.stringify(exportedData, null, 2));
+  if (exportedData.metadata.experiments.length === 0) {
+    throw new Error('No valid experiments to publish');
+  }
+  if (check) {
+    const committed: ExportedData = JSON.parse(await readFile(outputPath, 'utf-8'));
+    // Export time changes on every invocation, even when all measurements match.
+    exportedData.metadata.exportedAt = committed.metadata.exportedAt;
+    if (!isDeepStrictEqual(committed, exportedData)) {
+      throw new Error('agent-results.json is out of date. Run pnpm export-results and commit it.');
+    }
+  } else {
+    await writeFile(outputPath, JSON.stringify(exportedData, null, 2));
+  }
 
   console.log('\n' + '-'.repeat(60));
-  console.log(`Exported to: ${outputPath}`);
+  console.log(`${check ? 'Verified' : 'Exported to'}: ${outputPath}`);
   console.log(
     `Total: ${totalResults} | Pass: ${totalSuccess} | Fail: ${totalResults - totalSuccess - totalNotAvailable} | N/A: ${totalNotAvailable}`
   );
   console.log('-'.repeat(60));
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

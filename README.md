@@ -131,6 +131,10 @@ Exports clean results to `agent-results.json`. Non-model failures (infra/timeout
 are automatically deleted during eval runs, so only valid model results are
 exported.
 
+`pnpm export-results --check` verifies that the committed JSON matches a full
+export, ignoring only `metadata.exportedAt`. CI runs this check without changing
+the file. Export errors exit nonzero and an empty export is rejected.
+
 Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens are
 read from each run's `transcript-raw.jsonl` (handled per harness in
 `scripts/cost.ts`) and multiplied by the list prices in `MODEL_PRICING`. A model
@@ -228,12 +232,36 @@ refreshing, and record the rest in `ACCEPTED_STALE`.
 
 After running evals:
 
-1. Export results: `pnpm export-results`
-2. Copy to front repo:
-   ```bash
-   cp agent-results.json <path-to-front>/apps/next-site/app/\(next-site\)/evals/agent-results.json
-   ```
-3. Commit and deploy the front repo
+1. Export the full dataset: `pnpm export-results`.
+2. Include `agent-results.json` with the results in your PR to this repo.
+3. Merge the reviewed PR to `main`.
+
+Once the server-fetch integration in `front` is deployed, nextjs.org/evals reads
+the [published JSON](https://raw.githubusercontent.com/vercel/next-evals-oss/main/agent-results.json)
+on the server. Result updates require no copy, PR, or deployment in `front`.
+Merging this file to `main` publishes it to the website.
+
+After the checks pass on `main`, CI calls
+`POST https://nextjs.org/api/evals/revalidate` using a short-lived GitHub Actions
+OIDC token. Only the `main` workflow can invalidate production; PR runs only
+validate results. No shared secret needs provisioning.
+
+The website caches the snapshot without timed server revalidation. Invalidation
+starts a stale-while-revalidate window: subsequent requests can trigger a
+background refresh and receive the old snapshot for up to one hour, after which
+a server request must wait for fresh data. Browser navigation can reuse a page
+for five minutes, and already-open tabs need a refresh. Each upstream refresh
+bypasses GitHub's raw-file cache using a unique query parameter.
+
+Deploy the frontend endpoint before merging this CI integration. Delivery is
+retried three times and fails the `revalidate-site` job if unsuccessful. Rerun
+that job or manually dispatch this workflow on `main` to retry; there is no
+periodic refresh to repair a missed notification. Revert the JSON change and
+pass `main` CI to roll back published results through the same process.
+
+Keep the existing JSON shape compatible with the website. Coordinate changes
+to required fields or scoring semantics with `front`; the format is currently
+unversioned.
 
 ## Model retention policy
 
