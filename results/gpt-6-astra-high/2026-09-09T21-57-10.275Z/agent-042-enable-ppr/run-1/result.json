@@ -1,0 +1,100 @@
+{
+  "status": "passed",
+  "duration": 178.842,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 13,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 13,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g '*lock*' -g 'README*' -g 'tsconfig.json' -g '\"'!node_modules'\"' -g '\"'!.git'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short --branch && ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files app __agent_eval__ && cat package.json next.config.ts tsconfig.json && git diff -- package.json && git log -4 --oneline'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'for p in /AGENTS.md /workspace/AGENTS.md; do if [ -f \"$p\" ]; then cat \"$p\"; fi; done; rg --files node_modules/next -g '\"'*cache*' -g '*dynamic*' -g '*prerender*' | head -60\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/cache.d.ts; rg -n 'cacheComponents|hours:|cacheLife' node_modules/next/dist/server/config-shared.d.ts node_modules/next/dist/server/config-shared.js node_modules/next/dist/server/use-cache/cache-life.d.ts; cat __agent_eval__/run.mjs\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat app/layout.tsx app/page.tsx app/news/page.tsx app/preview/page.tsx .gitignore'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git switch -c cache-components'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && git diff --stat && rg -n 'dynamicIO|force-dynamic|force-static|revalidate|fetchCache|experimental_ppr|cacheComponents|use cache|cookies|Suspense' app next.config.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport { readFileSync } from 'node:fs'\nconst manifest = JSON.parse(readFileSync('.next/prerender-manifest.json', 'utf8'))\nfor (const route of ['/news', '/preview']) {\n  console.log(route, JSON.stringify(manifest.routes[route], null, 2))\n}\nNODE\n\ngit diff -- tsconfig.json .gitignore next.config.ts app/news/page.tsx app/preview/page.tsx\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFileSync } from 'node:fs'\n\nconst origin = 'http://127.0.0.1:3100'\nconst manifest = JSON.parse(readFileSync('.next/prerender-manifest.json', 'utf8'))\nassert.equal(manifest.routes['/news'].initialRevalidateSeconds, 3600)\nassert.equal(manifest.routes['/news'].response, 'complete')\nassert.equal(manifest.routes['/preview'].response, 'initial')\nassert.equal(manifest.routes['/preview'].experimentalPPR, true)\nconst shell = readFileSync('.next/server/app/preview.html', 'utf8')\nassert.match(shell, /Editor preview/)\nassert.match(shell, /Loading draft/)\nassert.doesNotMatch(shell, /Untitled draft/)\nconsole.log('PASS: newsroom revalidates hourly; preview prerenders only its shell.')\n\nfor (const path of ['/', '/news']) {\n  const response = await fetch(origin + path)\n  assert.equal(response.status, 200)\n  const body = await response.text()\n  if (path === '/news') {\n    assert.match(body, /City council approves new park/)\n    assert.match(body, /Night market opens Friday/)\n    assert.match(response.headers.get('cache-control'), /s-maxage=3600/)\n  } else {\n    assert.match(body, /Northstar Publishing/)\n  }\n}\nconsole.log('PASS: home and newsroom serve successfully, with hourly newsroom cache headers.')\n\nconst titles = ['Editor-A-unique-draft', 'Editor-B-unique-draft']\nasync function checkPreview(title) {\n  const response = await fetch(origin + '/preview', {\n    headers: title ? { cookie: \"'`draft-title=${title}` } : {},\n  })\n  assert.equal(response.status, 200)\n  assert.match(response.headers.get('\"'cache-control'), /private/)\n  assert.match(response.headers.get('cache-control'), /no-store/)\n  const body = await response.text()\n  assert.ok(body.includes(\"'`<p>${title ?? '\"'Untitled draft'}</p>\"'`))\n  for (const other of titles.filter(value => value !== title)) {\n    assert.ok(!body.includes(other), `Preview leaked ${other}`)\n  }\n}\nawait checkPreview(undefined)\nawait Promise.all(titles.map(checkPreview))\nawait checkPreview(undefined)\nawait checkPreview(titles[0])\nconsole.log('\"'PASS: distinct editor cookies stay isolated across concurrent and repeated requests; missing cookies use Untitled draft.')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git status --short --branch'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

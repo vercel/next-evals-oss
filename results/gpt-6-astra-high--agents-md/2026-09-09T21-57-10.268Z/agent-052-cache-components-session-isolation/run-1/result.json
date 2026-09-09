@@ -1,0 +1,95 @@
+{
+  "status": "passed",
+  "duration": 309.343,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'components/**' -g 'lib/**' -g '*lock*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs | head -70'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat AGENTS.md package.json next.config.ts app/page.tsx app/layout.tsx lib/projects.ts && git status --short && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!.next'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md && rg --files node_modules/next/dist/docs | rg 'cache-components|use-cache|cacheLife|cache-life|cookies|headers'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,210p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheLife.md && sed -n '1,170p' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,190p' node_modules/next/dist/docs/01-app/02-guides/migrating-to-cache-components.md && cat tsconfig.json && node --version && npm --version\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git diff -- app/page.tsx lib/projects.ts next.config.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- next-env.d.ts tsconfig.json && rg --files .next/server/app | head -25 && node -e \\\"const fs = require('node:fs'); const html = fs.readFileSync('.next/server/app/index.html', 'utf8'); console.log(html.slice(0, html.indexOf('</main>') + 7)); const manifest = JSON.parse(fs.readFileSync('.next/prerender-manifest.json', 'utf8')); console.log(JSON.stringify(manifest.routes['/'], null, 2));\\\"\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFile } from 'node:fs/promises'\n\nconst shell = await readFile('.next/server/app/index.html', 'utf8')\nconst shellMarkup = shell.replace(/<\"'!--.*?-->/gs, '\"'')\nassert.ok(shellMarkup.includes('<h1>Workspace</h1>'))\nassert.ok(shellMarkup.includes('<p>12 active projects</p>'))\nassert.ok(shellMarkup.includes('<p role=\\\"status\\\">Loading your member details...</p>'))\nassert.ok(\"'!/Welcome,|Team:|Region:/.test(shellMarkup))\nconst manifest = JSON.parse(await readFile('\"'.next/prerender-manifest.json', 'utf8'))\nassert.equal(manifest.routes['/'].renderingMode, 'PARTIALLY_STATIC')\nassert.equal(manifest.routes['/'].initialRevalidateSeconds, 60)\nconsole.log('PASS: prerendered shell contains the heading, shared totals, and loading status without member data.')\n\nconst cases = [\n  { cookie: 'member=Alice; team=Orbit', region: 'iad', expected: ['Alice', 'Orbit', 'iad'] },\n  { cookie: 'member=Bob; team=Comet', region: 'fra', expected: ['Bob', 'Comet', 'fra'] },\n  { cookie: 'member=Alice; team=Orbit', region: 'syd', expected: ['Alice', 'Orbit', 'syd'] },\n  { expected: ['Guest', 'Community', 'global'] },\n  { cookie: 'member=Carol', expected: ['Carol', 'Community', 'global'] },\n  { cookie: 'team=Support', region: 'sin', expected: ['Guest', 'Support', 'sin'] },\n]\n\nasync function checkRequest(testCase) {\n  const headers = { 'user-agent': 'Mozilla/5.0' }\n  if (testCase.cookie) headers.cookie = testCase.cookie\n  if (testCase.region) headers['x-region'] = testCase.region\n  const response = await fetch('http://127.0.0.1:3100/', { headers })\n  assert.equal(response.status, 200)\n  const html = (await response.text()).replace(/<script\\\\b[\"'^>]*>['\"\\\\s\\\\S]*?<\\\\/script>/g, '').replace(/<\"'!--.*?-->/gs, '\"'')\n  const paragraphs = [...html.matchAll(/<p(?:\\\\s[\"'^>]*)?>(.*?)<'\"\\\\/p>/gs)].map((match) => match[1])\n  const [member, team, region] = testCase.expected\n  assert.deepEqual(paragraphs.filter((text) => /\"'^(Welcome,|Team:|Region:)/.test(text)), [\n    `Welcome, ${member}`, `Team: ${team}`, `Region: ${region}`,\n  ])\n  assert.ok(paragraphs.includes('\"'12 active projects'))\n}\n\nfor (const testCase of cases) await checkRequest(testCase)\nawait Promise.all(cases.map(checkRequest))\nconsole.log('PASS: 12 sequential/concurrent production requests preserve member, team, region, and defaults while sharing totals.')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && rg -n 'instant\\\\s*=\\\\s*false|force-dynamic|force-static|unstable_noStore|connection\\\\(|fetchCache|revalidate\\\\s*=' app lib next.config.ts; git diff --stat\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

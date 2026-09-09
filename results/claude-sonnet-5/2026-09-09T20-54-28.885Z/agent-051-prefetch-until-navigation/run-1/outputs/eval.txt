@@ -1,0 +1,79 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 4 failed) 90252ms
+   × enables Partial Prefetching globally or for the project route 14ms
+     → expected false to be true // Object.is equality
+   ✓ opts the project link into per-link prefetching 1ms
+   × uses the navigation cache stage 1ms
+     → expected null not to be null
+   × includes the project title in the selected prefetch 76897ms
+     → [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: app/projects/[slug]/page.tsx never imports or calls unstable_navigation() anywhere in the codebase (confirmed by grep and by EVAL.ts's own 'uses the navigation cache stage' test failing with 'expected null not to be null'), so ProjectDetails is just a plain async Suspense boundary with a setTimeout delay rather than a boundary that actually waits for navigation, meaning the title's Suspense boundary cannot be said to resolve 'before the nested boundary that waits for navigation' as required.
+   × waits until navigation for project details 13338ms
+     → [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits unstable_navigation() before loading or rendering them.
+
+The unstable_navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching unstable_navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: No call to unstable_navigation() exists anywhere in the codebase (grep found none); ProjectDetails in app/projects/[slug]/page.tsx directly awaits the uncached getProjectDetails() without gating on unstable_navigation(), so project details still join the prefetch instead of waiting for real navigation.
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  20:59:30
+   Duration  90.65s (transform 102ms, setup 39ms, collect 48ms, tests 90.25s, environment 0ms, prepare 124ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > enables Partial Prefetching globally or for the project route
+AssertionError: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:57:5
+     55|     /partialPrefetching\s*:\s*true/.test(config) ||
+     56|       /export\s+const\s+prefetch\s*=\s*['"]partial['"]/.test(source)
+     57|   ).toBe(true)
+       |     ^
+     58| })
+     59| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  EVAL.ts > uses the navigation cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:68:32
+     66|     /\bunstable_navigation(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     67|   )
+     68|   expect(navigationImport).not.toBeNull()
+       |                                ^
+     69| 
+     70|   const localName = navigationImport?.[1] ?? 'unstable_navigation'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  EVAL.ts > includes the project title in the selected prefetch
+Error: [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: app/projects/[slug]/page.tsx never imports or calls unstable_navigation() anywhere in the codebase (confirmed by grep and by EVAL.ts's own 'uses the navigation cache stage' test failing with 'expected null not to be null'), so ProjectDetails is just a plain async Suspense boundary with a setTimeout delay rather than a boundary that actually waits for navigation, meaning the title's Suspense boundary cannot be said to resolve 'before the nested boundary that waits for navigation' as required.
+ ❯ EVAL.ts:75:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  EVAL.ts > waits until navigation for project details
+Error: [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits unstable_navigation() before loading or rendering them.
+
+The unstable_navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching unstable_navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: No call to unstable_navigation() exists anywhere in the codebase (grep found none); ProjectDetails in app/projects/[slug]/page.tsx directly awaits the uncached getProjectDetails() without gating on unstable_navigation(), so project details still join the prefetch instead of waiting for real navigation.
+ ❯ EVAL.ts:83:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

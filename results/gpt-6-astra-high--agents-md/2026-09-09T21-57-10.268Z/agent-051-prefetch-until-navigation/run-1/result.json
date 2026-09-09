@@ -1,0 +1,194 @@
+{
+  "status": "passed",
+  "duration": 369.615,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 33,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 33,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc 'ls node_modules/next/dist/docs'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g '*project*' -g '*dashboard*' -g 'next.config.*' -g 'README*' -g '\"'!node_modules'\"' -g '\"'!.git'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat AGENTS.md package.json next.config.ts && rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!package-lock.json'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'prefetch|instant|useLink|unstable_instant|title|optimistic' node_modules/next/dist/docs/01-app/03-api-reference/02-components/link.mdx node_modules/next/dist/docs/01-app/02-guides/* node_modules/next/dist/docs/01-app/01-getting-started/*\"",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/02-guides/optimizing-prefetching.md'"
+      },
+      {
+        "command": "/bin/bash -lc \"cat app/page.tsx app/layout.tsx 'app/projects/[slug]/page.tsx' lib/data.ts tsconfig.json && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | rg '(navigation|partialPrefetching|/prefetch|/link)\\\\.md\"'$'\"' && cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/navigation.md node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/partialPrefetching.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"ls -a && npm ls --depth=0 && rg --files node_modules | rg '(\"'^|/)(playwright|puppeteer)(-core)?/(package.json|index.js)$'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- app/page.tsx 'app/projects/[slug]/page.tsx' next.config.ts && command -v chromium || command -v chromium-browser || command -v google-chrome || true\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls /tmp /opt /home/vercel-sandbox/.cache /root/.cache'",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc \"cat .gitignore && git diff -- tsconfig.json && rg -n -A 33 '\"'^### `?prefetch'\"' node_modules/next/dist/docs/01-app/03-api-reference/02-components/link.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm install --prefix /tmp/project-navigation-check --no-package-lock playwright'"
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3000'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'node /tmp/project-navigation-check/node_modules/playwright/cli.js install chromium'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > /tmp/project-navigation-check/check.mjs <<'EOF'\nimport assert from 'node:assert/strict'\nimport { chromium } from 'playwright'\n\nconst browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })\nconst projects = [\n  { slug: 'acme', title: 'Acme Storefront', description: 'Commerce storefront and checkout.', activity: 'Production deployment' },\n  { slug: 'orbit', title: 'Orbit Analytics', description: 'Product analytics and reporting.', activity: 'Report published' },\n]\ntry {\n  for (const project of projects) {\n    const context = await browser.newContext()\n    const page = await context.newPage()\n    const errors = []\n    page.on('pageerror', (error) => errors.push(error.message))\n    const prefetches = []\n    page.on('response', (response) => {\n      const request = response.request()\n      if (request.headers()['next-router-prefetch']) {\n        prefetches.push(response.text().then((body) => ({ url: response.url(), body })))\n      }\n    })\n    await page.goto('http://localhost:3000/')\n    await page.waitForLoadState('networkidle')\n    const prefetched = await Promise.all(prefetches)\n    assert(prefetched.some(({ body }) => body.includes(project.title)), \"'`Missing prefetched title: ${project.title}`)\n    for (const { body } of prefetched) {\n      for (const item of projects) {\n        assert(!body.includes(item.description), `Prefetched description: ${item.slug}`)\n        assert(!body.includes(item.activity), `Prefetched activity: ${item.slug}`)\n      }\n      assert(!body.includes('\"'Recent activity'), 'Prefetched details section')\n    }\n\n    let releaseNavigation\n    const navigationGate = new Promise((resolve) => { releaseNavigation = resolve })\n    let heldRequests = 0\n    await page.route('**/projects/**', async (route) => {\n      if (route.request().headers().rsc === '1' && \"'!route.request().headers()['\"'next-router-prefetch']) {\n        heldRequests++\n        await navigationGate\n      }\n      await route.continue()\n    })\n    await page.getByRole('link', { name: project.title, exact: true }).click()\n    await page.waitForURL(\"'`**/projects/${project.slug}`)\n    await page.getByRole('\"'heading', { name: project.title, exact: true }).waitFor({ state: 'visible' })\n    assert(heldRequests > 0, 'Expected to hold the navigation request')\n    assert(await page.getByText('Loading project details...', { exact: true }).isVisible())\n    assert.equal(await page.getByText(project.description, { exact: true }).count(), 0)\n    assert.equal(await page.getByRole('heading', { name: 'Recent activity' }).count(), 0)\n    releaseNavigation()\n    await page.getByText(project.description, { exact: true }).waitFor({ state: 'visible' })\n    await page.getByText(project.activity, { exact: true }).waitFor({ state: 'visible' })\n    assert.deepEqual(errors, [])\n    console.log(\"'`PASS ${project.slug}: title visible with navigation response blocked; details absent from prefetch and loaded after release`)\n    await context.close()\n  }\n  const page = await browser.newPage()\n  await page.goto('\"'http://localhost:3000/projects/acme')\n  await page.getByRole('heading', { name: 'Acme Storefront', exact: true }).waitFor()\n  await page.getByText('Commerce storefront and checkout.', { exact: true }).waitFor()\n  await page.goto('http://localhost:3000/projects/missing')\n  await page.getByRole('heading', { name: 'Unknown project', exact: true }).waitFor()\n  await page.getByText('This project could not be found.', { exact: true }).waitFor()\n  console.log('PASS direct visits: known project and unknown-project fallback')\n} finally {\n  await browser.close()\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'node /tmp/project-navigation-check/check.mjs'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short --untracked-files=normal'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat /etc/os-release && id && command -v apt-get && command -v sudo'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'ldd /home/vercel-sandbox/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm install --prefix /tmp/project-navigation-check --no-package-lock @sparticuz/chromium'"
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport subprocess\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('/tmp/project-navigation-check/check.mjs')\ns = p.read_text().replace(\\\"import { chromium } from 'playwright'\\\", \\\"import { chromium } from 'playwright'\\\\nimport serverChromium from '@sparticuz/chromium'\\\")\ns = s.replace(\\\"const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] })\\\", \\\"const browser = await chromium.launch({ headless: true, args: serverChromium.args, executablePath: await serverChromium.executablePath() })\\\")\np.write_text(s)\nPY\nnode /tmp/project-navigation-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'al2023|AWS_EXECUTION_ENV|LD_LIBRARY_PATH|isRunningInAws' /tmp/project-navigation-check/node_modules/@sparticuz/chromium/build && ls /tmp/project-navigation-check/node_modules/@sparticuz/chromium/bin\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,55p' /tmp/project-navigation-check/node_modules/@sparticuz/chromium/build/index.js && sed -n '78,102p' /tmp/project-navigation-check/node_modules/@sparticuz/chromium/build/helper.js && sed -n '85,145p' /tmp/project-navigation-check/node_modules/@sparticuz/chromium/build/index.js\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('/tmp/project-navigation-check/check.mjs')\ns = p.read_text().replace(\\\"import serverChromium from '@sparticuz/chromium'\\\", \\\"import serverChromium, { inflate, setupLambdaEnvironment } from '@sparticuz/chromium'\\\\n\\\\nawait inflate('/tmp/project-navigation-check/node_modules/@sparticuz/chromium/bin/al2023.tar.br')\\\\nsetupLambdaEnvironment('/tmp/al2023/lib')\\\")\ns = s.replace('args: serverChromium.args,', \\\"args: serverChromium.args.filter((arg) => arg \"'!== '\"'--single-process'),\\\")\np.write_text(s)\nPY\nnode /tmp/project-navigation-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('/tmp/project-navigation-check/check.mjs')\ns = p.read_text().replace(\\\"prefetches.push(response.text().then((body) => ({ url: response.url(), body })))\\\", \\\"prefetches.push(response.text().then((body) => ({ url: response.url(), body })).catch(() => ({ url: response.url(), body: '' })))\\\")\np.write_text(s)\nPY\nnode /tmp/project-navigation-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('/tmp/project-navigation-check/check.mjs')\ns = p.read_text().replace(\\\"    assert(prefetched.some\\\", \\\"    console.log(prefetched)\\\\n    assert(prefetched.some\\\")\ns = s.replace(\\\"    const prefetches = []\\\", \\\"    const prefetches = []\\\\n    page.on('request', (r) => { if (r.url().includes('/projects/')) console.log(r.url(), r.headers()) })\\\")\np.write_text(s)\nPY\nnode /tmp/project-navigation-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('/tmp/project-navigation-check/check.mjs')\ns = p.read_text()\ns = s.replace(\\\"    page.on('request', (r) => { if (r.url().includes('/projects/')) console.log(r.url(), r.headers()) })\\\", '')\ns = s.replace(\\\"    console.log(prefetched)\\\\n    assert(prefetched.some(({ body }) => body.includes(project.title)), \"'`Missing prefetched title: ${project.title}`)\", \"    // The router cancels streaming prefetches after reading their usable payload.'\"\\\\n    // Verify availability by blocking every navigation request below.\\\")\np.write_text(s)\nPY\nnode /tmp/project-navigation-check/check.mjs\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('/tmp/project-navigation-check/check.mjs')\ns = p.read_text()\na = s.index('    const prefetches = []')\nb = s.index('    for (const { body } of prefetched)', a)\ns = s[:a] + '''    const prefetchRequests = []\n    page.on('request', (request) => {\n      if (request.headers()['next-router-prefetch']) {\n        prefetchRequests.push({ url: request.url(), headers: request.headers() })\n      }\n    })\n    await page.goto('http://localhost:3000/')\n    await page.waitForLoadState('networkidle')\n    // Replay the same prefetch requests because the browser router cancels\n    // streaming responses once it has consumed the usable payload.\n    const prefetched = await Promise.all(prefetchRequests.map(async ({ url, headers }) => {\n      const response = await fetch(url, { headers, signal: AbortSignal.timeout(10000) })\n      assert.equal(response.status, 200)\n      return { url, body: await response.text() }\n    }))\n    assert(prefetched.some(({ body }) => body.includes(project.title)), \"'`Missing prefetched title: ${project.title}`)\n'\"''' + s[b:]\np.write_text(s)\nPY\nnode /tmp/project-navigation-check/check.mjs\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && git diff --stat && git diff -- app/page.tsx 'app/projects/[slug]/page.tsx' next.config.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nshutil.rmtree('.next')\nPath('next-env.d.ts').unlink()\nPY\ngit status --short && git diff --check\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

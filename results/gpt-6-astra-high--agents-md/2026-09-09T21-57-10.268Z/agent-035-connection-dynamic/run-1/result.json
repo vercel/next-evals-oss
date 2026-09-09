@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "duration": 303.128,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/**' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs | head -70'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next/dist/docs | rg 'cache-components|connection|route-segment-config|suspense'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat AGENTS.md package.json next.config.ts app/layout.tsx app/page.tsx && git status --short && rg --files -g '\"'!node_modules'\"' -g '\"'!.next'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat components/request-metadata.tsx tsconfig.json && cat node_modules/next/dist/docs/01-app/02-guides/migrating-to-cache-components.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/connection.md && rg -n 'cacheComponents|Math.random|randomUUID|Date.now|Suspense' node_modules/next/dist/docs/01-app/01-getting-started/05-cache-components.md node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md\"",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- app/layout.tsx components/request-metadata.tsx next.config.ts && rg -n 'instant\\\\s*=\\\\s*false|force-dynamic|force-static|experimental_ppr|fetchCache|revalidate|use cache|unstable_noStore' app components next.config.ts; git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files .next/server/app | head -35 && git diff -- tsconfig.json && cat next-env.d.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFile } from 'node:fs/promises'\n\nconst metadataPattern = /Request ([0-9a-f-]{36}) generated at ([0-9TZ:.-]+) \\\\(sample ([0-9.e-]+)\\\\)/\nconst stripComments = (html) => html.replace(/<\"'!--.*?-->/gs, '\"'')\nfor (const route of ['index', '_not-found']) {\n  const shell = await readFile(\"'`.next/server/app/${route}.html`, '\"'utf8')\n  assert.ok(shell.includes('<nav>Operations</nav>'), \"'`${route}: navigation is in the static shell`)\n  assert.ok(shell.includes('\"'Loading request metadata...'), \"'`${route}: metadata fallback is prerendered`)\n  assert.ok(!metadataPattern.test(stripComments(shell)), `${route}: metadata is not generated at build time`)\n  if (route === '\"'index') assert.ok(shell.includes('<h1>Deployment health</h1>'))\n}\nconst samples = []\nfor (let i = 0; i < 2; i++) {\n  const started = Date.now()\n  const response = await fetch('http://127.0.0.1:3100/')\n  assert.equal(response.status, 200)\n  const html = await response.text()\n  const finished = Date.now()\n  const match = stripComments(html).match(metadataPattern)\n  assert.ok(match, 'response includes request metadata')\n  const [, requestId, generatedAt, sample] = match\n  assert.ok(Date.parse(generatedAt) >= started && Date.parse(generatedAt) <= finished, 'timestamp is generated during this request')\n  assert.ok(Number(sample) >= 0 && Number(sample) < 1)\n  samples.push({ requestId, generatedAt, sample })\n}\nfor (const field of ['requestId', 'generatedAt', 'sample']) {\n  assert.notEqual(samples[0][field], samples[1][field], \"'`${field} changes between requests`)\n}\nconsole.log('\"'PASS: navigation and fallback are prerendered on both routes; deployment health is prerendered; request ID, timestamp, and sample are fresh for each production request.')\nNODE\n\ngit diff --check\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && git diff --stat && rg -n 'instant|force-dynamic|force-static|experimental_ppr|fetchCache|revalidate' app components next.config.ts\"",
+        "success": false,
+        "exitCode": 1
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

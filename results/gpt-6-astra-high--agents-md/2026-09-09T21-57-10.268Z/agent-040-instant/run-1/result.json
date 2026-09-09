@@ -1,0 +1,100 @@
+{
+  "status": "passed",
+  "duration": 340.32,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 3,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 13,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 13,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*page*' -g '*layout*' -g '*loading*' -g '*product*' -g '*inventory*' -g 'next.config.*' -g '*test*' -g '*spec*' -g '*lock*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files node_modules/next/dist/docs | head -60'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md node_modules/next/dist/docs/01-app/02-guides/streaming.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md package.json next.config.ts app/page.tsx app/product/page.tsx app/layout.tsx && git status --short && rg --files app'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/02-guides/prefetching.md && rg --files node_modules/next/dist/docs | rg 'cache-components|suspense|connection|loading|route-segment-config'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,200p' node_modules/next/dist/docs/01-app/02-guides/streaming.md && sed -n '170,245p' node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!next-env.d.ts'\"' && cat lib/data.ts tsconfig.json && rg -n 'Suspense|uncached|async|static shell' node_modules/next/dist/docs/01-app/02-guides/streaming.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node -e \\\"for (const name of ['playwright', '@playwright/test', 'puppeteer']) { try { console.log(name + ': ' + import.meta.resolve(name)) } catch {} }\\\" && git diff --check && git diff -- app/product/page.tsx\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- tsconfig.json && git status --short && rg --files .next/server/app | rg 'product'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\nimport { readFile } from 'node:fs/promises'\n\nconst shell = await readFile('.next/server/app/product.html', 'utf8')\nassert.ok(shell.includes('<h1>Premium Widget</h1>'))\nassert.ok(shell.includes('<p>Loading inventory...</p>'))\nassert.ok(\"'!shell.includes('\"' in stock'))\nassert.ok(\"'!shell.includes('\"'Price: \"'$'\"'))\nconsole.log('PASS: prerendered HTML contains the title and loading fallback without live inventory.')\n\nconst prefetch = await readFile('.next/server/app/product.segments/product/__PAGE__.segment.rsc', 'utf8')\nassert.ok(prefetch.includes('Premium Widget'))\nassert.ok(prefetch.includes('Loading inventory...'))\nassert.ok(\"'!prefetch.includes('\"' in stock'))\nconsole.log('PASS: prefetched page payload contains the title and fallback without waiting for inventory.')\n\nconst response = await fetch('http://localhost:3100/product')\nassert.equal(response.status, 200)\nconst html = await response.text()\nassert.ok(html.includes('<h1>Premium Widget</h1>'))\nassert.match(html, /\\\\d+<\"'!-- --> in stock/)\nassert.match(html, /Price: '\"\\\\\"'$<!-- -->'\"\\\\d+\\\\.\\\\d{2}/)\nassert.ok(html.indexOf('Loading inventory...') < html.indexOf(' in stock'))\nconsole.log('PASS: production response streams the stock count and price after the loading shell.')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\n\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nshutil.rmtree('.next')\nPath('next-env.d.ts').unlink()\nPY\n\ngit diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

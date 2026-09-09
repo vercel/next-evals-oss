@@ -39,17 +39,10 @@ pnpm sync-evals <ref>    # ...or a branch, tag, or commit SHA
 `evals/` is git-ignored here, so a fresh clone has no fixtures and every command
 fails with `Evals directory not found`. `sync-evals` sparse-checkouts them.
 
-`sync-evals` imports the complete `agent-030-app-router-migration-hard` fixture
-from merged [next.js#98387](https://github.com/vercel/next.js/pull/98387), pinned at
-`4d621240c38ebceeac693951d7c6b04636632adc`. This includes the LayoutProps and
-version-aware error-boundary assertions without locally rewriting upstream code.
-The other 25 fixtures still come from the requested suite ref. The imported
-fixture is byte-identical to the one used for Astra's results in #119.
-
-The override accepts only the two known older fixture trees and the corrected
-one; an unfamiliar upstream tree fails before replacing the existing fixtures.
-Remove the override when the suite pin includes the upstream fix. Syncing never
-relabels old results as passes: content changes stay stale until rerun.
+Fixtures listed in upstream `evals/eval.config.json` use local skill treatments
+for PR development. `sync-evals` omits them from this repository's public model
+and bundled-docs matrix. Syncing never relabels old results as passes: content
+changes stay stale until rerun.
 
 Syncing from `canary` picks up whatever landed upstream since results were last
 recorded, so it usually reports evals as changed:
@@ -339,6 +332,11 @@ sync, `ls evals/` is authoritative.
 | agent-041 | Optimize the PPR shell |
 | agent-042 | Enable PPR |
 | agent-043 | View transitions with shared elements |
+| agent-048 | Prefetch URL data |
+| agent-049 | Defer content to a selected prefetch |
+| agent-051 | Defer content until navigation |
+| agent-052 | Keep session data out of a public cache |
+| agent-053 | Preserve a useful URL-dependent shell |
 
 ## License
 

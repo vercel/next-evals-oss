@@ -1,0 +1,108 @@
+{
+  "status": "passed",
+  "duration": 236.266,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'components/**' -g 'lib/**' -g 'tsconfig.json' -g 'README*'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat package.json next.config.ts app/layout.tsx app/page.tsx 'app/products/[slug]/page.tsx' lib/products.ts tsconfig.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!.next'\"' -g '\"'!package-lock.json'\"' && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'for p in /AGENTS.md /workspace/AGENTS.md; do if [ -f \"$p\" ]; then cat \"$p\"; fi; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- next.config.ts 'app/products/[slug]/page.tsx' lib/products.ts && cat lib/products.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --stat && git diff -- tsconfig.json next-env.d.ts && rg -n 'force-dynamic|force-static|revalidate|fetchCache|dynamicParams|use cache|cacheComponents' app lib next.config.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport assert from 'node:assert/strict'\n\nasync function readProduct(path, name, price, relatedName) {\n  const started = performance.now()\n  const response = await fetch(\"'`http://localhost:3100${path}`)\n  assert.equal(response.status, 200)\n  const reader = response.body.getReader()\n  const decoder = new TextDecoder()\n  let html = '\"''\n  const seen = {}\n  const markers = {\n    shell: 'Signal Shop collection',\n    loading: 'Loading product details…',\n    product: \"'`<h1>${name}</h1>`,\n    price: `<p>${price}</p>`,\n    relatedLoading: '\"'Loading related products…',\n    related: \"'`<p>${relatedName}</p>`,\n  }\n  let chunk = 0\n  while (true) {\n    const result = await reader.read()\n    if (result.done) break\n    html += decoder.decode(result.value, { stream: true })\n    for (const [key, marker] of Object.entries(markers)) {\n      if (!seen[key] && html.includes(marker)) {\n        seen[key] = { chunk, ms: Math.round(performance.now() - started) }\n      }\n    }\n    chunk++\n  }\n  for (const key of Object.keys(markers)) assert.ok(seen[key], `${path}: missing ${key}`)\n  assert.ok(html.includes('\"'<nav><a href=\\\"/\\\">Signal Shop</a></nav>'), 'Shop navigation remains available')\n  assert.ok(seen.shell.chunk <= seen.product.chunk, 'Shop frame precedes details')\n  assert.ok(seen.product.chunk < seen.related.chunk, 'Related products stream after details')\n  assert.ok(seen.relatedLoading.chunk < seen.related.chunk, 'Related loading state precedes results')\n  console.log(JSON.stringify({ path, seen }))\n  return seen\n}\n\nconst cold = await readProduct('/products/lamp?currency=EUR', 'Brass lamp', 'EUR 110.40', 'Stone vase')\nconst warm = await readProduct('/products/lamp?currency=EUR', 'Brass lamp', 'EUR 110.40', 'Stone vase')\nassert.ok(cold.product.ms - warm.product.ms > 70, 'Repeated product requests reuse the cached result instead of the 120ms data load')\nawait readProduct('/products/lamp', 'Brass lamp', 'USD 120.00', 'Stone vase')\nawait readProduct('/products/vase?currency=EUR', 'Stone vase', 'EUR 73.60', 'Brass lamp')\nawait readProduct('/products/vase?currency=USD', 'Stone vase', 'USD 80.00', 'Brass lamp')\nawait readProduct('/products/lamp?currency=EUR&currency=USD', 'Brass lamp', 'EUR 110.40', 'Stone vase')\nawait readProduct('/products/lamp?currency=USD', 'Brass lamp', 'USD 120.00', 'Stone vase')\nconst missing = await fetch('http://localhost:3100/products/missing?currency=EUR')\nconst missingHtml = await missing.text()\nassert.ok(missingHtml.includes('NEXT_HTTP_ERROR_FALLBACK;404'), 'Unknown products retain notFound handling in the stream')\nassert.ok(\"'!missingHtml.includes('\"'Loading related products…'), 'Unknown products do not render recommendations')\nconst home = await fetch('http://localhost:3100/')\nassert.equal(home.status, 200)\nassert.ok((await home.text()).includes('/products/lamp?currency=EUR'))\nconsole.log('PASS: product and currency isolation, repeated-request cache reuse, streaming order, unknown-product handling, and home navigation')\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && cat .next/prerender-manifest.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -a && if [ -f .gitignore ]; then cat .gitignore; fi'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport subprocess\npath = Path('tsconfig.json')\noriginal = subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json'], text=True)\npath.write_text(original.replace('\\\".next/types/**/*.ts\\\"', '\\\".next/types/**/*.ts\\\", \\\".next/dev/types/**/*.ts\\\"'))\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff --check && git diff --stat && nl -ba 'app/products/[slug]/page.tsx' && nl -ba lib/products.ts && nl -ba next.config.ts\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
