@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   status-check:
@@ -35,3 +36,36 @@ jobs:
 
       - name: published export is current
         run: pnpm export-results --check
+
+  revalidate-site:
+    needs: status-check
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: invalidate the published evals cache
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const url = 'https://nextjs.org/api/evals/revalidate';
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const token = await core.getIDToken(url);
+                const response = await fetch(url, {
+                  method: 'POST',
+                  headers: { authorization: `Bearer ${token}` },
+                  redirect: 'error',
+                  signal: AbortSignal.timeout(15_000),
+                });
+                if (!response.ok) throw new Error(`Revalidation returned HTTP ${response.status}`);
+                if ((await response.json()).revalidated !== true) throw new Error('Revalidation was not acknowledged');
+                core.info('Evals cache invalidated; stale content may be served for up to one hour.');
+                return;
+              } catch (error) {
+                if (attempt === 3) throw error;
+                core.warning(`Revalidation attempt ${attempt} failed: ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+            }

@@ -241,11 +241,23 @@ the [published JSON](https://raw.githubusercontent.com/vercel/next-evals-oss/mai
 on the server. Result updates require no copy, PR, or deployment in `front`.
 Merging this file to `main` publishes it to the website.
 
-The website revalidates its cache after five minutes on the next request. GitHub
-also caches the raw file (currently five minutes), and browser navigation may
-reuse a cached page, so updates are eventual rather than immediate. There is no
-webhook to configure. Revert the JSON change to roll back published results;
-the same cache refresh applies.
+After the checks pass on `main`, CI calls
+`POST https://nextjs.org/api/evals/revalidate` using a short-lived GitHub Actions
+OIDC token. Only the `main` workflow can invalidate production; PR runs only
+validate results. No shared secret needs provisioning.
+
+The website caches the snapshot without timed server revalidation. Invalidation
+starts a stale-while-revalidate window: subsequent requests can trigger a
+background refresh and receive the old snapshot for up to one hour, after which
+a server request must wait for fresh data. Browser navigation can reuse a page
+for five minutes, and already-open tabs need a refresh. Each upstream refresh
+bypasses GitHub's raw-file cache using a unique query parameter.
+
+Deploy the frontend endpoint before merging this CI integration. Delivery is
+retried three times and fails the `revalidate-site` job if unsuccessful. Rerun
+that job or manually dispatch this workflow on `main` to retry; there is no
+periodic refresh to repair a missed notification. Revert the JSON change and
+pass `main` CI to roll back published results through the same process.
 
 Keep the existing JSON shape compatible with the website. Coordinate changes
 to required fields or scoring semantics with `front`; the format is currently
