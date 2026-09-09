@@ -40,8 +40,8 @@ pnpm sync-evals <ref>    # ...or a branch, tag, or commit SHA
 fails with `Evals directory not found`. `sync-evals` sparse-checkouts them.
 
 `sync-evals` imports the complete `agent-030-app-router-migration-hard` fixture
-from [next.js#98387](https://github.com/vercel/next.js/pull/98387), pinned at
-`d4edf394ea4423a673cb08ed04a1c27eab1c210e`. This includes the LayoutProps and
+from merged [next.js#98387](https://github.com/vercel/next.js/pull/98387), pinned at
+`4d621240c38ebceeac693951d7c6b04636632adc`. This includes the LayoutProps and
 version-aware error-boundary assertions without locally rewriting upstream code.
 The other 25 fixtures still come from the requested suite ref. The imported
 fixture is byte-identical to the one used for Astra's results in #119.

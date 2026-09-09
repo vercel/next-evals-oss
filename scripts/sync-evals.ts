@@ -18,7 +18,7 @@ import { join } from 'node:path';
 const REPO_URL = 'https://github.com/vercel/next.js.git';
 // next.js#98387: import the measured fixture directly from upstream instead of
 // rewriting EVAL.ts locally. Remove this override when the suite pin includes it.
-const AGENT_030_REF = 'd4edf394ea4423a673cb08ed04a1c27eab1c210e';
+const AGENT_030_REF = '4d621240c38ebceeac693951d7c6b04636632adc';
 const AGENT_030_PATH = 'evals/evals/agent-030-app-router-migration-hard';
 const AGENT_030_FIXED_TREE = '62164b209023c9be6207ab8812203d2172aaf149';
 const AGENT_030_OLD_TREES = new Set([
