@@ -48,6 +48,7 @@ interface AgentResult {
 // variant → base experiment (same agent harness). Hoisted to module scope so
 // both cost pricing (per eval) and the docs-impact merge resolve the same base.
 const AGENTS_MD_PAIRS: Record<string, string> = {
+  'claude-fable-5.1--agents-md': 'claude-fable-5.1',
   'claude-fable-5--agents-md': 'claude-fable-5',
   'claude-opus-5--agents-md': 'claude-opus-5',
   'claude-sonnet-5--agents-md': 'claude-sonnet-5',
@@ -169,6 +170,12 @@ interface ExportedData {
  * tier 2 until they can actually be rerun (provider ACL / missing API key).
  */
 const TIER_1 = new Set([
+  // claude-fable-5.1 is registered but unmeasured, so it is deliberately absent
+  // — an experiment with no results is not exported at all and has no tier. The
+  // PR that lands its run takes the Fable line's tier-1 slot for it and drops
+  // claude-fable-5 to tier 2: 5.1 shipped 2026-09-01 and 5 was already being
+  // measured here on 2026-06-09, so at least 84 days separate them, well past
+  // the under-a-month carve-out that would let the two share the slot.
   'claude-fable-5',
   'claude-opus-5',
   'claude-sonnet-5',
@@ -186,6 +193,8 @@ const TIER_1 = new Set([
 ]);
 
 const MODEL_NAMES: Record<string, string> = {
+  'claude-fable-5.1': 'Claude Fable 5.1 (high)',
+  'claude-fable-5.1--agents-md': 'Claude Fable 5.1 (high) + AGENTS.md',
   'claude-fable-5': 'Claude Fable 5 (high)',
   'claude-fable-5--agents-md': 'Claude Fable 5 (high) + AGENTS.md',
   'claude-opus-5': 'Claude Opus 5',
