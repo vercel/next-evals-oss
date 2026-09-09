@@ -7,8 +7,9 @@ description: Add a model to the nextjs.org/evals board end to end — register t
 
 ## The deliverable is a landed run, not a config
 
-A model addition is **done** when `agent-results.json` contains its numbers and the
-board can show it. It is **not** done when the experiment config exists.
+A model addition is **done** when the run has happened, `agent-results.json` contains
+its numbers, and a PR against the site repo carries that file. It is **not** done when
+the experiment config exists.
 
 `export-results` only exports experiments that have results, so a registered-but-unrun
 model does not reach the board at all — the PR looks complete and changes nothing a
@@ -146,3 +147,38 @@ actually produced.
 The PR body should state the scores for both experiments (`n/26`, pass@4), the mean
 cost per eval, the tiering change and its date arithmetic, and what the AGENTS.md
 variant won or lost.
+
+### 6. Publish to the site — a second PR, in `vercel/front`
+
+Merging here does not change nextjs.org/evals. The page reads a **copy** of
+`agent-results.json` checked into the site repo, so the task is not finished until that
+copy is updated:
+
+```
+vercel/front → apps/next-site/app/(next-site)/evals/agent-results.json
+```
+
+The page is entirely data-driven off that file — `modelName`, `tier`, `agentHarness`,
+`avgCostUsd`, `avgDuration` and `docsImpact` all come from it, and there is no
+per-model code — so replacing the file is the whole change. Open it as a PR, not a push
+to `main`.
+
+`front` is a large private monorepo; a sparse shallow clone is enough:
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/vercel/front.git
+cd front && git sparse-checkout set "apps/next-site/app/(next-site)/evals"
+```
+
+Two things the README's bare `cp` does not mention:
+
+- **Add a trailing newline.** `export-results` writes `JSON.stringify(…, null, 2)` with
+  no final newline, which is fine here but fails `front`'s Prettier check. `printf '\n'
+  >> <file>` after copying. (A formatter bot will also push a fixup commit that collapses
+  single-element arrays — cosmetic, no data change.)
+- **The copy is usually a release or two behind**, so the diff carries earlier refreshes
+  as well as your rows. That is expected; say so in the PR body rather than trying to
+  narrow the diff, and never hand-edit the file to do it.
+
+The GitHub contents API cannot write here — `front` requires verified signatures and
+rejects API-authored commits with a 409. Clone and `git push` instead.
