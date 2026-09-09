@@ -1,0 +1,59 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 3 failed) 158299ms
+   ✓ enables Partial Prefetching globally or for the project route 2ms
+   ✓ opts the project link into per-link prefetching 0ms
+   × uses the navigation cache stage 6ms
+     → expected null not to be null
+   × includes the project title in the selected prefetch 139994ms
+     → [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: ProjectDetails in app/projects/[slug]/page.tsx:25-29 fetches getProjectDetails without awaiting unstable_navigation(), so the per-link prefetch resolves the details subtree along with the title—effectively prefetching the whole page, which the criterion rejects.
+   × waits until navigation for project details 18295ms
+     → [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits unstable_navigation() before loading or rendering them.
+
+The unstable_navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching unstable_navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: app/projects/[slug]/page.tsx fetches project details (description, activity) inside ProjectDetails before any unstable_navigation() call, and the project page contains no import or await of unstable_navigation(), so details join the per-link prefetch.
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Start at  22:41:20
+   Duration  158.61s (transform 67ms, setup 27ms, collect 38ms, tests 158.30s, environment 0ms, prepare 87ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > uses the navigation cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:68:32
+     66|     /\bunstable_navigation(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     67|   )
+     68|   expect(navigationImport).not.toBeNull()
+       |                                ^
+     69| 
+     70|   const localName = navigationImport?.[1] ?? 'unstable_navigation'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > includes the project title in the selected prefetch
+Error: [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: ProjectDetails in app/projects/[slug]/page.tsx:25-29 fetches getProjectDetails without awaiting unstable_navigation(), so the per-link prefetch resolves the details subtree along with the title—effectively prefetching the whole page, which the criterion rejects.
+ ❯ EVAL.ts:75:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > waits until navigation for project details
+Error: [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits unstable_navigation() before loading or rendering them.
+
+The unstable_navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching unstable_navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: app/projects/[slug]/page.tsx fetches project details (description, activity) inside ProjectDetails before any unstable_navigation() call, and the project page contains no import or await of unstable_navigation(), so details join the per-link prefetch.
+ ❯ EVAL.ts:83:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

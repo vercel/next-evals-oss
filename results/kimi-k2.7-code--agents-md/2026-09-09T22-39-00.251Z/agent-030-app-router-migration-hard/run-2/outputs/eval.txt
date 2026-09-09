@@ -1,0 +1,129 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (8 tests | 1 failed) 29758ms
+   ✓ Root layout exists and replaces _app/_document 1ms
+   ✓ Home page migrated to Server Component with async data fetching  18392ms
+   ✓ Blog index migrated with ISR equivalent 1ms
+   × Dynamic blog route migrated to generateStaticParams 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /export.*generateStaticParams|generate…/
+   ✓ API routes migrated to Route Handlers 0ms
+   ✓ Metadata API replaces next/head 0ms
+   ✓ Error handling migrated to error.js and not-found.js  11355ms
+   ✓ Client components use next/navigation hooks 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  22:42:19
+   Duration  29.98s (transform 48ms, setup 19ms, collect 28ms, tests 29.76s, environment 0ms, prepare 62ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dynamic blog route migrated to generateStaticParams
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /export.*generateStaticParams|generate…/
+
+[32m- Expected:[39m 
+/export.*generateStaticParams|generateStaticParams.*export/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import type { Comment, Post } from '../../../lib/types'
+
+interface BlogPostPageProps {
+  params: Promise<{ id: string }>
+}
+
+export const revalidate = 300
+
+async function getPost(id: string): Promise<{ post: Post; comments: Comment[] } | null> {
+  try {
+    const [postRes, commentsRes] = await Promise.all([
+      fetch(`https://jsonplaceholder.typicode.com/posts/${id}`),
+      fetch(`https://jsonplaceholder.typicode.com/posts/${id}/comments`),
+    ])
+
+    if (!postRes.ok) {
+      return null
+    }
+
+    const post: Post = await postRes.json()
+    const comments: Comment[] = await commentsRes.json()
+
+    return { post, comments }
+  } catch {
+    return null
+  }
+}
+
+export async function generateMetadata({
+  params,
+}: BlogPostPageProps): Promise<Metadata> {
+  const { id } = await params
+  const data = await getPost(id)
+
+  if (!data) {
+    return {
+      title: 'Post Not Found - My Blog',
+    }
+  }
+
+  const { post } = data
+  const description = post.body.substring(0, 160)
+
+  return {
+    title: `${post.title} - My Blog`,
+    description,
+    openGraph: {
+      title: post.title,
+      description,
+    },
+  }
+}
+
+export default async function BlogPostPage({ params }: BlogPostPageProps) {
+  const { id } = await params
+  const data = await getPost(id)
+
+  if (!data) {
+    notFound()
+  }
+
+  const { post, comments } = data
+
+  return (
+    <article>
+      <Link href=\"/blog\">
+        <button>← Back</button>
+      </Link>
+
+      <h1>{post.title}</h1>
+      <p>{post.body}</p>
+
+      <h2>Comments ({comments.length})</h2>
+      <div className=\"comments\">
+        {comments.map((comment) => (
+          <div key={comment.id} className=\"comment\">
+            <h3>{comment.name}</h3>
+            <p>{comment.body}</p>
+            <small>By: {comment.email}</small>
+          </div>
+        ))}
+      </div>
+    </article>
+  )
+}
+"
+
+ ❯ EVAL.ts:93:26
+     91| 
+     92|   // Should export generateStaticParams
+     93|   expect(dynamicContent).toMatch(
+       |                          ^
+     94|     /export.*generateStaticParams|generateStaticParams.*export/
+     95|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
