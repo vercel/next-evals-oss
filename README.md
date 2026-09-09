@@ -131,6 +131,10 @@ Exports clean results to `agent-results.json`. Non-model failures (infra/timeout
 are automatically deleted during eval runs, so only valid model results are
 exported.
 
+`pnpm export-results --check` verifies that the committed JSON matches a full
+export, ignoring only `metadata.exportedAt`. Run this check before publishing;
+it does not change the file. Export errors exit nonzero and an empty export is rejected.
+
 Each experiment also gets an `avgCostUsd`: the mean list cost per eval. Tokens are
 read from each run's `transcript-raw.jsonl` (handled per harness in
 `scripts/cost.ts`) and multiplied by the list prices in `MODEL_PRICING`. A model
@@ -228,12 +232,24 @@ refreshing, and record the rest in `ACCEPTED_STALE`.
 
 After running evals:
 
-1. Export results: `pnpm export-results`
-2. Copy to front repo:
-   ```bash
-   cp agent-results.json <path-to-front>/apps/next-site/app/\(next-site\)/evals/agent-results.json
-   ```
-3. Commit and deploy the front repo
+1. Export the full dataset: `pnpm export-results`.
+2. Include `agent-results.json` with the results in your PR to this repo.
+3. Merge the reviewed PR to `main`.
+
+Once the server-fetch integration in `front` is deployed, nextjs.org/evals reads
+the [published JSON](https://raw.githubusercontent.com/vercel/next-evals-oss/main/agent-results.json)
+on the server. Result updates require no copy, PR, or deployment in `front`.
+Merging this file to `main` publishes it to the website.
+
+The website revalidates its cache after five minutes on the next request. GitHub
+also caches the raw file (currently five minutes), and browser navigation may
+reuse a cached page, so updates are eventual rather than immediate. There is no
+webhook to configure. Revert the JSON change to roll back published results;
+the same cache refresh applies.
+
+Keep the existing JSON shape compatible with the website. Coordinate changes
+to required fields or scoring semantics with `front`; the format is currently
+unversioned.
 
 ## Model retention policy
 
