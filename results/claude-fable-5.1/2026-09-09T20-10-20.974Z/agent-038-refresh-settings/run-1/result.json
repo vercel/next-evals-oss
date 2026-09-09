@@ -1,0 +1,81 @@
+{
+  "status": "passed",
+  "duration": 198.045,
+  "model": "claude-fable-5.1",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 6,
+    "toolCalls": {
+      "file_read": 1,
+      "file_write": 5,
+      "file_edit": 0,
+      "shell": 9,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/node_modules/next/dist/server/web/spec-extension/revalidate.d.ts"
+    ],
+    "filesModified": [
+      "/workspace/lib/preferences.ts",
+      "/workspace/app/actions.ts",
+      "/workspace/app/toggle-button.tsx",
+      "/workspace/app/page.tsx",
+      "/workspace/app/layout.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la && cat package.json && git diff package.json && find . -path ./node_modules -prune -o -type f -print | grep -v \"^./.git/\" | head -50",
+        "success": true
+      },
+      {
+        "command": "cat app/page.tsx; echo ---; cat tsconfig.json; echo ---; cat __agent_eval__/run.mjs; echo ---; cat node_modules/next/package.json | grep '\"version\"'; ls node_modules/next/dist/server/ | grep -i refresh; grep -rl \"refresh\" node_modules/next/dist/server/app-render/*.d.ts 2>/dev/null | head",
+        "success": true
+      },
+      {
+        "command": "cat node_modules/next/cache.d.ts; echo ---; cat node_modules/next/dist/server/web/spec-extension/refresh.d.ts 2>/dev/null; grep -rn \"export.*refresh\" node_modules/next/dist/server/web/spec-extension/*.d.ts node_modules/next/dist/server/*.d.ts 2>/dev/null | head; ls node_modules/next/dist/server/web/spec-extension/",
+        "success": true
+      },
+      {
+        "command": "npx next build 2>&1 | tail -30 && npx tsc --noEmit && echo \"TSC OK\"",
+        "success": true
+      },
+      {
+        "command": "npx next build 2>&1 | tail -20 && npx tsc --noEmit && echo \"TSC OK\"",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 > /tmp/next.log 2>&1 &) && sleep 4 && \\\necho \"--- initial page:\" && curl -s http://localhost:3123/ | grep -o 'Notifications are currently <!-- -->[^.]*' ; \\\nID=$(node -e \"const m=require('./.next/server/server-reference-manifest.json'); const ids=Object.keys(m.node||{}); console.log(ids[0])\") && echo \"action id: $ID\" && \\\necho \"--- action response status/headers:\" && curl -s -o /tmp/action.out -D - -X POST http://localhost:3123/ -H \"Next-Action: $ID\" -H \"Accept: text/x-component\" -H \"Content-Type: text/plain;charset=UTF-8\" --data '[]' | grep -iE \"^(HTTP|location|x-action)\" ; \\\necho \"--- action payload contains refreshed page?\" && grep -o 'Notifications are currently[^.]*' /tmp/action.out | head -1; \\\necho \"--- page after toggle:\" && curl -s http://localhost:3123/ | grep -o 'Notifications are currently <!-- -->[^.]*'; \\\npkill -f \"next start -p 3123\"; true",
+        "success": false
+      },
+      {
+        "command": "(npx next start -p 3124 > /tmp/next2.log 2>&1 &) && sleep 4 && \\\necho \"--- initial:\" && curl -s http://localhost:3124/ | grep -oE '<strong>[a-z]+</strong>' ; \\\nID=$(node -e \"const m=require('./.next/server/server-reference-manifest.json'); console.log(Object.keys(m.node)[0])\") && \\\ncurl -s -o /dev/null -X POST http://localhost:3124/ -H \"Next-Action: $ID\" -H \"Accept: text/x-component\" -H \"Content-Type: text/plain;charset=UTF-8\" --data '[]' && \\\necho \"--- after 1st toggle:\" && curl -s http://localhost:3124/ | grep -oE '<strong>[a-z]+</strong>' ; \\\ncurl -s -o /dev/null -X POST http://localhost:3124/ -H \"Next-Action: $ID\" -H \"Accept: text/x-component\" -H \"Content-Type: text/plain;charset=UTF-8\" --data '[]' && \\\necho \"--- after 2nd toggle:\" && curl -s http://localhost:3124/ | grep -oE '<strong>[a-z]+</strong>' ; \\\npkill -f \"next start -p 3124\"; true",
+        "success": false
+      },
+      {
+        "command": "cat .gitignore; git status --short",
+        "success": true
+      },
+      {
+        "command": "printf 'node_modules/\\n__agent_eval__/\\n.next/\\nnext-env.d.ts\\n*.tsbuildinfo\\n' > .gitignore && rm -rf .next tsconfig.tsbuildinfo && git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

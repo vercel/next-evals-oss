@@ -1,0 +1,82 @@
+{
+  "status": "passed",
+  "duration": 181.624,
+  "model": "claude-fable-5.1",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 4,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 14,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [
+      "/workspace/next.config.ts",
+      "/workspace/app/lib/posts.ts",
+      "/workspace/app/actions.ts",
+      "/workspace/app/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "git status --short && cat package.json && find . -path ./node_modules -prune -o -type f -print | grep -v '^./.git/' | head -50",
+        "success": true
+      },
+      {
+        "command": "cat app/page.tsx app/layout.tsx next.config.ts; ls node_modules/next/dist/docs/; ls node_modules/next/dist/docs/01-app/03-api-reference/04-functions/ 2>/dev/null | grep -i -E 'revalidate|update|cache'",
+        "success": true
+      },
+      {
+        "command": "cd node_modules/next/dist/docs/01-app/03-api-reference/04-functions/ && cat revalidateTag.md updateTag.md cacheTag.md",
+        "success": true
+      },
+      {
+        "command": "cd /workspace && cat __agent_eval__/run.mjs; cat tsconfig.json; sed -n 1,80p node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/*.md 2>/dev/null | head -0; ls node_modules/next/dist/docs/01-app/03-api-reference/; grep -n -i \"cacheComponents\" node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md | head",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app && ls 01-getting-started/ && grep -n -B2 -A12 \"updateTag\\|revalidateTag\" 01-getting-started/*mutating-data*.md | head -80; sed -n 44,140p 03-api-reference/01-directives/use-cache.md",
+        "success": true
+      },
+      {
+        "command": "cd /workspace && npx tsc --noEmit 2>&1 | tail -20; echo \"--- tsc exit: ${PIPESTATUS[0]}\"; timeout 300 npx next build 2>&1 | tail -30",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 > /tmp/next.log 2>&1 &) ; for i in $(seq 1 30); do curl -sf http://localhost:3123/ >/dev/null 2>&1 && break; sleep 1; done\necho \"--- initial page:\"; curl -s http://localhost:3123/ | grep -o -E '<p>No posts yet.</p>|<h2>[^<]*</h2>'\nACTION_ID=$(curl -s http://localhost:3123/ | grep -o -E 'name=\"\\$ACTION_ID_[0-9a-f]+\"' | head -1 | sed -E 's/name=\"\\$ACTION_ID_([0-9a-f]+)\"/\\1/')\necho \"action id: $ACTION_ID\"\ncurl -s -o /dev/null -w \"action POST status: %{http_code}\\n\" -X POST http://localhost:3123/ \\\n  -H \"Next-Action: $ACTION_ID\" -H \"Accept: text/x-component\" \\\n  -F \"title=Hello from smoke test\" -F \"content=First post body\" -F \"\\$ACTION_ID_$ACTION_ID=\"\necho \"--- page after create:\"; curl -s http://localhost:3123/ | grep -o -E '<p>No posts yet.</p>|<h2>[^<]*</h2>'\npkill -f \"next start -p 3123\"; tail -5 /tmp/next.log",
+        "success": false
+      },
+      {
+        "command": "cat /tmp/next.log | tail -30",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 > /tmp/next.log 2>&1 &) ; for i in $(seq 1 30); do curl -sf http://localhost:3123/ >/dev/null 2>&1 && break; sleep 1; done\necho \"--- initial page:\"; curl -s http://localhost:3123/ | grep -o -E '<p>No posts yet.</p>|<h2>[^<]*</h2>'\nACTION_ID=$(curl -s http://localhost:3123/ | grep -o -E 'name=\"\\$ACTION_ID_[0-9a-f]+\"' | head -1 | sed -E 's/name=\"\\$ACTION_ID_([0-9a-f]+)\"/\\1/')\ncurl -s -o /tmp/action.html -w \"action POST status: %{http_code}\\n\" -X POST http://localhost:3123/ \\\n  -F \"title=Hello from smoke test\" -F \"content=First post body\" -F \"\\$ACTION_ID_$ACTION_ID=\"\necho \"--- action response render:\"; grep -o -E '<p>No posts yet.</p>|<h2>[^<]*</h2>' /tmp/action.html\necho \"--- fresh GET after create:\"; curl -s http://localhost:3123/ | grep -o -E '<p>No posts yet.</p>|<h2>[^<]*</h2>'\npkill -f \"next start -p 3123\"; grep -i -E \"error|⨯\" /tmp/next.log || echo \"no server errors\"",
+        "success": false
+      },
+      {
+        "command": "grep -i -E \"error|⨯\" /tmp/next.log || echo \"no server errors\"; git -C /workspace status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

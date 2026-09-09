@@ -39,6 +39,11 @@ export interface Pricing {
  * When adding a model, add its price here or /evals shows N/A for that row.
  */
 export const MODEL_PRICING: Record<string, Pricing | null> = {
+  // Same in/out/cache-write as Fable 5, but cache reads are a quarter of it
+  // ($0.25 vs $1 per 1M) — the gateway catalog's `anthropic/claude-fable-5.1`
+  // entry as of 2026-09-09. Claude Code caches heavily, so that difference
+  // does real work on the exported cost.
+  'claude-fable-5.1': { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
   'claude-fable-5': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
   'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   // Introductory pricing through 2026-08-31; standard is 3/15/0.3/3.75 after.

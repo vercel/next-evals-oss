@@ -48,6 +48,7 @@ interface AgentResult {
 // variant → base experiment (same agent harness). Hoisted to module scope so
 // both cost pricing (per eval) and the docs-impact merge resolve the same base.
 const AGENTS_MD_PAIRS: Record<string, string> = {
+  'claude-fable-5.1--agents-md': 'claude-fable-5.1',
   'claude-fable-5--agents-md': 'claude-fable-5',
   'claude-opus-5--agents-md': 'claude-opus-5',
   'claude-sonnet-5--agents-md': 'claude-sonnet-5',
@@ -169,7 +170,11 @@ interface ExportedData {
  * tier 2 until they can actually be rerun (provider ACL / missing API key).
  */
 const TIER_1 = new Set([
-  'claude-fable-5',
+  // Claude Fable 5.1 holds the Fable line's only tier-1 slot. It shipped
+  // 2026-09-01, and Fable 5 was already being measured here on 2026-06-09 — at
+  // least 84 days earlier, past the under-a-month carve-out — so the two do not
+  // share the slot and claude-fable-5 drops to tier 2.
+  'claude-fable-5.1',
   'claude-opus-5',
   'claude-sonnet-5',
   // GPT 6 Astra holds the GPT line's only tier-1 slot, and that line includes
@@ -186,6 +191,8 @@ const TIER_1 = new Set([
 ]);
 
 const MODEL_NAMES: Record<string, string> = {
+  'claude-fable-5.1': 'Claude Fable 5.1 (high)',
+  'claude-fable-5.1--agents-md': 'Claude Fable 5.1 (high) + AGENTS.md',
   'claude-fable-5': 'Claude Fable 5 (high)',
   'claude-fable-5--agents-md': 'Claude Fable 5 (high) + AGENTS.md',
   'claude-opus-5': 'Claude Opus 5',
