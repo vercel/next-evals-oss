@@ -170,13 +170,11 @@ interface ExportedData {
  * tier 2 until they can actually be rerun (provider ACL / missing API key).
  */
 const TIER_1 = new Set([
-  // claude-fable-5.1 is registered but unmeasured, so it is deliberately absent
-  // — an experiment with no results is not exported at all and has no tier. The
-  // PR that lands its run takes the Fable line's tier-1 slot for it and drops
-  // claude-fable-5 to tier 2: 5.1 shipped 2026-09-01 and 5 was already being
-  // measured here on 2026-06-09, so at least 84 days separate them, well past
-  // the under-a-month carve-out that would let the two share the slot.
-  'claude-fable-5',
+  // Claude Fable 5.1 holds the Fable line's only tier-1 slot. It shipped
+  // 2026-09-01, and Fable 5 was already being measured here on 2026-06-09 — at
+  // least 84 days earlier, past the under-a-month carve-out — so the two do not
+  // share the slot and claude-fable-5 drops to tier 2.
+  'claude-fable-5.1',
   'claude-opus-5',
   'claude-sonnet-5',
   // GPT 6 Astra holds the GPT line's only tier-1 slot, and that line includes
