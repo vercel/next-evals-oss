@@ -1,0 +1,171 @@
+{
+  "status": "passed",
+  "duration": 470.668,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 6,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 28,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 28,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd; rg --files -g 'AGENTS.md' -g 'package.json' -g '*catalog*' -g 'next.config.*' -g '*lock*' -g 'tsconfig.json' -g 'README*' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls node_modules/next/dist/docs'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat AGENTS.md package.json next.config.ts; rg --files app src tests e2e 2>/dev/null; git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'searchParams|prefetch|instant|runtime' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache* node_modules/next/dist/docs/01-app/03-api-reference/02-components/link* node_modules/next/dist/docs/01-app/02-guides/prefetching* node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/*\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat app/page.tsx app/catalog/page.tsx app/layout.tsx; rg --files -g '\"'!node_modules'\"' -g '\"'!.git'\"' -g '\"'!package-lock.json'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/02-guides/optimizing-prefetching.md node_modules/next/dist/docs/01-app/02-guides/adopting-partial-prefetching.md node_modules/next/dist/docs/01-app/03-api-reference/04-file-conventions/route-segment-config/prefetch.md'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"cat lib/data.ts tsconfig.json; rg --files node_modules/next/dist/docs | rg '/(prefetch|instant|cacheLife|use-cache)\\\\.md\"'$'\"'; ls -a\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/partialPrefetching.md; sed -n '1,165p' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md; rg -n -A 90 'Prevent regressions' node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node -e \\\"for (const pkg of ['playwright', '@playwright/test', 'next/package.json']) { try { console.log(pkg, require.resolve(pkg)) } catch { console.log(pkg, 'unavailable') } }\\\"; ls /tmp; cat .gitignore\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc 'command -v chromium || command -v chromium-browser || command -v google-chrome; ls /opt /root/.cache/ms-playwright /home/vercel-sandbox/.cache/ms-playwright 2>/dev/null; npm install --prefix /tmp/catalog-prefetch-check --no-save --package-lock=false playwright'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --stat; git diff -- tsconfig.json; git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1 --port 3000'"
+      },
+      {
+        "command": "/bin/bash -lc 'node /tmp/catalog-prefetch-check/node_modules/playwright/cli.js install chromium'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > /tmp/catalog-prefetch-check/check.mjs <<'EOF'\nimport assert from 'node:assert/strict'\nimport { chromium } from './node_modules/playwright/index.mjs'\n\nconst browser = await chromium.launch({ headless: true })\nconst context = await browser.newContext()\nconst page = await context.newPage()\nconst prefetches = []\nconst responseTasks = []\nconst errors = []\npage.on('pageerror', (error) => errors.push(error.message))\npage.on('response', (response) => {\n  const request = response.request()\n  if (request.url().includes('/catalog') && request.headers()['next-router-prefetch']) {\n    responseTasks.push(response.text().then((body) => {\n      prefetches.push({ url: request.url(), body })\n    }))\n  }\n})\n\ntry {\n  await page.goto('http://127.0.0.1:3000/')\n  await page.waitForLoadState('networkidle')\n  await Promise.all(responseTasks)\n  for (const [category, heading, products] of [\n    ['featured', 'Featured products', ['Desk Lamp', 'Wool Blanket']],\n    ['sale', 'Products on sale', ['Canvas Tote', 'Travel Mug']],\n  ]) {\n    const payload = prefetches.filter(({ url }) => new URL(url).searchParams.get('category') === category).map(({ body }) => body).join('\\\\n')\n    assert.ok(payload.includes(heading), \"'`${category}: heading was prefetched`)\n    for (const product of products) assert.ok(payload.includes(product), `${category}: ${product} was prefetched`)\n  }\n  console.log('\"'Both category URLs prefetched their own headings and products before any click.')\n\n  await context.setOffline(true)\n  await page.evaluate(() => {\n    window.loadingStateSeen = false\n    new MutationObserver((mutations) => {\n      if (document.body.innerText.includes('Loading category...') || mutations.some((mutation) => [...mutation.addedNodes].some((node) => node.textContent?.includes('Loading category...')))) {\n        window.loadingStateSeen = true\n      }\n    }).observe(document.body, { subtree: true, childList: true, characterData: true })\n  })\n  for (const [category, heading, products] of [\n    ['featured', 'Featured products', ['Desk Lamp', 'Wool Blanket']],\n    ['sale', 'Products on sale', ['Canvas Tote', 'Travel Mug']],\n  ]) {\n    const start = Date.now()\n    await page.locator(\"'`a[href=\"/catalog?category=${category}\"]`).click()\n    await page.waitForURL(`**/catalog?category=${category}`, { timeout: 2000 })\n    await page.getByRole('\"'heading', { name: heading, exact: true }).waitFor({ timeout: 2000 })\n    assert.deepEqual(await page.locator('section li').allTextContents(), products)\n    assert.equal(await page.evaluate(() => window.loadingStateSeen), false, 'Loading fallback never appeared')\n    console.log(\"'`${category}: correct heading and products rendered offline in ${Date.now() - start}ms, without the loading state.`)\n    await page.goBack()\n    await page.getByRole('\"'heading', { name: 'Shop by category' }).waitFor()\n  }\n  assert.deepEqual(errors, [])\n} finally {\n  await browser.close()\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'node /tmp/catalog-prefetch-check/check.mjs'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"cat /etc/os-release; command -v apt-get; command -v dnf; id; ldd /home/vercel-sandbox/.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell | rg 'not found'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'sudo -n dnf install -y nspr nss atk at-spi2-atk dbus-libs libX11 libXcomposite libXdamage libXext libXfixes libXrandr mesa-libgbm libxcb libxkbcommon alsa-lib'"
+      },
+      {
+        "command": "/bin/bash -lc 'git show HEAD:tsconfig.json > tsconfig.json; git diff --check; git diff -- app/page.tsx lib/data.ts next.config.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'node /tmp/catalog-prefetch-check/check.mjs'",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\npath = Path('/tmp/catalog-prefetch-check/check.mjs')\ns = path.read_text().replace(\\\"responseTasks.push(response.text().then((body) => {\\\", \\\"responseTasks.push(response.text().catch(() => '').then((body) => {\\\")\npath.write_text(s)\nPY\nnode /tmp/catalog-prefetch-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\npath = Path('/tmp/catalog-prefetch-check/check.mjs')\ns = path.read_text().replace(\\\"  await Promise.all(responseTasks)\\\", \\\"  await Promise.all(responseTasks)\\\\n  console.log(prefetches)\\\")\npath.write_text(s)\nPY\nnode /tmp/catalog-prefetch-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'fc-list 2>/dev/null | head -5; ls /usr/share/fonts 2>/dev/null'",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'EOF'\nimport { chromium } from '/tmp/catalog-prefetch-check/node_modules/playwright/index.mjs'\nconst browser = await chromium.launch()\nconst page = await browser.newPage()\nawait page.goto('http://127.0.0.1:3000/')\nawait page.waitForLoadState('networkidle')\nconsole.log(await page.evaluate(() => ({ html: document.body.outerHTML, rects: Array.from(document.querySelectorAll('a')).map(a=>({rect: a.getBoundingClientRect().toJSON(), css: getComputedStyle(a).cssText, display: getComputedStyle(a).display, visibility: getComputedStyle(a).visibility})) })))\nawait browser.close()\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'sudo -n dnf install -y dejavu-sans-fonts > /tmp/catalog-prefetch-check/fonts-install.log 2>&1'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\npath = Path('/tmp/catalog-prefetch-check/check.mjs')\ns = path.read_text().replace(\\\"  console.log(prefetches)\\\\n\\\", '')\npath.write_text(s)\nPY\nnode /tmp/catalog-prefetch-check/check.mjs\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\npath = Path('/tmp/catalog-prefetch-check/check.mjs')\ns = path.read_text().replace(\\\"  await Promise.all(responseTasks)\\\", \\\"\\\"\\\"  const deadline = Date.now() + 10000\n  while (\"'!['\"'Featured products', 'Products on sale'].every((heading) => prefetches.some(({ body }) => body.includes(heading))) && Date.now() < deadline) {\n    await new Promise((resolve) => setTimeout(resolve, 100))\n  }\n  await page.waitForLoadState('networkidle')\n  await Promise.all(responseTasks)\\\"\\\"\\\")\npath.write_text(s)\nPY\nnode /tmp/catalog-prefetch-check/check.mjs\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'mv .next next-env.d.ts /tmp/catalog-prefetch-check/; git diff --check; git status --short; git diff --stat -- app/page.tsx lib/data.ts next.config.ts'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

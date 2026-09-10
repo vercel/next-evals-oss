@@ -1,0 +1,109 @@
+{
+  "status": "passed",
+  "duration": 1191.665,
+  "model": "claude-opus-5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 8,
+    "toolCalls": {
+      "file_read": 5,
+      "file_write": 3,
+      "file_edit": 2,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 25,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/app/layout.tsx",
+      "/workspace/app/page.tsx",
+      "/workspace/app/news/page.tsx",
+      "/workspace/app/preview/page.tsx",
+      "/workspace/__agent_eval__/run.mjs"
+    ],
+    "filesModified": [
+      "/workspace/next.config.ts",
+      "/workspace/app/news/page.tsx",
+      "/workspace/app/preview/page.tsx",
+      "/workspace/tsconfig.json",
+      "/workspace/.gitignore"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la && cat package.json",
+        "success": true
+      },
+      {
+        "command": "git status && git log --oneline -5",
+        "success": true
+      },
+      {
+        "command": "find /workspace/app /workspace/__agent_eval__ -type f | sort && echo \"---CONFIG---\" && cat /workspace/next.config.ts /workspace/tsconfig.json",
+        "success": true
+      },
+      {
+        "command": "git diff package.json",
+        "success": true
+      },
+      {
+        "command": "git checkout -b cache-components 2>&1 && node -e \"console.log(require('next/package.json').version)\"",
+        "success": true
+      },
+      {
+        "command": "cat node_modules/next/cache.d.ts 2>/dev/null; echo \"=== cache.js ===\"; cat node_modules/next/cache.js 2>/dev/null | head -40",
+        "success": true
+      },
+      {
+        "command": "grep -rn \"cacheComponents\" node_modules/next/dist/server/config-shared.d.ts | head -20; echo \"=== dynamicIO refs ===\"; grep -rn \"dynamicIO\" node_modules/next/dist/server/config-shared.d.ts | head -10",
+        "success": true
+      },
+      {
+        "command": "grep -rn \"dynamicIO\" node_modules/next/dist/server/config.js | head -20",
+        "success": true
+      },
+      {
+        "command": "npm run build 2>&1 | tail -50",
+        "success": true
+      },
+      {
+        "command": "grep -rn \"force-dynamic\\|force-static\\|export const revalidate\\|dynamicIO\\|unstable_cacheLife\\|noStore\" app/ next.config.ts || echo \"no opt-outs found\"",
+        "success": true
+      },
+      {
+        "command": "git status --short && echo \"=== DIFF ===\" && git diff -- app next.config.ts tsconfig.json",
+        "success": true
+      },
+      {
+        "command": "git checkout tsconfig.json && cat .gitignore",
+        "success": true
+      },
+      {
+        "command": "rm -rf .next && npm run build 2>&1 | tail -25",
+        "success": true
+      },
+      {
+        "command": "git status --short && git add -A && git status --short",
+        "success": true
+      },
+      {
+        "command": "git commit -q -F - <<'EOF'\nMigrate to Cache Components\n\nReplace the removed experimental.dynamicIO flag with top-level\ncacheComponents, and convert the two routes that relied on segment-level\nconfig off their opt-outs:\n\n- /news: `export const revalidate = 3600` -> `'use cache'` +\n  cacheLife('hours'), which is the same 1h revalidate. Segment-level\n  revalidate is not supported under Cache Components.\n- /preview: drop `dynamic = 'force-dynamic'` and move the cookies() read\n  into a Suspense-wrapped child, so the shell prerenders and the draft\n  title still resolves per request.\n\nBoth routes build without opting out: /news prerenders with a 1h\nrevalidate, /preview partially prerenders with the draft streamed in.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nEOF\ngit log --oneline -2 && git branch --show-current",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

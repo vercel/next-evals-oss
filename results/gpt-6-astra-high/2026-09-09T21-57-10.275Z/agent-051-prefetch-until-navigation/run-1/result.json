@@ -1,0 +1,108 @@
+{
+  "status": "failed",
+  "duration": 373.959,
+  "model": "openai/gpt-6-astra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*lock*' -g '\"'!node_modules'\"' -g '\"'!vendor'\"' -g '\"'!dist'\"' -g '\"'!build'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!dist'\"' -g '\"'!build'\"' -g '\"'!vendor'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && git status --short && ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat app/page.tsx app/projects/'[slug]'/page.tsx lib/data.ts app/layout.tsx next.config.ts tsconfig.json && rg -n 'unstable_instant|prefetch.*(unstable|partial)|unstable.*prefetch|instant' node_modules/next/dist/client/app-dir/link.d.ts node_modules/next/dist/shared/lib/app-router* node_modules/next/dist/server/config-shared.d.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files node_modules/next | rg 'prefetch|instant|connection|docs' | head -70 && git diff -- package.json && cat .gitignore\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '85,145p' node_modules/next/dist/client/app-dir/link.d.ts && rg -n 'prefetch|runtime' node_modules/next/dist/build/segment-config/app/app-segment-config.* -g '\"'!*.map'\"' && rg -n 'prefetch' node_modules/next -g '*.d.ts' -g '\"'!compiled/**'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'unstable_prefetch|unstable.*navigation|prefetch = .partial.|partialPrefetching' node_modules/next/dist/docs/01-app -g '*.md' && cat node_modules/next/dist/server/request/cache-stages.d.ts && cat node_modules/next/server.d.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '35,85p' node_modules/next/dist/docs/01-app/02-guides/optimizing-prefetching.md && sed -n '32,125p' node_modules/next/dist/docs/01-app/03-api-reference/04-functions/navigation.md && cat node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/02-route-segment-config/prefetch.md && rg --files node_modules | rg 'playwright|puppeteer' | head -25\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc 'command -v chromium || command -v chromium-browser || command -v google-chrome || true\nls /tmp\nls /home/vercel-sandbox/.cache'",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'PREFETCH_HEADER|isRuntimePrefetch|isRuntimeShellPrefetch|prefetchHeader ===' node_modules/next/dist/server/app-render/app-render.js node_modules/next/dist/client/components/segment-cache/cache.js node_modules/next/dist/client/components/app-router-headers.js && git diff --stat && git status --short && git diff -- tsconfig.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --hostname 127.0.0.1'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport assert from 'node:assert/strict'\n\nconst cases = [\n  ['acme', 'Acme Storefront', 'Commerce storefront and checkout.', 'Production deployment'],\n  ['orbit', 'Orbit Analytics', 'Product analytics and reporting.', 'Report published'],\n  ['missing', 'Unknown project', 'This project could not be found.', null],\n]\nfor (const [slug, title, description, activity] of cases) {\n  const url = \"'`http://127.0.0.1:3000/projects/${slug}`\n  const prefetch = await fetch(url, { headers: { RSC: '\"'1', 'Next-Router-Prefetch': '2' } })\n  assert.equal(prefetch.status, 200)\n  assert.match(prefetch.headers.get('content-type'), /text\\\\/x-component/)\n  const prefetched = await prefetch.text()\n  assert.ok(prefetched.includes(title), \"'`${slug}: title missing from prefetch`)\n  assert.ok(prefetched.includes('\"'Loading project details...'), \"'`${slug}: details fallback missing`)\n  assert.ok(!prefetched.includes(description), `${slug}: description was prefetched`)\n  assert.ok(!prefetched.includes('\"'Recent activity'), \"'`${slug}: activity section was prefetched`)\n  if (activity) assert.ok(!prefetched.includes(activity), `${slug}: activity was prefetched`)\n\n  const navigation = await fetch(url, { headers: { RSC: '\"'1' } })\n  assert.equal(navigation.status, 200)\n  const rendered = await navigation.text()\n  assert.ok(rendered.includes(title), \"'`${slug}: title missing after navigation`)\n  assert.ok(rendered.includes(description), `${slug}: description missing after navigation`)\n  assert.ok(rendered.includes('\"'Recent activity'), \"'`${slug}: activity section missing after navigation`)\n  if (activity) assert.ok(rendered.includes(activity), `${slug}: activity missing after navigation`)\n  console.log(`${slug}: prefetch contains title and loading fallback only; navigation includes details`)\n}\nJS'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport assert from 'node:assert/strict'\nfor (const [slug, title, description] of [\n  ['acme', 'Acme Storefront', 'Commerce storefront and checkout.'],\n  ['orbit', 'Orbit Analytics', 'Product analytics and reporting.'],\n]) {\n  const response = await fetch(\"'`http://127.0.0.1:3000/projects/${slug}`, {\n    headers: { RSC: '\"'1', 'Next-Router-Prefetch': '2' },\n  })\n  assert.equal(response.status, 200)\n  const body = await response.text()\n  assert.ok(body.includes(title))\n  assert.ok(body.includes('Loading project details...'))\n  assert.ok(\"'!body.includes(description))\n  assert.ok(!body.includes('\"'Recent activity'))\n  console.log(\"'`${slug}: cached details remain excluded from subsequent prefetches`)\n}\nconst response = await fetch('\"'http://127.0.0.1:3000/projects/acme')\nassert.equal(response.status, 200)\nconst html = await response.text()\nassert.ok(html.includes('Acme Storefront'))\nassert.ok(html.includes('Commerce storefront and checkout.'))\nconsole.log('Direct project page load returns title and details')\nJS\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nimport subprocess\n\nPath('tsconfig.json').write_bytes(subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json']))\nPath('next-env.d.ts').unlink()\nshutil.rmtree('.next')\nPY\n git diff --check\n git diff -- app/page.tsx app/projects/'[slug]'/page.tsx\n git status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

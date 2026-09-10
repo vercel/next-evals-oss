@@ -1,0 +1,381 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (6 tests | 3 failed) 53127ms
+   × enables Partial Prefetching globally or for the catalog route 7ms
+     → expected false to be true // Object.is equality
+   ✓ preserves the category URL structure 0ms
+   ✓ opts the category links into per-link prefetching 0ms
+   × caches the category data 1ms
+     → expected 'import { getCategoryHeading, getProdu…' to match /['"]use cache['"]/
+   ✓ does not use a navigation-stage boundary 0ms
+   × prefetches the selected category and cached products 53117ms
+     → [judge:environment] FAIL — The implementation must make the selected category heading and its cached products available from the completed per-link prefetch before navigation.
+
+A correct solution preserves the existing /catalog?category=... URLs, enables Partial Prefetching globally or on the catalog route, and opts the category Links into per-link prefetching with prefetch={true} or the equivalent bare prefetch prop. The catalog route reads the category from searchParams beneath Suspense and renders both the matching heading and getProducts(category) result in the prefetched result. The category data must use a use cache scope, with either the default cache profile or an explicit cacheLife(); searchParams must remain outside that cache scope. Keep the Suspense boundary: the shared App Shell uses its fallback, while a completed per-link prefetch can resolve the cached content inside it before navigation.
+
+This is the basic URL-data inclusion case. Do not use unstable_navigation(), unstable_prefetch(), connection(), or an uncached request boundary to defer the category content. Reject solutions that only prefetch the reusable Catalog shell while leaving the selected heading or product list behind the loading fallback.
+  reason: Partial prefetching is not enabled (`next.config.ts` has only `cacheComponents: true`, no `partialPrefetching: true` or `prefetch = 'partial'`), and category data is not in a `"use cache"` scope (`lib/categories.ts` lacks it). The catalog route delegates to client `CategoryResults` (`useSearchParams()` + `useCategoryData()` from `lib/category-store.ts` and `/api/products`), so per-link prefetch resolves only the shell—not the selected heading and `getProducts(category)` list before navigation.
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  23:59:31
+   Duration  53.39s (transform 52ms, setup 22ms, collect 38ms, tests 53.13s, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > enables Partial Prefetching globally or for the catalog route
+AssertionError: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:56:5
+     54|     /partialPrefetching\s*:\s*true/.test(config) ||
+     55|       /export\s+const\s+prefetch\s*=\s*['"]partial['"]/.test(source)
+     56|   ).toBe(true)
+       |     ^
+     57| })
+     58| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > caches the category data
+AssertionError: expected 'import { getCategoryHeading, getProdu…' to match /['"]use cache['"]/
+
+[32m- Expected:[39m 
+/['"]use cache['"]/
+
+[31m+ Received:[39m 
+"import { getCategoryHeading, getProducts } from '@/lib/categories'
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const category = searchParams.get('category') ?? 'featured'
+  const products = await getProducts(category)
+
+  return Response.json({
+    heading: getCategoryHeading(category),
+    products,
+  })
+}
+
+---FILE---
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+import { useCategoryData } from '@/lib/category-store'
+
+export function CategoryResults() {
+  const searchParams = useSearchParams()
+  const category = searchParams.get('category') ?? 'featured'
+  const data = useCategoryData(category)
+
+  if (!data) {
+    return <p>Loading category...</p>
+  }
+
+  return (
+    <section>
+      <h2>{data.heading}</h2>
+      <ul>
+        {data.products.map((product) => (
+          <li key={product}>{product}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { CategoryResults } from './category-results'
+
+export default function CatalogPage() {
+  return (
+    <main>
+      <h1>Catalog</h1>
+      <Suspense fallback={null}>
+        <CategoryResults />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import { CategoryLink } from '@/components/category-link'
+import { CategoryPrefetch } from '@/components/category-prefetch'
+import { categories, getProducts } from '@/lib/categories'
+
+export async function CategoryLinks() {
+  const categoryData = await Promise.all(
+    categories.map(async (category) => ({
+      slug: category.slug,
+      heading: category.label,
+      products: await getProducts(category.slug),
+    }))
+  )
+
+  return (
+    <>
+      <CategoryPrefetch data={categoryData} />
+      <ul>
+        {categories.map((category) => (
+          <li key={category.slug}>
+            <CategoryLink slug={category.slug} label={category.label} />
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Product catalog',
+  description: 'Browse products by category',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { CategoryLinks } from './category-links'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Shop by category</h1>
+      <Suspense fallback={<p>Loading categories...</p>}>
+        <CategoryLinks />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+'use client'
+
+import Link from 'next/link'
+import { useEffect } from 'react'
+import { prefetchCategory } from '@/lib/category-store'
+
+export function CategoryLink({
+  slug,
+  label,
+}: {
+  slug: string
+  label: string
+}) {
+  useEffect(() => {
+    prefetchCategory(slug)
+  }, [slug])
+
+  return (
+    <Link href={`/catalog?category=${slug}`} prefetch={true}>
+      {label}
+    </Link>
+  )
+}
+
+---FILE---
+'use client'
+
+import type { CategoryData } from '@/lib/category-store'
+import { seedCategoryCache } from '@/lib/category-store'
+
+export function CategoryPrefetch({ data }: { data: CategoryData[] }) {
+  seedCategoryCache(data)
+  return null
+}
+
+---FILE---
+export const categories = [
+  { slug: 'featured', label: 'Featured products' },
+  { slug: 'sale', label: 'Products on sale' },
+]
+
+const productsByCategory: Record<string, string[]> = {
+  featured: ['Desk Lamp', 'Wool Blanket'],
+  sale: ['Canvas Tote', 'Travel Mug'],
+}
+
+export function getCategoryHeading(slug: string) {
+  return categories.find((category) => category.slug === slug)?.label ?? categories[0].label
+}
+
+export async function getProducts(category: string) {
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  return productsByCategory[category] ?? []
+}
+
+---FILE---
+'use client'
+
+import { useEffect, useSyncExternalStore } from 'react'
+
+export type CategoryData = {
+  slug: string
+  heading: string
+  products: string[]
+}
+
+type CachedCategory = {
+  heading: string
+  products: string[]
+}
+
+const cache = new Map<string, CachedCategory>()
+const inflight = new Map<string, Promise<CachedCategory>>()
+const listeners = new Set<() => void>()
+
+function notify() {
+  for (const listener of listeners) {
+    listener()
+  }
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+function getSnapshot() {
+  return cache
+}
+
+function getServerSnapshot() {
+  return cache
+}
+
+export function seedCategoryCache(data: CategoryData[]) {
+  for (const item of data) {
+    cache.set(item.slug, {
+      heading: item.heading,
+      products: item.products,
+    })
+  }
+}
+
+async function fetchCategory(slug: string): Promise<CachedCategory> {
+  const response = await fetch(`/api/products?category=${encodeURIComponent(slug)}`)
+  if (!response.ok) {
+    throw new Error(`Failed to load category: ${slug}`)
+  }
+
+  const data = (await response.json()) as CachedCategory
+  cache.set(slug, data)
+  inflight.delete(slug)
+  notify()
+  return data
+}
+
+export function prefetchCategory(slug: string) {
+  if (cache.has(slug) || inflight.has(slug)) {
+    return
+  }
+
+  const promise = fetchCategory(slug)
+  inflight.set(slug, promise)
+  promise.catch(() => {
+    inflight.delete(slug)
+  })
+}
+
+export function getCategoryData(slug: string) {
+  return cache.get(slug)
+}
+
+export function useCategoryData(slug: string) {
+  const store = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+
+  useEffect(() => {
+    prefetchCategory(slug)
+  }, [slug])
+
+  return store.get(slug)
+}
+
+---FILE---
+export { getProducts } from './categories'
+
+---FILE---
+
+
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+
+
+
+---FILE---
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+---FILE---
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    
+    
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:69:18
+     67| 
+     68| test('caches the category data', () => {
+     69|   expect(source).toMatch(/['"]use cache['"]/)
+       |                  ^
+     70| })
+     71| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > prefetches the selected category and cached products
+Error: [judge:environment] FAIL — The implementation must make the selected category heading and its cached products available from the completed per-link prefetch before navigation.
+
+A correct solution preserves the existing /catalog?category=... URLs, enables Partial Prefetching globally or on the catalog route, and opts the category Links into per-link prefetching with prefetch={true} or the equivalent bare prefetch prop. The catalog route reads the category from searchParams beneath Suspense and renders both the matching heading and getProducts(category) result in the prefetched result. The category data must use a use cache scope, with either the default cache profile or an explicit cacheLife(); searchParams must remain outside that cache scope. Keep the Suspense boundary: the shared App Shell uses its fallback, while a completed per-link prefetch can resolve the cached content inside it before navigation.
+
+This is the basic URL-data inclusion case. Do not use unstable_navigation(), unstable_prefetch(), connection(), or an uncached request boundary to defer the category content. Reject solutions that only prefetch the reusable Catalog shell while leaving the selected heading or product list behind the loading fallback.
+  reason: Partial prefetching is not enabled (`next.config.ts` has only `cacheComponents: true`, no `partialPrefetching: true` or `prefetch = 'partial'`), and category data is not in a `"use cache"` scope (`lib/categories.ts` lacks it). The catalog route delegates to client `CategoryResults` (`useSearchParams()` + `useCategoryData()` from `lib/category-store.ts` and `/api/products`), so per-link prefetch resolves only the shell—not the selected heading and `getProducts(category)` list before navigation.
+ ❯ EVAL.ts:77:3
+     75| 
+     76| test('prefetches the selected category and cached products', async () …
+     77|   await expect(environment).toSatisfyCriterion(
+       |   ^
+     78|     `The implementation must make the selected category heading and it…
+     79| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

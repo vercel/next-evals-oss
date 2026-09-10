@@ -1,0 +1,131 @@
+{
+  "status": "passed",
+  "duration": 458.789,
+  "model": "claude-fable-5.1",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 10,
+    "toolCalls": {
+      "file_read": 1,
+      "file_write": 0,
+      "file_edit": 3,
+      "shell": 22,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 26,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md"
+    ],
+    "filesModified": [
+      "/workspace/next.config.ts",
+      "/workspace/lib/data.ts",
+      "/workspace/app/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "git status --short && cat package.json && find . -path ./node_modules -prune -o -type f -print | grep -v '^./.git/' | head -100",
+        "success": true
+      },
+      {
+        "command": "git diff package.json; for f in next.config.ts tsconfig.json lib/data.ts app/layout.tsx app/page.tsx app/catalog/page.tsx __agent_eval__/run.mjs; do echo \"=== $f ===\"; cat \"$f\"; done",
+        "success": true
+      },
+      {
+        "command": "node -e \"console.log(require('next/package.json').version)\" && grep -rl \"unstable_prefetch\" node_modules/next/dist/server/ 2>/dev/null | head -20; grep -rn \"runtime\" node_modules/next/dist/build/segment-config/app/app-segment-config.js | head -20",
+        "success": true
+      },
+      {
+        "command": "sed -n 85,125p node_modules/next/dist/build/segment-config/app/app-segment-config.js; echo ----; grep -n \"runtime\" node_modules/next/dist/server/request/cache-stages.d.ts node_modules/next/dist/server/request/cache-stages.js | head -40; echo ----; grep -rn \"cacheLife.*prefetch\\|'prefetch'\\|stages\" node_modules/next/dist/server/lib/router-utils/cache-life-type-utils.js | head -20",
+        "success": true
+      },
+      {
+        "command": "sed -n 1,80p node_modules/next/dist/build/segment-config/app/app-segment-config.js; echo ----; cat node_modules/next/dist/server/request/cache-stages.d.ts",
+        "success": true
+      },
+      {
+        "command": "ls node_modules/next/dist/server/app-render/ | grep -i instant; grep -rln \"instant\" node_modules/next/dist/server/app-render/*.js node_modules/next/dist/build/*.js node_modules/next/dist/client/components/*.js 2>/dev/null | head -20; echo ----; ls node_modules/next/dist/docs 2>/dev/null | head; find node_modules/next -iname \"*instant*\" | grep -v \"\\.map$\" | head",
+        "success": true
+      },
+      {
+        "command": "ls node_modules/next/dist/docs/01-app/02-guides/ | grep -i prefetch; cat node_modules/next/dist/docs/01-app/02-guides/optimizing-prefetching.md",
+        "success": true
+      },
+      {
+        "command": "grep -n \"partialPrefetching\" node_modules/next/dist/server/config-schema.js node_modules/next/dist/server/config-shared.d.ts | head; echo ----; sed -n 1,400p node_modules/next/dist/docs/01-app/02-guides/adopting-partial-prefetching.md | grep -n -i -B2 -A12 \"use cache\\|prefetch={true}\\|searchParams\" | head -150",
+        "success": true
+      },
+      {
+        "command": "npx next build 2>&1 | tail -40",
+        "success": true
+      },
+      {
+        "command": "cat node_modules/next/dist/client/components/app-router-headers.js | grep -n \"NEXT_ROUTER\\|RSC_HEADER\\|NEXT_URL\\|NEXT_HTML\" | head -30; echo ----; grep -rn \"NEXT_ROUTER_PREFETCH_HEADER\\]\\|NEXT_ROUTER_SEGMENT_PREFETCH_HEADER\\]\\|'runtime'\\|PrefetchKind\\|isRuntimePrefetch\" node_modules/next/dist/client/components/segment-cache/cache.js | head -30",
+        "success": true
+      },
+      {
+        "command": "sed -n 1640,1690p node_modules/next/dist/client/components/segment-cache/cache.js",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 > /tmp/next-start.log 2>&1 &) ; for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:3123/ && break; sleep 1; done; echo \"server up\"\necho \"=== App Shell prefetch (header 3) for ?category=sale ===\"\ncurl -s \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 3\" -H \"next-url: /\" | tr -d '\\0' | grep -o \"Loading category\\.\\.\\.\\|Products on sale\\|Featured products\\|Canvas Tote\\|Travel Mug\\|Desk Lamp\\|Wool Blanket\" | sort | uniq -c\necho \"=== Per-link runtime prefetch (header 2) for ?category=sale, first request (cold cache) ===\"\ntime (curl -s \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" -D /tmp/h1 | tr -d '\\0' | grep -o \"Loading category\\.\\.\\.\\|Products on sale\\|Featured products\\|Canvas Tote\\|Travel Mug\\|Desk Lamp\\|Wool Blanket\" | sort | uniq -c)\necho \"=== Per-link runtime prefetch (header 2) for ?category=sale, second request (warm cache) ===\"\ntime (curl -s \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" | tr -d '\\0' | grep -o \"Loading category\\.\\.\\.\\|Products on sale\\|Featured products\\|Canvas Tote\\|Travel Mug\\|Desk Lamp\\|Wool Blanket\" | sort | uniq -c)\necho \"=== Per-link runtime prefetch for ?category=featured ===\"\ncurl -s \"http://localhost:3123/catalog?category=featured\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" | tr -d '\\0' | grep -o \"Loading category\\.\\.\\.\\|Products on sale\\|Featured products\\|Canvas Tote\\|Travel Mug\\|Desk Lamp\\|Wool Blanket\" | sort | uniq -c\ngrep -i \"x-nextjs\\|vary\\|cache-control\" /tmp/h1",
+        "success": true
+      },
+      {
+        "command": "cat /tmp/next-start.log | tail -5; echo ----; curl -s -i \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" | head -c 3000",
+        "success": true
+      },
+      {
+        "command": "check() { tr -d '\\0' | grep -o \"Loading category\\.\\.\\.\\|Products on sale\\|Featured products\\|Canvas Tote\\|Travel Mug\\|Desk Lamp\\|Wool Blanket\" | sort | uniq -c; }\necho \"=== App Shell prefetch (header 3) for ?category=sale ===\"\ncurl -sL \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 3\" -H \"next-url: /\" | check\necho \"=== Per-link runtime prefetch (header 2) for ?category=sale, cold ===\"\ntime (curl -sL \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" -D /tmp/h1 | check)\necho \"=== Per-link runtime prefetch (header 2) for ?category=sale, warm ===\"\ntime (curl -sL \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" | check)\necho \"=== Per-link runtime prefetch for ?category=featured ===\"\ncurl -sL \"http://localhost:3123/catalog?category=featured\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" | check\ngrep -i \"^x-nextjs\\|^vary\\|^cache-control\\|^HTTP\" /tmp/h1",
+        "success": true
+      },
+      {
+        "command": "curl -sL \"http://localhost:3123/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\" | tr -d '\\0' | grep -n \"Loading category\\|Products on sale\" | cut -c1-600",
+        "success": true
+      },
+      {
+        "command": "(npx next dev -p 3124 > /tmp/next-dev.log 2>&1 &); for i in $(seq 1 40); do curl -s -o /dev/null http://localhost:3124/ && break; sleep 1; done\ncurl -s -o /dev/null \"http://localhost:3124/catalog?category=sale\"; curl -s -o /dev/null \"http://localhost:3124/catalog?category=featured\"; sleep 4\ncurl -sL -o /dev/null \"http://localhost:3124/catalog?category=sale\" -H \"rsc: 1\" -H \"next-router-prefetch: 2\" -H \"next-url: /\"; sleep 3\ngrep -iv \"^$\" /tmp/next-dev.log | tail -30\npkill -f \"next start\" ; pkill -f \"next dev\"; sleep 1; echo stopped",
+        "success": false
+      },
+      {
+        "command": "git status --short; echo ----; git diff tsconfig.json; cat .gitignore",
+        "success": true
+      },
+      {
+        "command": "git checkout -- tsconfig.json && rm -rf .next AGENTS.md CLAUDE.md next-env.d.ts && git status --short && echo ---- && git diff -- app lib next.config.ts",
+        "success": true
+      },
+      {
+        "command": "sleep 2; pgrep -fa \"next\" | grep -v pgrep; rm -rf .next; git status --short && echo ---- && git diff -- app lib next.config.ts",
+        "success": true
+      },
+      {
+        "command": "pkill -f \"next dev\" ; pkill -f \"next-server\"; sleep 1; pgrep -fa \"next\" | grep -v pgrep | grep -v run.mjs; rm -rf .next; git status --short",
+        "success": false
+      },
+      {
+        "command": "pgrep -fa \"next\" | grep -v pgrep | grep -v run.mjs; ls -a | grep -c \"^.next$\"; git status --short",
+        "success": true
+      },
+      {
+        "command": "git checkout -- tsconfig.json && rm -rf .next AGENTS.md CLAUDE.md next-env.d.ts && git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

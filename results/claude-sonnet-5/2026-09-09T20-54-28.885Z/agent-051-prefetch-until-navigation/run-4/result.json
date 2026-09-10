@@ -1,0 +1,133 @@
+{
+  "status": "failed",
+  "duration": 587.415,
+  "model": "claude-sonnet-5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 12,
+    "toolCalls": {
+      "file_read": 6,
+      "file_write": 0,
+      "file_edit": 4,
+      "shell": 22,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 1
+    },
+    "totalToolCalls": 33,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/app/projects/[slug]/page.tsx",
+      "/workspace/lib/data.ts",
+      "/workspace/app/page.tsx",
+      "/workspace/next.config.ts"
+    ],
+    "filesModified": [
+      "/workspace/app/projects/[slug]/page.tsx",
+      "/workspace/lib/data.ts"
+    ],
+    "shellCommands": [
+      {
+        "command": "npx tsc --noEmit 2>&1 | head -50",
+        "success": true
+      },
+      {
+        "command": "ls -la /workspace/.next/types 2>&1 | head -20; echo \"---\"; git -C /workspace stash; npx tsc --noEmit 2>&1 | head -20; git -C /workspace stash pop",
+        "success": true
+      },
+      {
+        "command": "rm -f tsconfig.tsbuildinfo && npx next build 2>&1 | tail -60",
+        "success": true
+      },
+      {
+        "command": "rm -f tsconfig.tsbuildinfo && npx next build 2>&1 | tail -60",
+        "success": true
+      },
+      {
+        "command": "npx next start -p 3100 > /tmp/next-start.log 2>&1 &\nsleep 2\necho \"started\"",
+        "success": true
+      },
+      {
+        "command": "sleep 1\necho \"--- Full page render (should include title AND details after 800ms) ---\"\ntime curl -s http://localhost:3100/projects/acme\necho\necho \"--- RSC prefetch payload (simulates Link prefetch; should have title but NOT details) ---\"\ncurl -s -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" http://localhost:3100/projects/acme",
+        "success": true
+      },
+      {
+        "command": "kill %1 2>/dev/null; sleep 1; rm -f tsconfig.tsbuildinfo && npx next build 2>&1 | tail -40",
+        "success": true
+      },
+      {
+        "command": "npx next start -p 3100 > /tmp/next-start.log 2>&1 &\nsleep 2\necho \"--- Timed full page load (should take ~800ms+ due to dynamic details) ---\"\ntime curl -s http://localhost:3100/projects/acme -o /tmp/full.html\ngrep -o '<h1>[^<]*</h1>' /tmp/full.html\ngrep -o 'Commerce storefront[^\"]*' /tmp/full.html\necho\necho \"--- Prefetch payload (RSC + prefetch headers; should resolve instantly with title but WITHOUT details) ---\"\ntime curl -s -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" -H \"Next-Router-State-Tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D\" http://localhost:3100/projects/acme -o /tmp/prefetch.txt\ncat /tmp/prefetch.txt",
+        "success": true
+      },
+      {
+        "command": "cat /tmp/next-start.log; echo \"---\"; lsof -i :3100 2>/dev/null; pkill -f \"next start\" 2>/dev/null; sleep 1",
+        "success": false
+      },
+      {
+        "command": "fuser -k 3100/tcp 2>/dev/null; sleep 1; npx next start -p 3101 > /tmp/next-start2.log 2>&1 &\nsleep 2\ncat /tmp/next-start2.log",
+        "success": true
+      },
+      {
+        "command": "echo \"--- Full page load (dynamic, should take ~800ms) ---\"\ntime curl -s http://localhost:3101/projects/acme -o /tmp/full.html\ngrep -o '<h1>[^<]*</h1>' /tmp/full.html\necho\necho \"--- Prefetch payload (should be instant, title present, details deferred/absent) ---\"\ntime curl -s -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" -H \"Next-Router-State-Tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D\" http://localhost:3101/projects/acme\necho",
+        "success": true
+      },
+      {
+        "command": "curl -sv -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" -H \"Next-Router-State-Tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D\" http://localhost:3101/projects/acme -o /tmp/prefetch2.txt 2>&1 | tail -20\necho \"=== BODY ===\"\ncat /tmp/prefetch2.txt",
+        "success": true
+      },
+      {
+        "command": "time curl -s -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" -H \"Next-Router-State-Tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D\" \"http://localhost:3101/projects/acme?_rsc=dqR7R9QVVV_bHJGW\" -o /tmp/prefetch3.txt\ncat /tmp/prefetch3.txt\necho\necho \"=== does it contain details text? ===\"\ngrep -o \"Commerce storefront\" /tmp/prefetch3.txt || echo \"NOT FOUND (details excluded, as expected)\"\necho \"=== does it contain title? ===\"\ngrep -o \"Acme Storefront\" /tmp/prefetch3.txt || echo \"NOT FOUND\"",
+        "success": true
+      },
+      {
+        "command": "wc -l /tmp/prefetch3.txt; echo \"---full content---\"; cat -A /tmp/prefetch3.txt | head -50",
+        "success": true
+      },
+      {
+        "command": "curl -sv -L -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" -H \"Next-Router-State-Tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D\" \"http://localhost:3101/projects/acme?_rsc=dqR7R9QVVV_bHJGW\" -o /tmp/prefetch4.txt 2>&1 | tail -30\necho \"=== body ===\"\ncat /tmp/prefetch4.txt",
+        "success": true
+      },
+      {
+        "command": "curl -s -D - -L -H \"RSC: 1\" -H \"Next-Router-Prefetch: 1\" -H \"Next-Router-State-Tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D\" -H \"Next-Url: /\" \"http://localhost:3101/projects/acme\" -o /tmp/prefetch5.txt\necho \"=== body ===\"\ncat /tmp/prefetch5.txt",
+        "success": true
+      },
+      {
+        "command": "(ls node_modules/.bin | grep -i playwright; npx playwright --version 2>&1 | head -5) ",
+        "success": true
+      },
+      {
+        "command": "pkill -f \"next start\" 2>/dev/null; rm -f tsconfig.tsbuildinfo; git -C /workspace status",
+        "success": false
+      },
+      {
+        "command": "rm -f /workspace/tsconfig.tsbuildinfo; git -C /workspace status",
+        "success": true
+      },
+      {
+        "command": "cat /workspace/.gitignore 2>/dev/null; echo \"---tsconfig diff---\"; git -C /workspace diff tsconfig.json; echo \"---package.json diff (pre-existing, not mine)---\"; git -C /workspace diff package.json | head -20",
+        "success": true
+      },
+      {
+        "command": "git -C /workspace checkout -- tsconfig.json\nrm -rf /workspace/.next /workspace/next-env.d.ts\ngit -C /workspace status",
+        "success": true
+      },
+      {
+        "command": "git -C /workspace diff app/projects/'[slug]'/page.tsx lib/data.ts",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

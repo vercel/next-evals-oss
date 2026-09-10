@@ -1,0 +1,145 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 114277ms
+   ✓ enables Cache Components without opt-outs 1ms
+   × introduces a reusable cache 6ms
+     → expected 'import type { ReactNode } from \'reac…' to match /['"]use cache['"]/
+   ✓ keeps a useful dashboard frame in the shell  13814ms
+   ✓ keeps member data isolated per request  65747ms
+   ✓ caches only the shared project totals  34706ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  22:30:05
+   Duration  114.59s (transform 71ms, setup 25ms, collect 36ms, tests 114.28s, environment 0ms, prepare 87ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > introduces a reusable cache
+AssertionError: expected 'import type { ReactNode } from \'reac…' to match /['"]use cache['"]/
+
+[32m- Expected:[39m 
+/['"]use cache['"]/
+
+[31m+ Received:[39m 
+"import type { ReactNode } from 'react'
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { cookies, headers } from 'next/headers'
+
+export async function MemberInfo() {
+  const cookieStore = await cookies()
+  const requestHeaders = await headers()
+  const member = cookieStore.get('member')?.value ?? 'Guest'
+  const team = cookieStore.get('team')?.value ?? 'Community'
+  const region = requestHeaders.get('x-region') ?? 'global'
+
+  return (
+    <section aria-label=\"Member info\">
+      <p>Welcome, {member}</p>
+      <p>Team: {team}</p>
+      <p>Region: {region}</p>
+    </section>
+  )
+}
+
+import { Suspense } from 'react'
+import { MemberInfo } from './member-info'
+import { Totals } from './totals'
+
+function DashboardSkeleton() {
+  return (
+    <div aria-busy=\"true\" aria-live=\"polite\">
+      <p>Loading dashboard details…</p>
+    </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <main>
+      <h1>Workspace</h1>
+      <Suspense fallback={<DashboardSkeleton />}>
+        <MemberInfo />
+        <Totals />
+      </Suspense>
+    </main>
+  )
+}
+
+import { getProjectTotals } from '@/lib/projects'
+
+export async function Totals() {
+  const totals = await getProjectTotals()
+
+  return (
+    <section aria-label=\"Project totals\">
+      <p>{totals.active} active projects</p>
+    </section>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+export const getProjectTotals = unstable_cache(
+  async () => {
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    return { active: 12, archived: 4 }
+  },
+  ['project-totals'],
+  { revalidate: 60 }
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:30:18
+     28| 
+     29| test('introduces a reusable cache', () => {
+     30|   expect(source).toMatch(/['"]use cache['"]/)
+       |                  ^
+     31| })
+     32| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

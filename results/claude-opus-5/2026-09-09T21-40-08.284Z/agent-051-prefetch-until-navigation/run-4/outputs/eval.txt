@@ -1,0 +1,59 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 3 failed) 174926ms
+   ✓ enables Partial Prefetching globally or for the project route 1ms
+   ✓ opts the project link into per-link prefetching 0ms
+   × uses the navigation cache stage 5ms
+     → expected null not to be null
+   × includes the project title in the selected prefetch 147891ms
+     → [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: The title is in a Suspense boundary with `use cache`/cacheLife('max') and `<Link prefetch>` (app/projects/[slug]/page.tsx, app/page.tsx), but there is no boundary that waits for navigation — grep shows unstable_navigation/unstable_prefetch are used nowhere, and the agent instead relied on a short cacheLife for getProjectDetails. Against `next start`, a per-link prefetch (RSC:1, Next-Router-Prefetch:2) of /projects/acme returned the title AND the full details ('Commerce storefront and checkout.', 'Production deployment') and took ~820ms cold, so the prefetch renders the entire page rather than resolving only the title ahead of the click.
+   × waits until navigation for project details 27027ms
+     → [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits unstable_navigation() before loading or rendering them.
+
+The unstable_navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching unstable_navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: No source file calls unstable_navigation() — grep across app/ and lib/ finds it only in EVAL.ts and generated .next/ artifacts. Instead of an async component awaiting unstable_navigation(), app/projects/[slug]/page.tsx's Details component immediately awaits getProjectDetails(slug), and the agent tried to exclude details from the prefetch by setting a short cacheLife({stale:60,revalidate:60,expire:240}) inside the 'use cache' function in lib/data.ts, which is not the required navigation cache stage.
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Start at  21:50:21
+   Duration  175.17s (transform 52ms, setup 21ms, collect 35ms, tests 174.93s, environment 0ms, prepare 65ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > uses the navigation cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:68:32
+     66|     /\bunstable_navigation(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     67|   )
+     68|   expect(navigationImport).not.toBeNull()
+       |                                ^
+     69| 
+     70|   const localName = navigationImport?.[1] ?? 'unstable_navigation'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > includes the project title in the selected prefetch
+Error: [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: The title is in a Suspense boundary with `use cache`/cacheLife('max') and `<Link prefetch>` (app/projects/[slug]/page.tsx, app/page.tsx), but there is no boundary that waits for navigation — grep shows unstable_navigation/unstable_prefetch are used nowhere, and the agent instead relied on a short cacheLife for getProjectDetails. Against `next start`, a per-link prefetch (RSC:1, Next-Router-Prefetch:2) of /projects/acme returned the title AND the full details ('Commerce storefront and checkout.', 'Production deployment') and took ~820ms cold, so the prefetch renders the entire page rather than resolving only the title ahead of the click.
+ ❯ EVAL.ts:75:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > waits until navigation for project details
+Error: [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits unstable_navigation() before loading or rendering them.
+
+The unstable_navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching unstable_navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: No source file calls unstable_navigation() — grep across app/ and lib/ finds it only in EVAL.ts and generated .next/ artifacts. Instead of an async component awaiting unstable_navigation(), app/projects/[slug]/page.tsx's Details component immediately awaits getProjectDetails(slug), and the agent tried to exclude details from the prefetch by setting a short cacheLife({stale:60,revalidate:60,expire:240}) inside the 'use cache' function in lib/data.ts, which is not the required navigation cache stage.
+ ❯ EVAL.ts:83:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

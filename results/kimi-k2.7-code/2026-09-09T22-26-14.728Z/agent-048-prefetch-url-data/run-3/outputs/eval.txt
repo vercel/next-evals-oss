@@ -1,0 +1,216 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (6 tests | 3 failed) 35531ms
+   × enables Partial Prefetching globally or for the catalog route 7ms
+     → expected false to be true // Object.is equality
+   ✓ preserves the category URL structure 0ms
+   ✓ opts the category links into per-link prefetching 0ms
+   × caches the category data 1ms
+     → expected 'import { Suspense } from \'react\'\ni…' to match /['"]use cache['"]/
+   ✓ does not use a navigation-stage boundary 0ms
+   × prefetches the selected category and cached products 35521ms
+     → [judge:environment] FAIL — The implementation must make the selected category heading and its cached products available from the completed per-link prefetch before navigation.
+
+A correct solution preserves the existing /catalog?category=... URLs, enables Partial Prefetching globally or on the catalog route, and opts the category Links into per-link prefetching with prefetch={true} or the equivalent bare prefetch prop. The catalog route reads the category from searchParams beneath Suspense and renders both the matching heading and getProducts(category) result in the prefetched result. The category data must use a use cache scope, with either the default cache profile or an explicit cacheLife(); searchParams must remain outside that cache scope. Keep the Suspense boundary: the shared App Shell uses its fallback, while a completed per-link prefetch can resolve the cached content inside it before navigation.
+
+This is the basic URL-data inclusion case. Do not use unstable_navigation(), unstable_prefetch(), connection(), or an uncached request boundary to defer the category content. Reject solutions that only prefetch the reusable Catalog shell while leaving the selected heading or product list behind the loading fallback.
+  reason: next.config.ts enables cacheComponents: true but not partialPrefetching: true, and lib/data.ts's getProducts is not wrapped in a 'use cache' scope / cacheLife(), so the selected category heading and product list cannot be resolved in the per-link prefetch payload before navigation.
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+   Start at  22:34:06
+   Duration  35.78s (transform 51ms, setup 20ms, collect 32ms, tests 35.53s, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > enables Partial Prefetching globally or for the catalog route
+AssertionError: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:56:5
+     54|     /partialPrefetching\s*:\s*true/.test(config) ||
+     55|       /export\s+const\s+prefetch\s*=\s*['"]partial['"]/.test(source)
+     56|   ).toBe(true)
+       |     ^
+     57| })
+     58| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > caches the category data
+AssertionError: expected 'import { Suspense } from \'react\'\ni…' to match /['"]use cache['"]/
+
+[32m- Expected:[39m 
+/['"]use cache['"]/
+
+[31m+ Received:[39m 
+"import { Suspense } from 'react'
+import { getProducts } from '@/lib/data'
+
+type CatalogSearchParams = Promise<{ category?: string }>
+
+export default function CatalogPage({
+  searchParams,
+}: {
+  searchParams: CatalogSearchParams
+}) {
+  return (
+    <main>
+      <h1>Catalog</h1>
+      <Suspense fallback={<p>Loading category...</p>}>
+        <CategoryResults searchParams={searchParams} />
+      </Suspense>
+    </main>
+  )
+}
+
+async function CategoryResults({
+  searchParams,
+}: {
+  searchParams: CatalogSearchParams
+}) {
+  const { category = 'featured' } = await searchParams
+  const products = await getProducts(category)
+
+  return (
+    <section>
+      <h2>{category === 'sale' ? 'Products on sale' : 'Featured products'}</h2>
+      <ul>
+        {products.map((product) => (
+          <li key={product}>{product}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Product catalog',
+  description: 'Browse products by category',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+
+const categories = [
+  { slug: 'featured', label: 'Featured products' },
+  { slug: 'sale', label: 'Products on sale' },
+]
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Shop by category</h1>
+      <ul>
+        {categories.map((category) => (
+          <li key={category.slug}>
+            <Link
+              href={`/catalog?category=${category.slug}`}
+              prefetch={true}
+            >
+              {category.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+
+---FILE---
+const productsByCategory: Record<string, string[]> = {
+  featured: ['Desk Lamp', 'Wool Blanket'],
+  sale: ['Canvas Tote', 'Travel Mug'],
+}
+
+export async function getProducts(category: string) {
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  return productsByCategory[category] ?? []
+}
+
+---FILE---
+
+
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+
+
+
+---FILE---
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+---FILE---
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    
+    
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:69:18
+     67| 
+     68| test('caches the category data', () => {
+     69|   expect(source).toMatch(/['"]use cache['"]/)
+       |                  ^
+     70| })
+     71| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > prefetches the selected category and cached products
+Error: [judge:environment] FAIL — The implementation must make the selected category heading and its cached products available from the completed per-link prefetch before navigation.
+
+A correct solution preserves the existing /catalog?category=... URLs, enables Partial Prefetching globally or on the catalog route, and opts the category Links into per-link prefetching with prefetch={true} or the equivalent bare prefetch prop. The catalog route reads the category from searchParams beneath Suspense and renders both the matching heading and getProducts(category) result in the prefetched result. The category data must use a use cache scope, with either the default cache profile or an explicit cacheLife(); searchParams must remain outside that cache scope. Keep the Suspense boundary: the shared App Shell uses its fallback, while a completed per-link prefetch can resolve the cached content inside it before navigation.
+
+This is the basic URL-data inclusion case. Do not use unstable_navigation(), unstable_prefetch(), connection(), or an uncached request boundary to defer the category content. Reject solutions that only prefetch the reusable Catalog shell while leaving the selected heading or product list behind the loading fallback.
+  reason: next.config.ts enables cacheComponents: true but not partialPrefetching: true, and lib/data.ts's getProducts is not wrapped in a 'use cache' scope / cacheLife(), so the selected category heading and product list cannot be resolved in the per-link prefetch payload before navigation.
+ ❯ EVAL.ts:77:3
+     75| 
+     76| test('prefetches the selected category and cached products', async () …
+     77|   await expect(environment).toSatisfyCriterion(
+       |   ^
+     78|     `The implementation must make the selected category heading and it…
+     79| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
