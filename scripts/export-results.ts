@@ -63,6 +63,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'cursor-composer-2.5--agents-md': 'cursor-composer-2.5',
   'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
   'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
+  'gemini-3.8-flash--agents-md': 'gemini-3.8-flash',
   'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
   'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
   'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
@@ -185,6 +186,16 @@ const TIER_1 = new Set([
   // the under-a-month carve-out, so sol does not stay alongside it and
   // gpt-5.6-sol-ultra drops to tier 2.
   'gpt-6-astra-high',
+  // Gemini 3.8 Flash (released 2026-09-02) takes the Gemini *Flash* line's
+  // tier-1 slot. Lines are tiered separately here — Claude keeps Fable, Opus
+  // and Sonnet slots side by side — and Google still ships Pro and Flash
+  // alongside each other, so this does not displace the Pro line. The
+  // previous-version carve-out has nothing to attach to either: no Flash-line
+  // model has ever been measured on this board, so there is no predecessor to
+  // share the slot with. The Pro rows (Gemini 3.0 / 3.1 Pro Preview) stay
+  // tier 2 for the reason noted above — the Gemini CLI harness they use needs
+  // GEMINI_API_KEY and cannot be rerun here.
+  'gemini-3.8-flash',
   'kimi-k3',
   'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
   'cursor-composer-2.5',
@@ -219,6 +230,10 @@ const MODEL_NAMES: Record<string, string> = {
   'gemini-3-pro-preview-gemini-cli': 'Gemini 3.0 Pro Preview',
   'gemini-3.1-pro-preview': 'Gemini 3.1 Pro Preview',
   'gemini-3.1-pro-preview--agents-md': 'Gemini 3.1 Pro Preview + AGENTS.md',
+  // No effort suffix: OpenCode never sends one for a gateway model — see the
+  // comment in experiments/gemini-3.8-flash.ts.
+  'gemini-3.8-flash': 'Gemini 3.8 Flash',
+  'gemini-3.8-flash--agents-md': 'Gemini 3.8 Flash + AGENTS.md',
   'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
   'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
