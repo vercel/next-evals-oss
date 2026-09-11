@@ -77,6 +77,36 @@ have moved):
   version (`Claude Fable 5.1 (high)`); use the slug when it does not
   (`gpt-6-astra-high`). Default to `high` — see "Reasoning effort" in the README.
 
+**Pick the harness by what the box can authenticate, not by the vendor.** `pnpm
+preflight` is the answer: the `gemini` and `cursor` harnesses are direct-vendor-API
+only, and without `GEMINI_API_KEY` / `CURSOR_API_KEY` the runner silently skips their
+experiments. `AI_GATEWAY_API_KEY` alone covers every `vercel-ai-gateway/*` harness, so
+a gateway-served model from any vendor can still be measured through
+`vercel-ai-gateway/opencode` — that is what glm, kimi, grok, minimax and
+`gemini-3.8-flash` do. Say so in the config comment when the harness differs from the
+vendor's own CLI; the board renders `agentHarness` per row, so the difference is
+visible and must be true.
+
+**A model the OpenCode binary predates needs `extraProviders`.** The pinned
+`binaryUrl` carries a frozen models.dev snapshot, so anything newer resolves to nothing
+unless the config fully specifies it (`name`, `reasoning`, `tool_call`, `temperature`,
+`attachment`, `modalities`, `limit`; `cost` stays zeroed — this repo prices runs from
+`MODEL_PRICING`, not from OpenCode).
+
+**Effort has no working knob on the OpenCode path.** OpenCode merges a model's
+`options` into `providerOptions.gateway` for `@ai-sdk/gateway` providers, and the
+gateway does not act on `reasoningEffort` there — a probe at `low` still burned ~1.4k
+reasoning tokens, where the same `low` sent as `reasoning_effort` to
+`/v1/chat/completions` burns 0. Every OpenCode pair on the board therefore publishes
+unpinned and unsuffixed even when the model advertises a ladder. Leave the label bare
+rather than claiming a rung the harness never sent, and record why in the config.
+
+**`reasoning_effort` is not validated for every model.** The 400-enumerates-the-set
+trick is real for OpenAI and Anthropic ids, but `google/gemini-3.8-flash` returns 200
+for a rung it does not have (`xhigh`) and simply ignores it. When the 400 does not
+come, compare `completion_tokens_details.reasoning_tokens` across rungs instead — a
+rung that changes nothing is a rung the model does not have.
+
 Sanity-check the wiring before spending anything:
 
 ```bash
@@ -96,10 +126,14 @@ pnpm eval:run '<slug>--agents-md'
 ```
 
 Run the two experiments **sequentially**. Every attempt starts concurrently within one
-experiment (`StartRateLimiter(20, 2_000)` barely throttles it), so `runs: 4` means ~104
-live sandboxes per experiment; both at once doubles that and invites 429s and sandbox
-faults. Expect 30–45 minutes each. Run it in the background and poll the log rather
-than blocking on it.
+experiment (`StartRateLimiter(20, 2_000)` barely throttles it), so with 31 evals
+`runs: 4` means ~124 live sandboxes per experiment; both at once doubles that and
+invites 429s and sandbox faults. Expect 30–45 minutes each. Run it in the background
+and poll the log rather than blocking on it.
+
+Even one experiment at a time, expect a handful of `GatewayInternalServerError:
+Service temporarily unavailable` attempts in the first minutes — that is the burst, not
+the model. They classify as infra, get deleted, and come back on the re-run below.
 
 `earlyExit` aborts an eval's remaining attempts once one passes, but because they all
 started together it trims the tail rather than saving 4× the cost — budget for close to
@@ -111,6 +145,18 @@ model failure. `EVAL_FILTER` is for cheap credential checks, not for a board run
 
 Infra failures (rate limits, sandbox faults, auth) are classified and deleted rather
 than counted, so re-run the experiment until `pnpm status` is quiet for it.
+
+**A `timeout` that is too tight cannot be re-run away.** Timeouts are deleted rather
+than counted, so the eval never publishes a wrong number — it just never publishes one,
+and `pnpm status` stays noisy forever. Read the first matrix's mean durations before
+re-running: if the evals that failed are the ones whose completed runs sit near the
+ceiling, the budget is the problem, not the burst. Copying the previous pair's timeout
+is a guess, and "fast model" says nothing about how long an agentic loop takes —
+`gemini-3.8-flash` completes the prefetch evals at 1000–1100s and needed 2400. Raise it
+once, decisively: `timeout` is part of the fingerprint, so every raise invalidates the
+whole experiment. **Delete `results/<slug>/` and `results/<slug>--agents-md/` when you
+do** — results recorded under the old fingerprint are not re-derived away, they stay on
+disk, export as the model's last measurement, and fail `check-stale.mjs` as `changed`.
 
 ### 4. Export, tier, and clean up
 
@@ -144,41 +190,40 @@ side effect ("carried forward N config-only result(s)"), which has nothing to do
 your change. Revert those paths — CI re-derives them — while keeping the results you
 actually produced.
 
-The PR body should state the scores for both experiments (`n/26`, pass@4), the mean
-cost per eval, the tiering change and its date arithmetic, and what the AGENTS.md
-variant won or lost.
+The PR body should state the scores for both experiments (`n/31` at the current eval
+set — count `evals/`, do not copy a number out of this file), the mean cost per eval,
+the tiering change and its date arithmetic, and what the AGENTS.md variant won or lost.
 
-### 6. Publish to the site — a second PR, in `vercel/front`
+### 6. Publish to the site — usually nothing to do in `vercel/front`
 
-Merging here does not change nextjs.org/evals. The page reads a **copy** of
-`agent-results.json` checked into the site repo, so the task is not finished until that
-copy is updated:
+**Merging this PR to `main` is the publish.** nextjs.org/evals fetches
+`agent-results.json` from this repo's `main` on the server and `main` CI invalidates its
+cache, so a model reaches the board with no PR, copy or deployment in the site repo. The
+page is entirely data-driven — `modelName`, `tier`, `agentHarness`, `avgCostUsd`,
+`avgDuration` and `docsImpact` all come from the JSON and there is no per-model code, so
+there is nothing model-shaped to add there.
 
-```
-vercel/front → apps/next-site/app/(next-site)/evals/agent-results.json
-```
+This changed on 2026-09-09 (this repo's #122, vercel/front#85415). Before that the site
+carried a checked-in copy at `apps/next-site/app/(next-site)/evals/agent-results.json`;
+that file is deleted. If a task asks for a paired `front` PR, do not recreate it — say
+that the copy is gone and point at `get-evals.ts`.
 
-The page is entirely data-driven off that file — `modelName`, `tier`, `agentHarness`,
-`avgCostUsd`, `avgDuration` and `docsImpact` all come from it, and there is no
-per-model code — so replacing the file is the whole change. Open it as a PR, not a push
-to `main`.
+Open a `front` PR only for a change that is genuinely about the site: the columns, the
+footnotes, `get-evals.ts`, the revalidate route, or
+`apps/next-site/app/(next-site)/evals/README.md`. When you do:
 
-`front` is a large private monorepo; a sparse shallow clone is enough:
+- `front` is a large private monorepo; a sparse shallow clone is enough:
 
-```bash
-git clone --depth 1 --filter=blob:none --sparse https://github.com/vercel/front.git
-cd front && git sparse-checkout set "apps/next-site/app/(next-site)/evals"
-```
+  ```bash
+  git clone --depth 1 --filter=blob:none --sparse https://github.com/vercel/front.git
+  cd front && git sparse-checkout set "apps/next-site/app/(next-site)/evals"
+  ```
 
-Two things the README's bare `cp` does not mention:
-
-- **Add a trailing newline.** `export-results` writes `JSON.stringify(…, null, 2)` with
-  no final newline, which is fine here but fails `front`'s Prettier check. `printf '\n'
-  >> <file>` after copying. (A formatter bot will also push a fixup commit that collapses
-  single-element arrays — cosmetic, no data change.)
-- **The copy is usually a release or two behind**, so the diff carries earlier refreshes
-  as well as your rows. That is expected; say so in the PR body rather than trying to
-  narrow the diff, and never hand-edit the file to do it.
-
-The GitHub contents API cannot write here — `front` requires verified signatures and
-rejects API-authored commits with a 409. Clone and `git push` instead.
+- It pins Node 24 via `.node-version`, which a non-interactive shell will not pick up —
+  `node -v` reporting 22 makes `pnpm` refuse the workspace on `engines.node`. Put
+  `~/.local/share/fnm/node-versions/v24.14.0/installation/bin` on `PATH` first.
+- Run `pnpm unit-test -- test/evals.test.tsx test/get-evals.test.ts
+  test/evals-revalidate.test.ts` from `apps/next-site`, and format with `npx oxfmt` for
+  `.tsx` / `npx prettier` for `.md` — the repo checks both.
+- The GitHub contents API cannot write here: `front` requires verified signatures and
+  rejects API-authored commits with a 409. Clone and `git push` instead.
