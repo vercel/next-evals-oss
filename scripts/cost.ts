@@ -57,6 +57,12 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'cursor-composer-2.5': { input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0 }, // cursor.com, Standard
   'gemini-3-pro-preview-gemini-cli': { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
   'gemini-3.1-pro-preview': { input: 2, output: 12, cacheRead: 0.2, cacheWrite: 0 },
+  // Introductory pricing through 2026-12-31; input/output double to 1.5/7.5 on
+  // 2027-01-01, so this row needs a re-export then even if nothing is rerun.
+  // The gateway catalog and the models.dev `vercel` entry agree on all three
+  // rates as of 2026-09-11. Caching is implicit (no write rate is published),
+  // so cacheWrite is 0 rather than unpriced.
+  'gemini-3.8-flash': { input: 0.75, output: 3.75, cacheRead: 0.075, cacheWrite: 0 },
   'gpt-5.2-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.3-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.4-xhigh': { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },

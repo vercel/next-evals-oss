@@ -229,10 +229,12 @@ After running evals:
 2. Include `agent-results.json` with the results in your PR to this repo.
 3. Merge the reviewed PR to `main`.
 
-Once the server-fetch integration in `front` is deployed, nextjs.org/evals reads
-the [published JSON](https://raw.githubusercontent.com/vercel/next-evals-oss/main/agent-results.json)
-on the server. Result updates require no copy, PR, or deployment in `front`.
-Merging this file to `main` publishes it to the website.
+nextjs.org/evals reads the
+[published JSON](https://raw.githubusercontent.com/vercel/next-evals-oss/main/agent-results.json)
+on the server — the server-fetch integration shipped on 2026-09-09
+(vercel/front#85415), and the copy the site used to carry is deleted. Result
+updates require no copy, PR, or deployment in `front`. Merging this file to
+`main` publishes it to the website.
 
 After the checks pass on `main`, CI calls
 `POST https://nextjs.org/api/evals/revalidate` using a short-lived GitHub Actions
@@ -246,11 +248,11 @@ a server request must wait for fresh data. Browser navigation can reuse a page
 for five minutes, and already-open tabs need a refresh. Each upstream refresh
 bypasses GitHub's raw-file cache using a unique query parameter.
 
-Deploy the frontend endpoint before merging this CI integration. Delivery is
-retried three times and fails the `revalidate-site` job if unsuccessful. Rerun
-that job or manually dispatch this workflow on `main` to retry; there is no
-periodic refresh to repair a missed notification. Revert the JSON change and
-pass `main` CI to roll back published results through the same process.
+Delivery is retried three times and fails the `revalidate-site` job if
+unsuccessful. Rerun that job or manually dispatch this workflow on `main` to
+retry; there is no periodic refresh to repair a missed notification. Revert the
+JSON change and pass `main` CI to roll back published results through the same
+process.
 
 Keep the existing JSON shape compatible with the website. Coordinate changes
 to required fields or scoring semantics with `front`; the format is currently
