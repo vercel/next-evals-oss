@@ -67,17 +67,17 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'gpt-5.3-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.4-xhigh': { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
   'gpt-5.5-pro': { input: 30, output: 180, cacheRead: 0, cacheWrite: 0 }, // never caches; cacheRead moot
-  // Cut from 5/30/0.5/6.25; gateway and models.dev vercel entry agree as of
-  // 2026-08-26. OpenAI-direct lists 4/20/0.4/5 (8/30 over 200k context), but
-  // these runs bill at the gateway rate.
-  'gpt-5.6-sol-ultra': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  // The gateway catalog's base context tier as of 2026-09-19. Over 272k
+  // context it rises to 8/30/0.8/10; eval runs stay far below that.
+  'gpt-5.6-sol-ultra': { input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5 },
   // openai/gpt-6-astra's base context tier; the gateway catalog and models.dev
   // vercel entry agree as of 2026-09-08. Over 272k context it doubles to
   // 20/75/2/25 — this table has no tiers, and eval runs stay far below that.
   'gpt-6-astra-high': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
-  'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
+  // The gateway catalog no longer publishes a cache-read rate for K2.5.
+  'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0, cacheWrite: 0 },
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
-  'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },
+  'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
   'kimi-k3': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
   'glm-5.1-opencode': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
   // Cut from 1.4/4.4/0.26 (zai's own rate); gateway and models.dev vercel
