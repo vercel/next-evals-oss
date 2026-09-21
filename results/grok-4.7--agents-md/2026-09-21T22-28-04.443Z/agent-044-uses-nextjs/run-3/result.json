@@ -1,0 +1,72 @@
+{
+  "status": "failed",
+  "duration": 95.96,
+  "model": "vercel/spacexai/grok-4.7",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 12,
+    "toolCalls": {
+      "file_read": 5,
+      "file_write": 5,
+      "file_edit": 0,
+      "shell": 6,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 1,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 17,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/opencode.json",
+      "/workspace/.gitignore",
+      "/workspace/__agent_eval__/run.mjs",
+      "/workspace/data/books.json"
+    ],
+    "filesModified": [
+      "/workspace/package.json",
+      "/workspace/data/books.json",
+      "/workspace/.gitignore",
+      "/workspace/server.js"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la /workspace && find /workspace -maxdepth 3 -type f -not -path '*/.git/*' | head -100",
+        "success": true
+      },
+      {
+        "command": "node server.js",
+        "success": false
+      },
+      {
+        "command": "curl -sS http://localhost:3000/ | head -40 && echo \"---ADD---\" && curl -sS -D - -o /dev/null -X POST http://localhost:3000/books --data-urlencode \"title=The Left Hand of Darkness\" --data-urlencode \"author=Ursula K. Le Guin\" --data-urlencode \"notes=Winter on Gethen.\" && echo \"---HOME---\" && curl -sS http://localhost:3000/ && echo \"---JSON---\" && cat data/books.json",
+        "success": false
+      },
+      {
+        "command": "node server.js",
+        "success": false
+      },
+      {
+        "command": "node server.js > /tmp/books-server.log 2>&1 & echo $! > /tmp/books-server.pid; sleep 0.3; cat /tmp/books-server.log; curl -sS -o /dev/null -w \"%{http_code}\" http://127.0.0.1:3000/",
+        "success": true
+      },
+      {
+        "command": "set -e\ncurl -sS -D /tmp/add.hdr -o /dev/null -X POST http://127.0.0.1:3000/books \\\n  --data-urlencode \"title=The Left Hand of Darkness\" \\\n  --data-urlencode \"author=Ursula K. Le Guin\" \\\n  --data-urlencode \"notes=Winter on Gethen.\"\necho \"ADD headers:\"; cat /tmp/add.hdr\necho \"HOME:\"; curl -sS http://127.0.0.1:3000/\nID=$(node -e \"const b=require('./data/books.json'); process.stdout.write(b[0].id)\")\necho \"DETAIL:\"; curl -sS \"http://127.0.0.1:3000/books/$ID\"\ncurl -sS -D /tmp/fin.hdr -o /dev/null -X POST \"http://127.0.0.1:3000/books/$ID/finish\"\necho \"FINISH headers:\"; cat /tmp/fin.hdr\necho \"AFTER:\"; curl -sS http://127.0.0.1:3000/\necho \"JSON:\"; cat data/books.json\necho \"MISSING:\"; curl -sS -o /dev/null -w \"%{http_code}\\n\" http://127.0.0.1:3000/books/nope\nkill $(cat /tmp/books-server.pid) || true",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -80,6 +80,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'glm-5.2--agents-md': 'glm-5.2',
   'grok-4.5--agents-md': 'grok-4.5',
   'grok-4.6--agents-md': 'grok-4.6',
+  'grok-4.7--agents-md': 'grok-4.7',
 };
 
 /**
@@ -169,8 +170,8 @@ interface ExportedData {
  * commitment to keep the results fresh (rerun on eval-set/canary changes).
  * Everything else exports as tier 2: previously measured, dated, not rerun.
  *
- * grok-4.6 and gemini-3.1-pro-preview qualify by the rule but are exported as
- * tier 2 until they can actually be rerun (provider ACL / missing API key).
+ * gemini-3.1-pro-preview qualifies by the rule but is exported as tier 2 until
+ * it can actually be rerun (missing direct-provider API key).
  */
 const TIER_1 = new Set([
   // Claude Fable 5.1 holds the Fable line's only tier-1 slot. It shipped
@@ -201,6 +202,9 @@ const TIER_1 = new Set([
   'cursor-composer-2.5',
   'glm-5.2',
   'minimax-m3',
+  // Grok 4.7 (2026-09-21) replaces Grok 4.6 (2026-08-12), 40 days later, so
+  // the predecessor is outside the under-a-month carve-out and stays tier 2.
+  'grok-4.7',
 ]);
 
 const MODEL_NAMES: Record<string, string> = {
@@ -267,6 +271,8 @@ const MODEL_NAMES: Record<string, string> = {
   'grok-4.5--agents-md': 'Grok 4.5 + AGENTS.md',
   'grok-4.6': 'Grok 4.6',
   'grok-4.6--agents-md': 'Grok 4.6 + AGENTS.md',
+  'grok-4.7': 'Grok 4.7',
+  'grok-4.7--agents-md': 'Grok 4.7 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
