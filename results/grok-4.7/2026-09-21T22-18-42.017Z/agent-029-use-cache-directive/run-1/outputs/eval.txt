@@ -1,0 +1,107 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 66847ms
+   × Catalog is cached, tagged, and revalidated by the sync action 66845ms
+     → [judge:environment] FAIL — Product catalog reads are cached and tagged, so that one tagged revalidation refreshes every view built on that data, and the "Sync latest catalog" Server Action invalidates them by revalidating that same tag with a revalidation profile. The catalog itself comes from the getAllProducts() helper the project already ships in lib/db rather than a reimplemented query.
+
+Correct:
+
+  // lib/products.ts
+  export const PRODUCTS_TAG = 'products'
+
+  export async function getProducts() {
+    'use cache'
+    cacheTag(PRODUCTS_TAG)
+    return getAllProducts()
+  }
+
+  // the Server Action
+  async function syncCatalog() {
+    'use server'
+    await refreshFromErp()
+    revalidateTag(PRODUCTS_TAG, 'max')
+  }
+
+Incorrect:
+
+  export async function getProducts() {
+    return getAllProducts()          // nothing cached, nothing to revalidate
+  }
+
+  export async function getProducts() {
+    'use cache'                      // cached but untagged, so the action has
+    return getAllProducts()          // no way to invalidate it
+  }
+
+  revalidateTag(PRODUCTS_TAG)        // no profile argument
+  revalidateTag('catalog', 'max')    // not the tag the catalog read carries
+  updateTag(PRODUCTS_TAG)            // read-your-own-writes; wrong API for this
+                                     // scenario, which wants the admin to carry
+                                     // on while the catalog refreshes behind them
+
+Judge the code that runs. Naming updateTag in a comment to explain why it was not chosen is correct reasoning, not a violation.
+
+Judge whether the caching, tagging and invalidation are wired to each other, not how they are spelled or which files they live in.
+
+These APIs are newer than most training data. Docs for the exact Next.js version installed here ship at node_modules/next/dist/docs — see 01-app/03-api-reference/01-directives/use-cache.md, 01-app/03-api-reference/04-functions/cacheTag.md and 01-app/03-api-reference/04-functions/revalidateTag.md.
+  reason: app/page.tsx tags getProducts() with cacheTag('products'), returns getAllProducts(), and syncCatalog calls revalidateTag('products', 'max'), but next.config.ts is empty and never sets cacheComponents: true. Installed Next.js docs and dist/server/config.js only enable the 'use cache' directive when that flag is on, so the catalog read is not actually cached and the revalidation has nothing to invalidate.
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  22:21:54
+   Duration  67.11s (transform 59ms, setup 21ms, collect 32ms, tests 66.85s, environment 0ms, prepare 74ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+Error: [judge:environment] FAIL — Product catalog reads are cached and tagged, so that one tagged revalidation refreshes every view built on that data, and the "Sync latest catalog" Server Action invalidates them by revalidating that same tag with a revalidation profile. The catalog itself comes from the getAllProducts() helper the project already ships in lib/db rather than a reimplemented query.
+
+Correct:
+
+  // lib/products.ts
+  export const PRODUCTS_TAG = 'products'
+
+  export async function getProducts() {
+    'use cache'
+    cacheTag(PRODUCTS_TAG)
+    return getAllProducts()
+  }
+
+  // the Server Action
+  async function syncCatalog() {
+    'use server'
+    await refreshFromErp()
+    revalidateTag(PRODUCTS_TAG, 'max')
+  }
+
+Incorrect:
+
+  export async function getProducts() {
+    return getAllProducts()          // nothing cached, nothing to revalidate
+  }
+
+  export async function getProducts() {
+    'use cache'                      // cached but untagged, so the action has
+    return getAllProducts()          // no way to invalidate it
+  }
+
+  revalidateTag(PRODUCTS_TAG)        // no profile argument
+  revalidateTag('catalog', 'max')    // not the tag the catalog read carries
+  updateTag(PRODUCTS_TAG)            // read-your-own-writes; wrong API for this
+                                     // scenario, which wants the admin to carry
+                                     // on while the catalog refreshes behind them
+
+Judge the code that runs. Naming updateTag in a comment to explain why it was not chosen is correct reasoning, not a violation.
+
+Judge whether the caching, tagging and invalidation are wired to each other, not how they are spelled or which files they live in.
+
+These APIs are newer than most training data. Docs for the exact Next.js version installed here ship at node_modules/next/dist/docs — see 01-app/03-api-reference/01-directives/use-cache.md, 01-app/03-api-reference/04-functions/cacheTag.md and 01-app/03-api-reference/04-functions/revalidateTag.md.
+  reason: app/page.tsx tags getProducts() with cacheTag('products'), returns getAllProducts(), and syncCatalog calls revalidateTag('products', 'max'), but next.config.ts is empty and never sets cacheComponents: true. Installed Next.js docs and dist/server/config.js only enable the 'use cache' directive when that flag is on, so the catalog read is not actually cached and the revalidation has nothing to invalidate.
+ ❯ EVAL.ts:83:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

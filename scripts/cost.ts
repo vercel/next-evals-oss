@@ -85,6 +85,8 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'glm-5.2': { input: 0.8, output: 2.55, cacheRead: 0.16, cacheWrite: 0 },
   'grok-4.5': { input: 2, output: 6, cacheRead: 0.3, cacheWrite: 0 },
   'grok-4.6': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 }, // same in/out as 4.5, pricier cache reads
+  // AI Gateway catalog, 2026-09-21. Caching is implicit, with no write rate.
+  'grok-4.7': { input: 1.2, output: 3.6, cacheRead: 0.3, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
 };
