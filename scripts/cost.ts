@@ -45,6 +45,8 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // does real work on the exported cost.
   'claude-fable-5.1': { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
   'claude-fable-5': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  // AI Gateway catalog, 2026-09-22.
+  'claude-opus-5.5-high': { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   // Introductory pricing through 2026-08-31; standard is 3/15/0.3/3.75 after.
   'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
@@ -75,6 +77,9 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // vercel entry agree as of 2026-09-08. Over 272k context it doubles to
   // 20/75/2/25 — this table has no tiers, and eval runs stay far below that.
   'gpt-6-astra-high': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  // Base-context standard-service prices from AI Gateway, 2026-09-22.
+  'gpt-6-sol-high': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  'gpt-6-luna-high': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
   'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
   'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },

@@ -1,0 +1,118 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 9ms
+   ✓ Page is an async server component with parallel data fetching 2ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 6ms
+     → expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  20:14:16
+   Duration  283ms (transform 47ms, setup 26ms, collect 28ms, tests 9ms, environment 0ms, prepare 80ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+const endpoints = [
+  { key: 'analytics', label: 'Analytics', url: '/api/analytics' },
+  { key: 'notifications', label: 'Notifications', url: '/api/notifications' },
+  { key: 'settings', label: 'Settings', url: '/api/settings' },
+] as const
+
+type SectionState =
+  | { status: 'loading' }
+  | { status: 'success'; data: unknown }
+  | { status: 'error'; message: string }
+
+type DashboardData = Record<(typeof endpoints)[number]['key'], SectionState>
+
+const initialData: DashboardData = {
+  analytics: { status: 'loading' },
+  notifications: { status: 'loading' },
+  settings: { status: 'loading' },
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardData>(initialData)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadData() {
+      const results = await Promise.all(
+        endpoints.map(async ({ key, url }) => {
+          try {
+            const response = await fetch(url, { signal: controller.signal })
+            if (!response.ok) {
+              throw new Error(`Request failed with status ${response.status}`)
+            }
+
+            const result: unknown = await response.json()
+            return [key, { status: 'success', data: result }] as const
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'Unable to load data.'
+            return [key, { status: 'error', message }] as const
+          }
+        }),
+      )
+
+      if (!controller.signal.aborted) {
+        setData(Object.fromEntries(results) as DashboardData)
+      }
+    }
+
+    void loadData()
+
+    return () => controller.abort()
+  }, [])
+
+  return (
+    <div>
+      <h2>Dashboard Content</h2>
+      {endpoints.map(({ key, label }) => {
+        const section = data[key]
+
+        return (
+          <section key={key} aria-labelledby={`${key}-heading`}>
+            <h3 id={`${key}-heading`}>{label}</h3>
+            {section.status === 'loading' && <p>Loading {label.toLowerCase()}…</p>}
+            {section.status === 'error' && (
+              <p role=\"alert\">Unable to load {label.toLowerCase()}: {section.message}</p>
+            )}
+            {section.status === 'success' && (
+              <pre>{JSON.stringify(section.data, null, 2) ?? 'No data'}</pre>
+            )}
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:68:32
+     66| 
+     67|   // Should NOT have 'use client' directive
+     68|   expect(dashboardContent).not.toMatch(/['"]use client['"];?/)
+       |                                ^
+     69| })
+     70| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

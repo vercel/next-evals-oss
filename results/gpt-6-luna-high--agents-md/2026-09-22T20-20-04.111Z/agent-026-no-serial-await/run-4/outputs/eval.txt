@@ -1,0 +1,131 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page is an async server component with parallel data fetching 1ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 5ms
+     → expected '\'use client\'\n\nimport { useEffect,…' to match /async\s+function|export\s+default\s+a…/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  20:22:14
+   Duration  321ms (transform 65ms, setup 26ms, collect 27ms, tests 8ms, environment 0ms, prepare 107ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' to match /async\s+function|export\s+default\s+a…/
+
+[32m- Expected:[39m 
+/async\s+function|export\s+default\s+async/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+type ApiState =
+  | { status: 'loading' }
+  | { status: 'success'; data: unknown }
+  | { status: 'error'; message: string }
+
+type DashboardData = {
+  analytics: ApiState
+  notifications: ApiState
+  settings: ApiState
+}
+
+const endpoints = [
+  ['analytics', '/api/analytics'],
+  ['notifications', '/api/notifications'],
+  ['settings', '/api/settings'],
+] as const
+
+const initialData: DashboardData = {
+  analytics: { status: 'loading' },
+  notifications: { status: 'loading' },
+  settings: { status: 'loading' },
+}
+
+function renderApiState(state: ApiState) {
+  if (state.status === 'loading') {
+    return <p>Loading…</p>
+  }
+
+  if (state.status === 'error') {
+    return <p role=\"alert\">Could not load data: {state.message}</p>
+  }
+
+  return <pre>{JSON.stringify(state.data, null, 2)}</pre>
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState(initialData)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    void Promise.all(
+      endpoints.map(async ([key, endpoint]) => {
+        try {
+          const response = await fetch(endpoint, { signal: controller.signal })
+
+          if (!response.ok) {
+            throw new Error(`Request failed (${response.status})`)
+          }
+
+          const result: unknown = await response.json()
+          return [key, { status: 'success', data: result }] as const
+        } catch (error) {
+          if (controller.signal.aborted) {
+            return [key, { status: 'loading' }] as const
+          }
+
+          const message =
+            error instanceof Error ? error.message : 'An unexpected error occurred'
+          return [key, { status: 'error', message }] as const
+        }
+      }),
+    ).then((results) => {
+      if (!controller.signal.aborted) {
+        setData(Object.fromEntries(results) as DashboardData)
+      }
+    })
+
+    return () => controller.abort()
+  }, [])
+
+  return (
+    <div>
+      <h2>Dashboard Content</h2>
+      <section>
+        <h3>Analytics</h3>
+        {renderApiState(data.analytics)}
+      </section>
+      <section>
+        <h3>Notifications</h3>
+        {renderApiState(data.notifications)}
+      </section>
+      <section>
+        <h3>Settings</h3>
+        {renderApiState(data.settings)}
+      </section>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:65:28
+     63| 
+     64|   // Should be async function
+     65|   expect(dashboardContent).toMatch(/async\s+function|export\s+default\…
+       |                            ^
+     66| 
+     67|   // Should NOT have 'use client' directive
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

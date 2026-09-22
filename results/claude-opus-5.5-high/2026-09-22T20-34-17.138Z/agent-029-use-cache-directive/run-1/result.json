@@ -1,0 +1,65 @@
+{
+  "status": "passed",
+  "duration": 285.706,
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 1,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 7,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 7,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "git diff package.json; cat package.json; find . -path ./node_modules -prune -o -type f -not -path './.git/*' -print | head -50; ls node_modules/next/dist/docs 2>/dev/null | head",
+        "success": true
+      },
+      {
+        "command": "cat next.config.ts tsconfig.json lib/db.js app/layout.tsx app/page.tsx; cat node_modules/next/package.json | grep '\"version\"'; grep -rl \"revalidateTag\" node_modules/next/dist/docs | head -20",
+        "success": true
+      },
+      {
+        "command": "cd node_modules/next/dist/docs/01-app/03-api-reference; cat 04-functions/revalidateTag.md; sed -n 1,140p 01-directives/use-cache.md; grep -n \"cacheComponents\" -r 05-config/01-next-config-js/*.md | head",
+        "success": true
+      },
+      {
+        "command": "cd /workspace && cat > next.config.ts <<'EOF'\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n}\n\nexport default nextConfig\nEOF\ncat > lib/products.ts <<'EOF'\nimport { cacheLife, cacheTag } from 'next/cache'\nimport { getAllProducts } from './db'\n\n// Shared, cached catalog read. Any view that calls this is invalidated\n// together when the \"products\" tag is revalidated.\nexport async function getProducts() {\n  'use cache'\n  cacheTag('products')\n  cacheLife('hours')\n\n  return getAllProducts()\n}\nEOF\ncat > app/page.tsx <<'EOF'\nimport { revalidateTag } from 'next/cache'\nimport { getProducts } from '@/lib/products'\n\nexport default async function Page() {\n  const products = await getProducts()\n\n  async function syncCatalog() {\n    'use server'\n    // Mark catalog data stale with stale-while-revalidate semantics: admins\n    // keep seeing the current list while fresh data is recomputed in the\n    // background on the next request.\n    revalidateTag('products', 'max')\n  }\n\n  return (\n    <div>\n      <h1>Product Catalog</h1>\n\n      <form action={syncCatalog}>\n        <button type=\"submit\">Sync latest catalog</button>\n      </form>\n\n      <table>\n        <thead>\n          <tr>\n            <th>ID</th>\n            <th>Name</th>\n            <th>Price</th>\n          </tr>\n        </thead>\n        <tbody>\n          {products.map((product) => (\n            <tr key={product.id}>\n              <td>{product.id}</td>\n              <td>{product.name}</td>\n              <td>${product.price}</td>\n            </tr>\n          ))}\n        </tbody>\n      </table>\n    </div>\n  )\n}\nEOF\nnpx next build 2>&1 | tail -25",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 >/tmp/next.log 2>&1 &) ; sleep 4; curl -s localhost:3123 | grep -o 'Sync latest catalog\\|Laptop' | sort -u; pkill -f \"next start\"; git status --short",
+        "success": false
+      },
+      {
+        "command": "git status --short; git diff tsconfig.json",
+        "success": true
+      },
+      {
+        "command": "git checkout tsconfig.json && rm -rf .next next-env.d.ts && git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

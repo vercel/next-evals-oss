@@ -1,0 +1,69 @@
+{
+  "status": "passed",
+  "duration": 294.129,
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 3,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 8,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 8,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "git diff && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print | grep -v package-lock && cat package.json && ls node_modules/next/package.json && node -p \"require('next/package.json').version\"",
+        "success": true
+      },
+      {
+        "command": "cat next.config.ts lib/projects.ts app/layout.tsx app/page.tsx tsconfig.json; head -50 __agent_eval__/run.mjs",
+        "success": true
+      },
+      {
+        "command": "ls node_modules/next/dist/docs 2>/dev/null | head; grep -rl \"cacheComponents\" node_modules/next/dist/docs 2>/dev/null | head -20",
+        "success": true
+      },
+      {
+        "command": "cd node_modules/next/dist/docs/01-app; cat 03-api-reference/05-config/01-next-config-js/cacheComponents.md; sed -n 1,400p 02-guides/migrating-to-cache-components.md",
+        "success": true
+      },
+      {
+        "command": "cd /workspace && cat > next.config.ts <<'EOF'\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n}\n\nexport default nextConfig\nEOF\ncat > lib/projects.ts <<'EOF'\nimport { cacheLife, cacheTag } from 'next/cache'\n\nexport async function getProjectTotals() {\n  'use cache'\n  cacheLife('hours')\n  cacheTag('project-totals')\n  await new Promise((resolve) => setTimeout(resolve, 120))\n  return { active: 12, archived: 4 }\n}\nEOF\ncat > app/page.tsx <<'EOF'\nimport { Suspense } from 'react'\nimport { cookies, headers } from 'next/headers'\nimport { getProjectTotals } from '@/lib/projects'\n\nexport default function DashboardPage() {\n  return (\n    <main>\n      <h1>Workspace</h1>\n      <Suspense fallback={<MemberDetailsFallback />}>\n        <MemberDetails />\n      </Suspense>\n      <ProjectTotals />\n    </main>\n  )\n}\n\n// Request-specific: reads cookies and headers, so it streams in at request time.\nasync function MemberDetails() {\n  const cookieStore = await cookies()\n  const requestHeaders = await headers()\n  const member = cookieStore.get('member')?.value ?? 'Guest'\n  const team = cookieStore.get('team')?.value ?? 'Community'\n  const region = requestHeaders.get('x-region') ?? 'global'\n\n  return (\n    <section>\n      <p>Welcome, {member}</p>\n      <p>Team: {team}</p>\n      <p>Region: {region}</p>\n    </section>\n  )\n}\n\nfunction MemberDetailsFallback() {\n  return (\n    <section aria-busy=\"true\">\n      <p>Welcome, …</p>\n      <p>Team: …</p>\n      <p>Region: …</p>\n    </section>\n  )\n}\n\n// Shared across all members: cached data, included in the prerendered shell.\nasync function ProjectTotals() {\n  const totals = await getProjectTotals()\n  return <p>{totals.active} active projects</p>\n}\nEOF\nnpm run build 2>&1 | tail -30",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 >/tmp/next.log 2>&1 &) ; sleep 4; curl -s -H 'Cookie: member=Ada; team=Core' -H 'x-region: eu-west' localhost:3123/ | grep -oE '(Welcome|Team|Region|[0-9]+ active)[^<]*(<!-- -->[^<]*)?' ; echo ---; curl -s localhost:3123/ | grep -oE '(Welcome|Team|Region)[^<]*(<!-- -->[^<]*)?'; pkill -f \"next start\" ; git status --short",
+        "success": false
+      },
+      {
+        "command": "ls .next/server/app/ | grep -i index; grep -o '<main>.*</main>' .next/server/app/index.html | head -c 800; echo; git status --short",
+        "success": true
+      },
+      {
+        "command": "cat .gitignore; git diff next-env.d.ts tsconfig.json",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

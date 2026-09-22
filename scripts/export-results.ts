@@ -52,6 +52,7 @@ interface AgentResult {
 const AGENTS_MD_PAIRS: Record<string, string> = {
   'claude-fable-5.1--agents-md': 'claude-fable-5.1',
   'claude-fable-5--agents-md': 'claude-fable-5',
+  'claude-opus-5.5-high--agents-md': 'claude-opus-5.5-high',
   'claude-opus-5--agents-md': 'claude-opus-5',
   'claude-sonnet-5--agents-md': 'claude-sonnet-5',
   'claude-opus-4.6--agents-md': 'claude-opus-4.6',
@@ -70,6 +71,8 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'gpt-5.5-pro--agents-md': 'gpt-5.5-pro',
   'gpt-5.6-sol-ultra--agents-md': 'gpt-5.6-sol-ultra',
   'gpt-6-astra-high--agents-md': 'gpt-6-astra-high',
+  'gpt-6-luna-high--agents-md': 'gpt-6-luna-high',
+  'gpt-6-sol-high--agents-md': 'gpt-6-sol-high',
   'kimi-k2.5--agents-md': 'kimi-k2.5',
   'kimi-k2.6--agents-md': 'kimi-k2.6',
   'kimi-k2.7-code--agents-md': 'kimi-k2.7-code',
@@ -179,14 +182,16 @@ const TIER_1 = new Set([
   // least 84 days earlier, past the under-a-month carve-out — so the two do not
   // share the slot and claude-fable-5 drops to tier 2.
   'claude-fable-5.1',
-  'claude-opus-5',
+  // Opus 5.5 shipped 2026-09-22, about 60 days after Opus 5 (2026-07-24),
+  // outside the under-a-month carve-out; Opus 5 therefore drops to tier 2.
+  'claude-opus-5.5-high',
   'claude-sonnet-5',
-  // GPT 6 Astra holds the GPT line's only tier-1 slot, and that line includes
-  // the codex-branded models (OpenAI folded codex into the unified releases
-  // after 5.3-codex). It shipped 2026-09-04, 57 days after gpt-5.6-sol — past
-  // the under-a-month carve-out, so sol does not stay alongside it and
-  // gpt-5.6-sol-ultra drops to tier 2.
+  // GPT 6 Astra, Sol, and Luna are the current sibling profiles. Sol replaces
+  // GPT 5.6 Sol after roughly 75 days, outside the under-a-month carve-out;
+  // Luna has no previously measured predecessor on this board.
   'gpt-6-astra-high',
+  'gpt-6-luna-high',
+  'gpt-6-sol-high',
   // Gemini 3.8 Flash (released 2026-09-02) takes the Gemini *Flash* line's
   // tier-1 slot. Lines are tiered separately here — Claude keeps Fable, Opus
   // and Sonnet slots side by side — and Google still ships Pro and Flash
@@ -212,6 +217,8 @@ const MODEL_NAMES: Record<string, string> = {
   'claude-fable-5.1--agents-md': 'Claude Fable 5.1 (high) + AGENTS.md',
   'claude-fable-5': 'Claude Fable 5 (high)',
   'claude-fable-5--agents-md': 'Claude Fable 5 (high) + AGENTS.md',
+  'claude-opus-5.5-high': 'Claude Opus 5.5 (high)',
+  'claude-opus-5.5-high--agents-md': 'Claude Opus 5.5 (high) + AGENTS.md',
   'claude-opus-5': 'Claude Opus 5',
   'claude-opus-5--agents-md': 'Claude Opus 5 + AGENTS.md',
   'claude-sonnet-5': 'Claude Sonnet 5',
@@ -250,6 +257,10 @@ const MODEL_NAMES: Record<string, string> = {
   'gpt-5.6-sol-ultra--agents-md': 'GPT 5.6 Sol (ultra) + AGENTS.md',
   'gpt-6-astra-high': 'GPT 6 Astra (high)',
   'gpt-6-astra-high--agents-md': 'GPT 6 Astra (high) + AGENTS.md',
+  'gpt-6-luna-high': 'GPT 6 Luna (high)',
+  'gpt-6-luna-high--agents-md': 'GPT 6 Luna (high) + AGENTS.md',
+  'gpt-6-sol-high': 'GPT 6 Sol (high)',
+  'gpt-6-sol-high--agents-md': 'GPT 6 Sol (high) + AGENTS.md',
   'kimi-k2.5': 'Kimi K2.5',
   'kimi-k2.5--agents-md': 'Kimi K2.5 + AGENTS.md',
   'kimi-k2.6': 'Kimi K2.6',

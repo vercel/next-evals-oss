@@ -1,0 +1,64 @@
+{
+  "status": "failed",
+  "duration": 188.305,
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 6,
+      "file_edit": 3,
+      "shell": 5,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 14,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [
+      "/workspace/src/store.js",
+      "/workspace/src/views.js",
+      "/workspace/src/app.js",
+      "/workspace/server.js",
+      "/workspace/test/app.test.js",
+      "/workspace/README.md"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la && git log --stat | head -30 && cat package.json 2>/dev/null; head -40 package-lock.json; node --version",
+        "success": true
+      },
+      {
+        "command": "cat .gitignore; ls __agent_eval__; ls node_modules | head -50",
+        "success": true
+      },
+      {
+        "command": "cat > package.json <<'EOF'\n{\n  \"private\": true,\n  \"type\": \"module\",\n  \"scripts\": {\n    \"start\": \"node server.js\",\n    \"test\": \"vitest run\",\n    \"build\": \"echo \\\"no build step configured\\\"\"\n  },\n  \"devDependencies\": {\n    \"vitest\": \"^3.1.3\"\n  }\n}\nEOF\nprintf 'data/\\n' >> .gitignore; cat .gitignore",
+        "success": true
+      },
+      {
+        "command": "npx vitest run 2>&1 | tail -30",
+        "success": true
+      },
+      {
+        "command": "export DATA_FILE=/tmp/smoke/books.json PORT=3456; rm -rf /tmp/smoke\nnode server.js & PID=$!; sleep 0.5\ncurl -s -o /dev/null -w \"add: %{http_code} -> %{redirect_url}\\n\" -d \"title=The Hobbit&author=J.R.R. Tolkien&notes=Chapter 3 so far.%0ALoving it.\" localhost:3456/books\nID=$(node -e \"console.log(JSON.parse(require('fs').readFileSync('/tmp/smoke/books.json'))[0].id)\")\ncurl -s localhost:3456/books/$ID | sed -n '/<body>/,$p'\ncurl -s -o /dev/null -w \"finish: %{http_code} -> %{redirect_url}\\n\" -d \"back=list\" localhost:3456/books/$ID/finish\nkill $PID; sleep 0.3\nnode server.js & PID=$!; sleep 0.5\necho \"--- after restart:\"; curl -s localhost:3456/ | sed -n '/<h2>Currently/,/<h2 id/p'\nkill $PID; cat /tmp/smoke/books.json",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
