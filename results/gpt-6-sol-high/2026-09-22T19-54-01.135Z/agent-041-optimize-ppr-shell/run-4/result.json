@@ -1,0 +1,72 @@
+{
+  "status": "passed",
+  "duration": 292.308,
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 7,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 7,
+      "web_fetch": 0,
+      "web_search": 1,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 8,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -c \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'pages/**' -g '\"'!node_modules'\"' | head -200 && printf '\\\\n--- root ---\\\\n' && ls -la\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -c \"printf '%s\\\\n' '--- status ---'; git status --short; printf '%s\\\\n' '--- config ---'; cat package.json next.config.ts tsconfig.json; printf '%s\\\\n' '--- app files ---'; for file in app/*; do echo \\\"--- \"'$file ---\"; sed -n '\"'1,260p' \\\"\"'$file\"; done; printf '\"'%s\\\\n' '--- other files ---'; rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!*.png'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: app/page.tsx\n@@\n+import { Suspense, cache } from 'react'\n import { RevenueChart } from './RevenueChart'\n import { LatestInvoices } from './LatestInvoices'\n import { CardStats } from './CardStats'\n \n-async function getDashboardData() {\n+type DashboardData = {\n+  totalRevenue: number\n+  totalInvoices: number\n+  revenue: { month: string; amount: number }[]\n+  invoices: { id: string; name: string; amount: number }[]\n+}\n+\n+const getDashboardData = cache(async (): Promise<DashboardData> => {\n   const res = await fetch('https://api.example.com/dashboard')\n+  if (\"'!res.ok) throw new Error('\"'Failed to load dashboard data')\n   return res.json()\n-}\n+})\n \n-export default async function Page() {\n-  const data = await getDashboardData()\n+async function DashboardStats() {\n+  const { totalRevenue, totalInvoices } = await getDashboardData()\n+\n+  return (\n+    <CardStats totalRevenue={totalRevenue} totalInvoices={totalInvoices} />\n+  )\n+}\n+\n+async function DashboardRevenue() {\n+  const { revenue } = await getDashboardData()\n+\n+  return <RevenueChart revenue={revenue} />\n+}\n+\n+async function DashboardInvoices() {\n+  const { invoices } = await getDashboardData()\n+\n+  return <LatestInvoices invoices={invoices} />\n+}\n+\n+function StatsFallback() {\n+  return (\n+    <div className=\\\"grid grid-cols-2 gap-4\\\" aria-busy=\\\"true\\\">\n+      <div className=\\\"card\\\">\n+        <h2>Total Revenue</h2>\n+        <p>Loading revenue...</p>\n+      </div>\n+      <div className=\\\"card\\\">\n+        <h2>Total Invoices</h2>\n+        <p>Loading invoices...</p>\n+      </div>\n+    </div>\n+  )\n+}\n+\n+function RevenueFallback() {\n+  return (\n+    <div className=\\\"chart\\\" aria-busy=\\\"true\\\">\n+      <h2>Revenue</h2>\n+      <p>Loading revenue...</p>\n+    </div>\n+  )\n+}\n+\n+function InvoicesFallback() {\n+  return (\n+    <div className=\\\"invoices\\\" aria-busy=\\\"true\\\">\n+      <h2>Latest Invoices</h2>\n+      <p>Loading invoices...</p>\n+    </div>\n+  )\n+}\n \n+export default function Page() {\n   return (\n     <main>\n       <h1>Dashboard</h1>\n-      <CardStats\n-        totalRevenue={data.totalRevenue}\n-        totalInvoices={data.totalInvoices}\n-      />\n-      <RevenueChart revenue={data.revenue} />\n-      <LatestInvoices invoices={data.invoices} />\n+      <Suspense fallback={<StatsFallback />}>\n+        <DashboardStats />\n+      </Suspense>\n+      <Suspense fallback={<RevenueFallback />}>\n+        <DashboardRevenue />\n+      </Suspense>\n+      <Suspense fallback={<InvoicesFallback />}>\n+        <DashboardInvoices />\n+      </Suspense>\n     </main>\n   )\n }\n*** End Patch\nPATCH\nnpm run build\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -c \"git status --short; git diff -- app/page.tsx tsconfig.json; printf '\\\\n--- prerender artifacts ---\\\\n'; rg --files .next/server/app | head -50; printf '\\\\n--- shell headings ---\\\\n'; rg -l 'Loading revenue|Latest Invoices|Dashboard' .next/server/app -g '*.html' | head -20\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -c \"node - <<'NODE'\nconst html = require('node:fs').readFileSync('.next/server/app/index.html', 'utf8')\nconst start = html.indexOf('<main>')\nconsole.log(start >= 0 ? html.slice(start, html.indexOf('</main>', start) + 7) : 'No prerendered main found')\nNODE\nprintf '\\\\n--- ignore rules ---\\\\n'; cat .gitignore; printf '\\\\n--- generated env ---\\\\n'; cat next-env.d.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: app/page.tsx\n@@\n const getDashboardData = cache(async (): Promise<DashboardData> => {\n   const res = await fetch('https://api.example.com/dashboard')\n-  if (\"'!res.ok) throw new Error('\"'Failed to load dashboard data')\n   return res.json()\n@@\n function RevenueFallback() {\n   return (\n     <div className=\\\"chart\\\" aria-busy=\\\"true\\\">\n       <h2>Revenue</h2>\n-      <p>Loading revenue...</p>\n+      <ul>\n+        <li>Loading revenue...</li>\n+      </ul>\n@@\n function InvoicesFallback() {\n   return (\n     <div className=\\\"invoices\\\" aria-busy=\\\"true\\\">\n       <h2>Latest Invoices</h2>\n-      <p>Loading invoices...</p>\n+      <ul>\n+        <li>Loading invoices...</li>\n+      </ul>\n*** Update File: tsconfig.json\n@@\n-    \\\"lib\\\": [\n-      \\\"dom\\\",\n-      \\\"dom.iterable\\\",\n-      \\\"esnext\\\"\n-    ],\n+    \\\"lib\\\": [\\\"dom\\\", \\\"dom.iterable\\\", \\\"esnext\\\"],\n@@\n-      \\\"@/*\\\": [\n-        \\\"./*\\\"\n-      ]\n+      \\\"@/*\\\": [\\\"./*\\\"]\n@@\n-  \\\"include\\\": [\n-    \\\"next-env.d.ts\\\",\n-    \\\"**/*.ts\\\",\n-    \\\"**/*.tsx\\\",\n-    \\\".next/types/**/*.ts\\\",\n-    \\\".next/dev/types/**/*.ts\\\"\n-  ],\n-  \\\"exclude\\\": [\n-    \\\"node_modules\\\",\n-    \\\"EVAL.ts\\\"\n-  ]\n+  \\\"include\\\": [\\\"next-env.d.ts\\\", \\\"**/*.ts\\\", \\\"**/*.tsx\\\", \\\".next/types/**/*.ts\\\"],\n+  \\\"exclude\\\": [\\\"node_modules\\\", \\\"EVAL.ts\\\"]\n }\n*** End Patch\nPATCH\nnpx tsc --noEmit && git diff --check && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -c 'build_tmp=$(mktemp -d /tmp/ppr-shell-build.XXXXXX) && mv -n -- .next next-env.d.ts tsconfig.tsbuildinfo \"$build_tmp\"/ && printf '\"'Build artifacts moved to %s\\\\n' \\\"\"'$build_tmp\" && git diff --check && git status --short && git diff --stat && nl -ba app/page.tsx | head -115'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 9
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

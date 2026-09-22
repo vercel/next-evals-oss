@@ -1,0 +1,225 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 9ms
+   × Catalog is cached, tagged, and revalidated by the sync action 8ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  20:16:18
+   Duration  333ms (transform 73ms, setup 27ms, collect 44ms, tests 9ms, environment 0ms, prepare 93ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product Catalog | Northstar Commerce',
+  description: 'Manage your product catalog and pricing.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { getCachedProducts } from '@/lib/catalog'
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+export default async function Page() {
+  async function syncLatestCatalog() {
+    'use server'
+
+    revalidateTag('products', 'max')
+  }
+
+  const products = await getCachedProducts()
+  const averagePrice = products.length
+    ? products.reduce((sum, product) => sum + product.price, 0) / products.length
+    : 0
+
+  return (
+    <main className=\"workspace\">
+      <aside className=\"sidebar\">
+        <a className=\"brand\" href=\"#catalog\" aria-label=\"Northstar home\">
+          <span className=\"brand-mark\" aria-hidden=\"true\">N</span>
+          <span>northstar<span className=\"brand-period\">.</span></span>
+        </a>
+
+        <div className=\"sidebar-label\">Workspace</div>
+        <nav className=\"navigation\" aria-label=\"Main navigation\">
+          <a className=\"nav-link\" href=\"#overview\"><span className=\"nav-icon\">⌂</span>Overview</a>
+          <a className=\"nav-link active\" href=\"#catalog\" aria-current=\"page\"><span className=\"nav-icon\">▦</span>Catalog</a>
+          <a className=\"nav-link\" href=\"#orders\"><span className=\"nav-icon\">⇄</span>Orders</a>
+          <a className=\"nav-link\" href=\"#customers\"><span className=\"nav-icon\">♙</span>Customers</a>
+        </nav>
+
+        <div className=\"sidebar-bottom\">
+          <div className=\"store-card\">
+            <span className=\"store-avatar\">S</span>
+            <span className=\"store-copy\"><strong>Studio Supply</strong><small>Admin workspace</small></span>
+            <span className=\"store-menu\">···</span>
+          </div>
+          <div className=\"sidebar-footer\">NORTHSTAR COMMERCE <span>v2.4</span></div>
+        </div>
+      </aside>
+
+      <section className=\"main-panel\" id=\"catalog\">
+        <header className=\"topbar\">
+          <div className=\"breadcrumbs\"><span>Workspace</span><span className=\"breadcrumb-divider\">/</span><strong>Catalog</strong></div>
+          <div className=\"topbar-actions\">
+            <button className=\"icon-button\" type=\"button\" aria-label=\"Help\">?</button>
+            <span className=\"topbar-divider\" />
+            <span className=\"user-avatar\" aria-label=\"Alex Morgan\">AM</span>
+          </div>
+        </header>
+
+        <div className=\"page-content\">
+          <div className=\"page-heading\">
+            <div>
+              <div className=\"eyebrow\"><span className=\"eyebrow-dot\" /> COMMERCE / INVENTORY</div>
+              <h1>Product catalog</h1>
+              <p className=\"page-description\">Manage your products, pricing, and availability in one place.</p>
+            </div>
+            <form action={syncLatestCatalog}>
+              <button className=\"sync-button\" type=\"submit\">
+                <span aria-hidden=\"true\" className=\"sync-icon\">↻</span>
+                Sync latest catalog
+              </button>
+            </form>
+          </div>
+
+          <div className=\"sync-note\"><span className=\"note-icon\">i</span> Catalog updates run in the background. You can keep working while the latest data refreshes.</div>
+
+          <div className=\"overview-grid\">
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span className=\"metric-label\">TOTAL PRODUCTS</span><span className=\"metric-icon products-icon\">▦</span></div>
+              <div className=\"metric-value\">{products.length.toLocaleString('en-US')}</div>
+              <div className=\"metric-caption\">Products in your catalog</div>
+            </article>
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span className=\"metric-label\">AVERAGE LIST PRICE</span><span className=\"metric-icon price-icon\">$</span></div>
+              <div className=\"metric-value\">{currencyFormatter.format(averagePrice)}</div>
+              <div className=\"metric-caption\">Across all listed products</div>
+            </article>
+            <article className=\"metric-card source-card\">
+              <div className=\"metric-top\"><span className=\"metric-label\">CATALOG SOURCE</span><span className=\"connected-dot\" /></div>
+              <div className=\"source-name\">ERP / PIM <span className=\"connected-label\">Sync on demand</span></div>
+              <div className=\"metric-caption\">Catalog sync is available</div>
+            </article>
+          </div>
+
+          <section className=\"catalog-card\" aria-labelledby=\"catalog-heading\">
+            <div className=\"catalog-toolbar\">
+              <div>
+                <h2 id=\"catalog-heading\">All products</h2>
+                <p>Browse and review your catalog items.</p>
+              </div>
+              <span className=\"product-count\">{products.length} {products.length === 1 ? 'product' : 'products'}</span>
+            </div>
+            <div className=\"table-scroll\">
+              <table>
+                <thead>
+                  <tr><th scope=\"col\">PRODUCT</th><th scope=\"col\">PRODUCT ID</th><th scope=\"col\" className=\"price-column\">LIST PRICE</th></tr>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product.id}>
+                      <td><span className=\"product-thumbnail\" aria-hidden=\"true\">{product.name.slice(0, 1)}</span><span className=\"product-name\">{product.name}</span></td>
+                      <td><span className=\"product-id\">PRD-{String(product.id).padStart(4, '0')}</span></td>
+                      <td className=\"price-column\">{currencyFormatter.format(product.price)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className=\"table-footer\"><span>Showing <strong>{products.length}</strong> of <strong>{products.length}</strong> products</span><span className=\"freshness-indicator\"><span /> Cached for faster browsing</span></div>
+          </section>
+
+          <footer className=\"page-footer\"><span>Need help managing your catalog?</span><a href=\"#support\">Visit the help center <span aria-hidden=\"true\">↗</span></a></footer>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db.js'
+
+export const getCachedProducts = unstable_cache(
+  async () => getAllProducts(),
+  ['products'],
+  { tags: ['products'] },
+)
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
