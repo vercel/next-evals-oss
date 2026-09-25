@@ -1,0 +1,59 @@
+{
+  "status": "failed",
+  "duration": 1185.137,
+  "model": "vercel/stealth/pixel-canary",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 2,
+    "toolCalls": {
+      "file_read": 2,
+      "file_write": 4,
+      "file_edit": 2,
+      "shell": 3,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 11,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/.gitignore"
+    ],
+    "filesModified": [
+      "/workspace/server.js",
+      "/workspace/public/index.html",
+      "/workspace/public/style.css",
+      "/workspace/public/app.js",
+      "/workspace/package.json",
+      "/workspace/.gitignore"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la /workspace && node --version",
+        "success": true
+      },
+      {
+        "command": "node server.js &\nsleep 1\necho \"--- empty list:\"; curl -s localhost:3000/api/books\necho; echo \"--- add book:\"; curl -s -X POST localhost:3000/api/books -H 'content-type: application/json' -d '{\"title\":\"Dune\",\"author\":\"Frank Herbert\",\"notes\":\"First read.\"}'\necho; echo \"--- validation:\"; curl -s -X POST localhost:3000/api/books -H 'content-type: application/json' -d '{\"title\":\"No author\"}'\necho; echo \"--- bad json:\"; curl -s -o /dev/null -w '%{http_code}\\n' -X POST localhost:3000/api/books -H 'content-type: application/json' -d '{oops'\nID=$(curl -s localhost:3000/api/books | node -e 'let d=\"\";process.stdin.on(\"data\",c=>d+=c).on(\"end\",()=>console.log(JSON.parse(d)[0].id))')\necho \"id=$ID\"\necho \"--- detail:\"; curl -s localhost:3000/api/books/$ID\necho; echo \"--- finish:\"; curl -s -X PATCH localhost:3000/api/books/$ID -d '{\"status\":\"finished\"}'\necho; echo \"--- deep link serves app:\"; curl -s localhost:3000/book/$ID | head -c 80\necho; echo \"--- traversal blocked:\"; curl -s \"localhost:3000/../etc/passwd\" | head -c 60\necho; echo \"--- persistence: restarting server\"\nkill %1; sleep 0.5\nnode server.js & sleep 1\necho \"--- after restart:\"; curl -s localhost:3000/api/books\nkill %1",
+        "success": true
+      },
+      {
+        "command": "node server.js & sleep 1\ncurl -s --path-as-is \"localhost:3000/..%2f..%2f..%2fetc/passwd\" | head -c 40; echo\ncurl -s --path-as-is \"localhost:3000/api/books/../..%2fetc/passwd\"; echo\nkill %1; rm -f books.json",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

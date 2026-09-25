@@ -50,6 +50,7 @@ interface AgentResult {
 // variant → base experiment (same agent harness). Hoisted to module scope so
 // both cost pricing (per eval) and the docs-impact merge resolve the same base.
 const AGENTS_MD_PAIRS: Record<string, string> = {
+  'pixel-canary--agents-md': 'pixel-canary',
   'claude-fable-5.1--agents-md': 'claude-fable-5.1',
   'claude-fable-5--agents-md': 'claude-fable-5',
   'claude-opus-5.5-high--agents-md': 'claude-opus-5.5-high',
@@ -210,9 +211,12 @@ const TIER_1 = new Set([
   // Grok 4.7 (2026-09-21) replaces Grok 4.6 (2026-08-12), 40 days later, so
   // the predecessor is outside the under-a-month carve-out and stays tier 2.
   'grok-4.7',
+  'pixel-canary',
 ]);
 
 const MODEL_NAMES: Record<string, string> = {
+  'pixel-canary': 'Pixel Canary',
+  'pixel-canary--agents-md': 'Pixel Canary + AGENTS.md',
   'claude-fable-5.1': 'Claude Fable 5.1 (high)',
   'claude-fable-5.1--agents-md': 'Claude Fable 5.1 (high) + AGENTS.md',
   'claude-fable-5': 'Claude Fable 5 (high)',
