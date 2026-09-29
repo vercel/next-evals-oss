@@ -92,6 +92,13 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'grok-4.6': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 }, // same in/out as 4.5, pricier cache reads
   // AI Gateway catalog, 2026-09-21. Caching is implicit, with no write rate.
   'grok-4.7': { input: 1.2, output: 3.6, cacheRead: 0.3, cacheWrite: 0 },
+  // FX rows use the same underlying gateway model rates as their native or
+  // OpenCode counterparts. FX session transcripts currently fall back to the
+  // canonical text-length estimate when provider token usage is unavailable.
+  'claude-opus-5.5-fx': { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  'gpt-6-sol-fx': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  'grok-4.7-fx': { input: 1.2, output: 3.6, cacheRead: 0.3, cacheWrite: 0 },
+  'glm-5.2-fx': { input: 0.8, output: 2.55, cacheRead: 0.16, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
 };

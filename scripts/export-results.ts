@@ -85,6 +85,10 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'grok-4.5--agents-md': 'grok-4.5',
   'grok-4.6--agents-md': 'grok-4.6',
   'grok-4.7--agents-md': 'grok-4.7',
+  'claude-opus-5.5-fx--agents-md': 'claude-opus-5.5-fx',
+  'gpt-6-sol-fx--agents-md': 'gpt-6-sol-fx',
+  'grok-4.7-fx--agents-md': 'grok-4.7-fx',
+  'glm-5.2-fx--agents-md': 'glm-5.2-fx',
 };
 
 /**
@@ -288,6 +292,14 @@ const MODEL_NAMES: Record<string, string> = {
   'grok-4.6--agents-md': 'Grok 4.6 + AGENTS.md',
   'grok-4.7': 'Grok 4.7',
   'grok-4.7--agents-md': 'Grok 4.7 + AGENTS.md',
+  'claude-opus-5.5-fx': 'Claude Opus 5.5',
+  'claude-opus-5.5-fx--agents-md': 'Claude Opus 5.5 + AGENTS.md',
+  'gpt-6-sol-fx': 'GPT 6 Sol',
+  'gpt-6-sol-fx--agents-md': 'GPT 6 Sol + AGENTS.md',
+  'grok-4.7-fx': 'Grok 4.7',
+  'grok-4.7-fx--agents-md': 'Grok 4.7 + AGENTS.md',
+  'glm-5.2-fx': 'GLM 5.2',
+  'glm-5.2-fx--agents-md': 'GLM 5.2 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
@@ -298,6 +310,7 @@ const HARNESS_NAMES: Record<string, string> = {
   'cursor': 'Cursor',
   'gemini': 'Gemini CLI',
   'vercel-ai-gateway/claude-code': 'Claude Code',
+  'vercel-ai-gateway/fx': 'FX',
 };
 
 function parseTimestamp(ts: string): string {
