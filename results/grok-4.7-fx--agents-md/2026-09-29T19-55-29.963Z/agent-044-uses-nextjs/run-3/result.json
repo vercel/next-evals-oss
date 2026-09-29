@@ -1,0 +1,60 @@
+{
+  "status": "failed",
+  "duration": 127.257,
+  "model": "spacexai/grok-4.7",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 7,
+    "toolCalls": {
+      "file_read": 4,
+      "file_write": 7,
+      "file_edit": 0,
+      "shell": 2,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 1,
+      "grep": 0,
+      "list_dir": 3,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 17,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/.gitignore",
+      "/workspace/__agent_eval__/run.mjs",
+      "/workspace/package-lock.json"
+    ],
+    "filesModified": [
+      "/workspace/package.json",
+      "/workspace/.gitignore",
+      "/workspace/lib/store.js",
+      "/workspace/lib/html.js",
+      "/workspace/server.js",
+      "/workspace/lib/store.test.js",
+      "/workspace/README.md"
+    ],
+    "shellCommands": [
+      {
+        "command": "npm test",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "node --input-type=module -e \"\nimport { mkdtemp, readFile } from 'node:fs/promises';\nimport os from 'node:os';\nimport path from 'node:path';\nimport { createServer } from 'node:http';\nimport { createStore } from './lib/store.js';\nimport { createApp } from './server.js';\n\nconst dir = await mkdtemp(path.join(os.tmpdir(), 'books-app-'));\nconst filePath = path.join(dir, 'books.json');\nconst store = createStore(filePath);\nconst server = createServer(createApp(store));\nawait new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));\nconst { port } = server.address();\nconst base = 'http://127.0.0.1:' + port;\n\nasync function request(method, urlPath, body) {\n  const res = await fetch(base + urlPath, {\n    method,\n    redirect: 'manual',\n    headers: body ? { 'content-type': 'application/x-www-form-urlencoded' } : undefined,\n    body,\n  });\n  return { status: res.status, location: res.headers.get('location'), text: await res.text() };\n}\n\nconst home = await request('GET', '/');\nif (home.status !== 200 || !home.text.includes('Currently reading') || !home.text.includes('Finished')) {\n  throw new Error('home failed: ' + home.status);\n}\n\nconst created = await request('POST', '/books', new URLSearchParams({\n  title: 'The Dispossessed',\n  author: 'Ursula K. Le Guin',\n  notes: 'Share this with Sam.',\n}).toString());\nif (created.status !== 303 || !created.location?.startsWith('/books/')) {\n  throw new Error('create failed: ' + JSON.stringify(created));\n}\n\nconst page = await request('GET', created.location);\nif (page.status !== 200 || !page.text.includes('The Dispossessed') || !page.text.includes('Ursula K. Le Guin') || !page.text.includes('Share this with Sam.')) {\n  throw new Error('detail failed');\n}\n\nconst id = created.location.split('/').pop();\nconst finished = await request('POST', '/books/' + id + '/finish');\nif (finished.status !== 303) throw new Error('finish failed');\n\nconst after = await request('GET', '/');\nif (!after.text.includes('The Dispossessed')) throw new Error('list missing book');\nconst finishedSection = after.text.split('<h2>Finished</h2>')[1] || '';\nif (!finishedSection.includes('The Dispossessed')) throw new Error('not in finished');\n\nconst missing = await request('GET', '/books/nope');\nif (missing.status !== 404) throw new Error('expected 404');\n\nconst raw = JSON.parse(await readFile(filePath, 'utf8'));\nif (raw.books[0].status !== 'finished') throw new Error('json not finished');\n\nconst restarted = createStore(filePath);\nconst again = await restarted.get(id);\nif (again?.title !== 'The Dispossessed') throw new Error('reload failed');\n\nserver.close();\nconsole.log('ok', created.location);\n\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

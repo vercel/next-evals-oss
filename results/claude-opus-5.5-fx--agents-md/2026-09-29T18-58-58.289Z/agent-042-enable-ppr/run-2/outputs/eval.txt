@@ -1,0 +1,133 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (4 tests | 1 failed) 40973ms
+   ✓ enables the current Cache Components config only 2ms
+   × removes route opt-outs and incompatible segment config 7ms
+     → expected 'import Link from \'next/link\'\nimpor…' not to match /export\s+(?:const|var|let)\s+(?:dynam…/
+   ✓ preserves the hourly newsroom feed  23327ms
+   ✓ keeps editor preview request-specific  17635ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  19:01:02
+   Duration  41.29s (transform 62ms, setup 24ms, collect 36ms, tests 40.97s, environment 0ms, prepare 84ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > removes route opt-outs and incompatible segment config
+AssertionError: expected 'import Link from \'next/link\'\nimpor…' not to match /export\s+(?:const|var|let)\s+(?:dynam…/
+
+[32m- Expected:[39m 
+/export\s+(?:const|var|let)\s+(?:dynamic|revalidate|fetchCache)\s*=/
+
+[31m+ Received:[39m 
+"import Link from 'next/link'
+import type { ReactNode } from 'react'
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang=\"en\">
+      <body>
+        <nav>
+          <Link href=\"/news\">Newsroom</Link>{' '}
+          <Link href=\"/preview\">Editor preview</Link>
+        </nav>
+        {children}
+      </body>
+    </html>
+  )
+}
+
+import { cacheLife } from 'next/cache'
+
+async function getStories() {
+  'use cache'
+  // Hourly refresh policy (previously `export const revalidate = 3600`).
+  cacheLife('hours')
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  return ['City council approves new park', 'Night market opens Friday']
+}
+
+export default async function NewsPage() {
+  const stories = await getStories()
+
+  return (
+    <main>
+      <h1>Newsroom</h1>
+      {stories.map((story) => (
+        <article key={story}>{story}</article>
+      ))}
+    </main>
+  )
+}
+
+export default function HomePage() {
+  return <h1>Northstar Publishing</h1>
+}
+
+import { cookies } from 'next/headers'
+import { Suspense } from 'react'
+
+async function DraftTitle() {
+  // Request-time API: runs per request, never cached.
+  const draft = (await cookies()).get('draft-title')?.value ?? 'Untitled draft'
+  return <p>{draft}</p>
+}
+
+export default function PreviewPage() {
+  return (
+    <main>
+      <h1>Editor preview</h1>
+      <Suspense fallback={<p>Loading draft…</p>}>
+        <DraftTitle />
+      </Suspense>
+    </main>
+  )
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:37:22
+     35| test('removes route opt-outs and incompatible segment config', () => {
+     36|   expect(source).not.toMatch(/export\s+(?:const|var|let)\s+instant\s*=…
+     37|   expect(source).not.toMatch(
+       |                      ^
+     38|     /export\s+(?:const|var|let)\s+(?:dynamic|revalidate|fetchCache)\s*…
+     39|   )
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

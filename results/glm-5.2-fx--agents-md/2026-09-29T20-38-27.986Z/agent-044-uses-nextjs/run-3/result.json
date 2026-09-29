@@ -1,0 +1,57 @@
+{
+  "status": "failed",
+  "duration": 142.713,
+  "model": "zai/glm-5.2",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 9,
+    "toolCalls": {
+      "file_read": 3,
+      "file_write": 3,
+      "file_edit": 2,
+      "shell": 2,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 3,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 13,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/.gitignore",
+      "/workspace/__agent_eval__/run.mjs"
+    ],
+    "filesModified": [
+      "/workspace/server.js",
+      "/workspace/server.test.js",
+      "/workspace/package.json",
+      "/workspace/README.md",
+      "/workspace/.gitignore"
+    ],
+    "shellCommands": [
+      {
+        "command": "npm test",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "node -e \"\nimport('./server.js').then(async ({ startServer }) => {\n  const srv = await startServer(3099);\n  const res = await fetch('http://localhost:3099/');\n  console.log('home status:', res.status);\n  const html = await res.text();\n  console.log('has Currently reading:', html.includes('Currently reading'));\n  console.log('has Add a book link:', html.includes('/books/new'));\n\n  // create a book\n  const created = await fetch('http://localhost:3099/books', {\n    method: 'POST',\n    headers: { 'content-type': 'application/x-www-form-urlencoded' },\n    body: 'title=Hyperion&author=Dan+Simmons&notes=great',\n    redirect: 'manual',\n  });\n  console.log('create status:', created.status, '->', created.headers.get('location'));\n  const id = created.headers.get('location').split('/').pop();\n\n  // detail page\n  const detail = await fetch('http://localhost:3099/books/' + id);\n  const dhtml = await detail.text();\n  console.log('detail status:', detail.status);\n  console.log('detail has title:', dhtml.includes('Hyperion'));\n  console.log('detail has author:', dhtml.includes('Dan Simmons'));\n  console.log('detail has notes:', dhtml.includes('great'));\n  console.log('detail has share link:', dhtml.includes('http://localhost:3099/books/' + id));\n\n  // mark finished\n  const fin = await fetch('http://localhost:3099/books/' + id + '/finished', {\n    method: 'POST',\n    headers: { 'content-type': 'application/x-www-form-urlencoded' },\n    body: 'finished=true',\n    redirect: 'manual',\n  });\n  console.log('finish status:', fin.status);\n\n  // home now shows it under Finished\n  const home2 = await fetch('http://localhost:3099/');\n  const h2 = await home2.text();\n  console.log('home has Hyperion:', h2.includes('Hyperion'));\n\n  srv.close();\n  // cleanup data file\n  const fs = await import('node:fs/promises');\n  await fs.unlink('books.json').catch(() => {});\n  process.exit(0);\n});\n\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

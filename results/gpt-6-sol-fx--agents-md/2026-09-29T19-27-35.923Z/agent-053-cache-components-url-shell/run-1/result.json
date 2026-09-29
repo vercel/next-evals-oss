@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "duration": 387.997,
+  "model": "openai/gpt-6-sol",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 10,
+      "file_write": 0,
+      "file_edit": 5,
+      "shell": 9,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 4,
+      "grep": 1,
+      "list_dir": 2,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 31,
+    "webFetches": [],
+    "filesRead": [
+      "next.config.ts",
+      "app/layout.tsx",
+      "app/page.tsx",
+      "app/products/[slug]/page.tsx",
+      "lib/products.ts",
+      "node_modules/next/dist/docs/01-app/02-guides/migrating-to-cache-components.md",
+      "node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md",
+      "node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md",
+      "tsconfig.json"
+    ],
+    "filesModified": [
+      "next.config.ts",
+      "lib/products.ts",
+      "app/products/[slug]/page.tsx",
+      "next-env.d.ts",
+      "tsconfig.json"
+    ],
+    "shellCommands": [
+      {
+        "command": "git status --short && cat package.json",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "npm run build",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "git diff -- next.config.ts lib/products.ts 'app/products/[slug]/page.tsx' tsconfig.json && git status --short"
+      },
+      {
+        "command": "npm run start -- -p 3100",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "git diff -- next-env.d.ts && cat .gitignore"
+      },
+      {
+        "command": "node --input-type=module <<'EOF'\nimport assert from 'node:assert/strict'\nconst base = 'http://localhost:3100'\nfor (const [path, expected] of [\n  ['/products/lamp?currency=EUR', ['Brass lamp', 'EUR 110.40', 'Stone vase']],\n  ['/products/lamp', ['Brass lamp', 'USD 120.00', 'Stone vase']],\n  ['/products/vase?currency=EUR', ['Stone vase', 'EUR 73.60', 'Brass lamp']],\n]) {\n  const response = await fetch(base + path)\n  const html = await response.text()\n  assert.equal(response.status, 200, path)\n  for (const text of expected) assert.ok(html.includes(text), `${path}: missing ${text}`)\n  console.log(`${path}: 200; ${expected.join(', ')}`)\n}\nconst response = await fetch(base + '/products/missing')\nassert.equal(response.status, 404)\nconsole.log('/products/missing: 404')\nconst started = performance.now()\nconst streamed = await fetch(base + '/products/lamp?currency=EUR')\nconst reader = streamed.body.getReader()\nlet first = ''\nwhile (!first.includes('Loading product details...')) {\n  const chunk = await reader.read()\n  assert.equal(chunk.done, false, 'no product fallback in response')\n  first += new TextDecoder().decode(chunk.value)\n}\nassert.ok(first.includes('Signal Shop collection'))\nassert.ok(!first.includes('Stone vase'), 'related product already in shell')\nconst firstMs = Math.round(performance.now() - started)\nlet rest = ''\nwhile (true) {\n  const chunk = await reader.read()\n  if (chunk.done) break\n  rest += new TextDecoder().decode(chunk.value)\n}\nassert.ok(rest.includes('Brass lamp') && rest.includes('Stone vase'))\nconsole.log(`shell and product fallback in initial response (${firstMs}ms); product and related details streamed afterward`)\nEOF",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "node --input-type=module <<'EOF'\nimport assert from 'node:assert/strict'\nconst base = 'http://localhost:3100'\nfor (const [path, expected] of [\n  ['/products/lamp?currency=EUR', ['Brass lamp', 'EUR 110.40', 'Stone vase']],\n  ['/products/lamp', ['Brass lamp', 'USD 120.00', 'Stone vase']],\n  ['/products/vase?currency=EUR', ['Stone vase', 'EUR 73.60', 'Brass lamp']],\n]) {\n  const response = await fetch(base + path)\n  const html = await response.text()\n  assert.equal(response.status, 200, path)\n  for (const text of expected) assert.ok(html.includes(text), `${path}: missing ${text}`)\n  console.log(`${path}: 200; ${expected.join(', ')}`)\n}\nconst missing = await fetch(base + '/products/missing')\nconst missingHtml = await missing.text()\nconsole.log(`missing product HTTP ${missing.status}; not-found markup: ${missingHtml.includes('NEXT_HTTP_ERROR_FALLBACK;404') || missingHtml.includes('This page could not be found')}; noindex: ${missingHtml.includes('noindex')}`)\nconst started = performance.now()\nconst streamed = await fetch(base + '/products/lamp?currency=EUR')\nconst reader = streamed.body.getReader()\nlet first = ''\nwhile (!first.includes('Loading product details...')) {\n  const chunk = await reader.read()\n  assert.equal(chunk.done, false, 'no product fallback in response')\n  first += new TextDecoder().decode(chunk.value)\n}\nassert.ok(first.includes('Signal Shop collection'))\nassert.ok(!first.includes('Stone vase'), 'related product already in shell')\nconst firstMs = Math.round(performance.now() - started)\nlet rest = ''\nwhile (true) {\n  const chunk = await reader.read()\n  if (chunk.done) break\n  rest += new TextDecoder().decode(chunk.value)\n}\nassert.ok(rest.includes('Brass lamp') && rest.includes('Stone vase'))\nconsole.log(`shell and product fallback in initial response (${firstMs}ms); product and related details streamed afterward`)\nEOF",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "git status --short && git diff --check && git diff --stat",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
