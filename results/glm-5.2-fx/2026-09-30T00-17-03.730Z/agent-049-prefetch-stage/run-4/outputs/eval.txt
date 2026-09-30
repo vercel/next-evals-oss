@@ -1,0 +1,54 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 2 failed) 50562ms
+   ✓ enables Partial Prefetching globally or for the product route 1ms
+   ✓ opts the featured product link into per-link prefetching 0ms
+   × uses the prefetch cache stage 7ms
+     → expected null not to be null
+   ✓ keeps stable product content in the reusable shell  27202ms
+   × includes related products only in the selected prefetch 23350ms
+     → [judge:environment] FAIL — The related-products section must be available before navigation from the featured-product Link without joining the default product App Shell.
+
+Render related products through an async component that awaits unstable_prefetch() before calling the cached getRelatedProducts() function. The unstable_prefetch() call must be outside every use cache scope, while the existing cached data function stays below it.
+
+Reject solutions that replace the stage with connection() or unstable_navigation(), make the related-products data uncached, or defer it until after navigation. Accept equivalent component and file organization.
+  reason: In app/product/page.tsx the RelatedProducts async component calls getRelatedProducts(productSlug) directly (line 30) with no preceding prefetch stage; unstable_prefetch is imported/awaited nowhere in the source (grep finds it only in EVAL.ts), so the required await unstable_prefetch() before the cached getRelatedProducts() is missing.
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  00:24:13
+   Duration  50.91s (transform 73ms, setup 29ms, collect 43ms, tests 50.56s, environment 0ms, prepare 98ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > uses the prefetch cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:67:30
+     65|     /\bunstable_prefetch(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     66|   )
+     67|   expect(prefetchImport).not.toBeNull()
+       |                              ^
+     68| 
+     69|   const localName = prefetchImport?.[1] ?? 'unstable_prefetch'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > includes related products only in the selected prefetch
+Error: [judge:environment] FAIL — The related-products section must be available before navigation from the featured-product Link without joining the default product App Shell.
+
+Render related products through an async component that awaits unstable_prefetch() before calling the cached getRelatedProducts() function. The unstable_prefetch() call must be outside every use cache scope, while the existing cached data function stays below it.
+
+Reject solutions that replace the stage with connection() or unstable_navigation(), make the related-products data uncached, or defer it until after navigation. Accept equivalent component and file organization.
+  reason: In app/product/page.tsx the RelatedProducts async component calls getRelatedProducts(productSlug) directly (line 30) with no preceding prefetch stage; unstable_prefetch is imported/awaited nowhere in the source (grep finds it only in EVAL.ts), so the required await unstable_prefetch() before the cached getRelatedProducts() is missing.
+ ❯ EVAL.ts:80:3
+     78| 
+     79| test('includes related products only in the selected prefetch', async …
+     80|   await expect(environment).toSatisfyCriterion(
+       |   ^
+     81|     `The related-products section must be available before navigation …
+     82| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

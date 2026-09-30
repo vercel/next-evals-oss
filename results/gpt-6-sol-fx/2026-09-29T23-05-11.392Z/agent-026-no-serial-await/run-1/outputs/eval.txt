@@ -1,0 +1,103 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page is an async server component with parallel data fetching 2ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 5ms
+     → expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  23:07:18
+   Duration  266ms (transform 49ms, setup 21ms, collect 24ms, tests 8ms, environment 0ms, prepare 76ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+type DashboardData = {
+  analytics: unknown
+  notifications: unknown
+  settings: unknown
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function getJson(path: string) {
+      const response = await fetch(path, { signal: controller.signal })
+      if (!response.ok) {
+        throw new Error(`Failed to load ${path} (${response.status})`)
+      }
+      return response.json()
+    }
+
+    async function loadDashboard() {
+      try {
+        const [analytics, notifications, settings] = await Promise.all([
+          getJson('/api/analytics'),
+          getJson('/api/notifications'),
+          getJson('/api/settings'),
+        ])
+
+        if (!controller.signal.aborted) {
+          setData({ analytics, notifications, settings })
+        }
+      } catch (cause) {
+        if (!controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : 'Failed to load dashboard data')
+        }
+      }
+    }
+
+    void loadDashboard()
+    return () => controller.abort()
+  }, [])
+
+  return (
+    <div>
+      <h2>Dashboard Content</h2>
+      {error ? (
+        <p role=\"alert\">{error}</p>
+      ) : data ? (
+        (['analytics', 'notifications', 'settings'] as const).map((section) => (
+          <section key={section}>
+            <h3>{section[0].toUpperCase() + section.slice(1)}</h3>
+            <pre>{JSON.stringify(data[section], null, 2)}</pre>
+          </section>
+        ))
+      ) : (
+        <p role=\"status\">Loading dashboard data...</p>
+      )}
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:68:32
+     66| 
+     67|   // Should NOT have 'use client' directive
+     68|   expect(dashboardContent).not.toMatch(/['"]use client['"];?/)
+       |                                ^
+     69| })
+     70| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

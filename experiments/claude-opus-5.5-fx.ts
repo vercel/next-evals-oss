@@ -3,9 +3,8 @@ import { isNextApp } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/fx',
-  // FX exposes model selection but not a reasoning-effort control, so this
-  // measures the provider default rather than claiming the native row's high.
   model: 'anthropic/claude-opus-5.5',
+  agentOptions: { effort: 'high' },
   evals: process.env.EVAL_FILTER ?? '*',
   webResearch: true,
   scripts: ['build'],

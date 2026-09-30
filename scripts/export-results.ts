@@ -292,14 +292,14 @@ const MODEL_NAMES: Record<string, string> = {
   'grok-4.6--agents-md': 'Grok 4.6 + AGENTS.md',
   'grok-4.7': 'Grok 4.7',
   'grok-4.7--agents-md': 'Grok 4.7 + AGENTS.md',
-  'claude-opus-5.5-fx': 'Claude Opus 5.5',
-  'claude-opus-5.5-fx--agents-md': 'Claude Opus 5.5 + AGENTS.md',
-  'gpt-6-sol-fx': 'GPT 6 Sol',
-  'gpt-6-sol-fx--agents-md': 'GPT 6 Sol + AGENTS.md',
-  'grok-4.7-fx': 'Grok 4.7',
-  'grok-4.7-fx--agents-md': 'Grok 4.7 + AGENTS.md',
-  'glm-5.2-fx': 'GLM 5.2',
-  'glm-5.2-fx--agents-md': 'GLM 5.2 + AGENTS.md',
+  'claude-opus-5.5-fx': 'Claude Opus 5.5 (high)',
+  'claude-opus-5.5-fx--agents-md': 'Claude Opus 5.5 (high) + AGENTS.md',
+  'gpt-6-sol-fx': 'GPT 6 Sol (high)',
+  'gpt-6-sol-fx--agents-md': 'GPT 6 Sol (high) + AGENTS.md',
+  'grok-4.7-fx': 'Grok 4.7 (high)',
+  'grok-4.7-fx--agents-md': 'Grok 4.7 (high) + AGENTS.md',
+  'glm-5.2-fx': 'GLM 5.2 (high)',
+  'glm-5.2-fx--agents-md': 'GLM 5.2 (high) + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {

@@ -1,0 +1,276 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 11ms
+   × Catalog is cached, tagged, and revalidated by the sync action 9ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  00:25:02
+   Duration  456ms (transform 96ms, setup 41ms, collect 45ms, tests 11ms, environment 0ms, prepare 140ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Admin · Product Catalog',
+  description: 'Admin product catalog with background ERP/PIM sync',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { after } from 'next/server'
+import { revalidateTag } from 'next/cache'
+import { getProducts } from '@/lib/products'
+import { syncCatalogFromUpstream } from '@/lib/db'
+import { SubmitButton } from './submit-button'
+
+// Admin catalog is read-heavy and should feel fast, so the page renders per
+// request but reads catalog data from the `products`-tagged data cache (no
+// re-query on every request). The expensive work only happens on a sync.
+export const dynamic = 'force-dynamic'
+
+// Inline Server Action for the \"Sync latest catalog\" trigger.
+//
+// It returns immediately so the admin can keep working -- the page re-renders
+// fast with the (still cached, briefly stale) catalog. The slow sync over
+// thousands of SKUs is deferred to `after()`, which runs only after the
+// response has been sent. Once the sync completes we invalidate the `products`
+// cache tag; the next read (here or in any other view sharing the tag)
+// repopulates the cache with fresh data, giving eventual consistency across
+// catalog views without forcing every request to block on fresh data.
+async function syncCatalogAction() {
+  'use server'
+
+  after(async () => {
+    await syncCatalogFromUpstream()
+    // Purge the `products` cache tag now that the sync has written fresh data.
+    // The next read -- on this page or any other view sharing the tag --
+    // repopulates the cache, so catalog views converge on the fresh data
+    // without forcing every request to block on a recompute.
+    revalidateTag('products', 'max')
+  })
+}
+
+export default async function AdminCatalogPage() {
+  const { items, version, lastSyncedAt } = await getProducts()
+
+  return (
+    <main style={{ maxWidth: 960, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Product Catalog</h1>
+          <p style={{ margin: '4px 0 0', color: '#555' }}>
+            Catalog version {version}
+            {lastSyncedAt ? ` · last synced ${new Date(lastSyncedAt).toLocaleString()}` : ' · not yet synced'}
+          </p>
+        </div>
+
+        <form action={syncCatalogAction}>
+          <SubmitButton />
+        </form>
+      </header>
+
+      <p style={{ color: '#666', fontSize: 14 }}>
+        Syncing pulls the latest pricing, inventory, and availability from the
+        upstream ERP/PIM. It runs in the background, so you can keep working --
+        the list may be briefly stale and will update shortly after the sync
+        finishes.
+      </p>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
+        <thead>
+          <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
+            <th style={{ padding: '8px' }}>ID</th>
+            <th style={{ padding: '8px' }}>Name</th>
+            <th style={{ padding: '8px' }}>Price</th>
+            <th style={{ padding: '8px' }}>Inventory</th>
+            <th style={{ padding: '8px' }}>Available</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((product) => (
+            <tr key={product.id} style={{ borderBottom: '1px solid #eee' }}>
+              <td style={{ padding: '8px' }}>{product.id}</td>
+              <td style={{ padding: '8px' }}>{product.name}</td>
+              <td style={{ padding: '8px' }}>${product.price}</td>
+              <td style={{ padding: '8px' }}>{product.inventory}</td>
+              <td style={{ padding: '8px' }}>
+                {product.available ? 'Yes' : 'No'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  )
+}
+
+'use client'
+
+import { useFormStatus } from 'react-dom'
+
+// Client island for the sync form submit button. The form itself stays a
+// regular server-rendered HTML form wired to the inline Server Action; this
+// only surfaces pending state so the admin knows the sync was accepted.
+export function SubmitButton() {
+  const { pending } = useFormStatus()
+
+  return (
+    <button type=\"submit\" disabled={pending}>
+      {pending ? 'Starting sync…' : 'Sync latest catalog'}
+    </button>
+  )
+}
+
+// Simulated product database for the admin catalog.
+//
+// In production `getAllProducts` would query your product DB. Here it reads an
+// in-memory store so the \"Sync latest catalog\" flow is observable: each sync
+// pulls a newer snapshot from the upstream ERP/PIM (updated pricing, inventory,
+// availability) and the catalog views pick it up after the cache is refreshed.
+
+// Local catalog store (what admin views read through `getProducts`).
+let products = [
+  { id: 1, name: 'Laptop', price: 999, inventory: 120, available: true },
+  { id: 2, name: 'Phone', price: 699, inventory: 80, available: true },
+  { id: 3, name: 'Tablet', price: 499, inventory: 0, available: false },
+  { id: 4, name: 'Headphones', price: 199, inventory: 300, available: true },
+  { id: 5, name: 'Watch', price: 299, inventory: 45, available: true },
+]
+
+let catalogVersion = 1
+let lastSyncedAt = null
+
+// Read the current catalog. Simulates a real DB query (latency we want to
+// avoid paying on every request -> that is what the `products` cache is for).
+export async function getAllProducts() {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  return products.map((p) => ({ ...p }))
+}
+
+export function getCatalogMeta() {
+  return { version: catalogVersion, lastSyncedAt }
+}
+
+// Pull the latest catalog from the upstream ERP/PIM into the local store.
+// Sync jobs touch thousands of SKUs, so this is intentionally slow -- this is
+// exactly the work we do NOT want to block admin requests on. It is run in the
+// background (via `after()`) by the sync Server Action.
+export async function syncCatalogFromUpstream() {
+  // Emulate a bulk sync over thousands of SKUs.
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+
+  products = products.map((p) => ({
+    ...p,
+    // Upstream repricing: ~10% price drop.
+    price: Math.max(1, Math.round(p.price * 0.9)),
+    // Replenished inventory.
+    inventory: p.inventory + 50,
+    // Re-availability of previously out-of-stock items.
+    available: true,
+  }))
+
+  catalogVersion += 1
+  lastSyncedAt = new Date().toISOString()
+
+  return { version: catalogVersion, lastSyncedAt }
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts, getCatalogMeta } from '@/lib/db'
+
+export type Product = {
+  id: number
+  name: string
+  price: number
+  inventory: number
+  available: boolean
+}
+
+export type Catalog = {
+  items: Product[]
+  version: number
+  lastSyncedAt: string | null
+}
+
+// Single, shared cached accessor for the product catalog.
+//
+// The catalog is read-heavy, so we cache the (slow) DB query under the
+// `products` cache tag. Day-to-day browsing reads from this cache instead of
+// re-querying on every request. Any admin view that depends on catalog data
+// should read through `getProducts` so a single `revalidateTag('products')`
+// (triggered after a sync) refreshes them all consistently.
+export const getProducts = unstable_cache(
+  async (): Promise<Catalog> => {
+    const items = await getAllProducts()
+    const { version, lastSyncedAt } = getCatalogMeta()
+    return { items, version, lastSyncedAt }
+  },
+  ['products'],
+  { tags: ['products'], revalidate: 3600 },
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

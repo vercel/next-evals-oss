@@ -4,6 +4,7 @@ import { isNextApp } from '../lib/setup.js';
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/fx',
   model: 'spacexai/grok-4.7',
+  agentOptions: { effort: 'high' },
   evals: process.env.EVAL_FILTER ?? '*',
   webResearch: true,
   scripts: ['build'],
