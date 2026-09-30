@@ -1,0 +1,129 @@
+{
+  "status": "passed",
+  "duration": 245.031,
+  "model": "zai/glm-5.2",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 29,
+    "toolCalls": {
+      "file_read": 14,
+      "file_write": 3,
+      "file_edit": 2,
+      "shell": 17,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 3,
+      "grep": 4,
+      "list_dir": 9,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 52,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/package.json",
+      "/workspace/app/page.tsx",
+      "/workspace/app/layout.tsx",
+      "/workspace/node_modules/next/dist/docs/01-app/02-guides/how-revalidation-works.md",
+      "/workspace/node_modules/next/dist/docs/01-app/02-guides/server-actions.md",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidateTag.md",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheTag.md",
+      "/workspace/next.config.ts",
+      "/workspace/tsconfig.json",
+      "/workspace/__agent_eval__/run.mjs",
+      "/workspace/node_modules/next/cache.d.ts",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/05-config/index.md",
+      "/workspace/node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md"
+    ],
+    "filesModified": [
+      "/workspace/next.config.ts",
+      "/workspace/app/data.ts",
+      "/workspace/app/actions.ts",
+      "/workspace/app/page.tsx"
+    ],
+    "shellCommands": [
+      {
+        "command": "cd /workspace && npx next build 2>&1 | tail -40",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && npx next build 2>&1 | tail -25",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && npx next start -p 3123 > /tmp/next-start.log 2>&1 &\nsleep 4\necho \"=== initial page ===\"\ncurl -s http://localhost:3123/ | grep -oE '<strong>[^<]+</strong>' | head -5\necho \"=== server log ===\"\ncat /tmp/next-start.log | tail -5",
+        "success": false
+      },
+      {
+        "command": "cd /workspace && (npx next start -p 3123 > /tmp/next-start.log 2>&1 &) ; sleep 5 ; echo \"=== initial page ===\" ; curl -s http://localhost:3123/ | grep -oE '<strong>[^<]+</strong>' | head -5 ; echo \"=== server log ===\" ; tail -5 /tmp/next-start.log",
+        "success": true
+      },
+      {
+        "command": "cat /tmp/next-start.log | tail -20",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && echo \"=== initial posts on page ===\" && curl -s http://localhost:3123/ | grep -oE '<strong>[^<]+</strong>' && echo \"=== action id ===\" && curl -s http://localhost:3123/ | grep -oE '\"[0-9a-f]{40}\"' | head -1 && echo \"=== action id (alt) ===\" && curl -s http://localhost:3123/ | grep -oE '\\$ACTION_ID_[0-9a-f]+' | head -1",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && echo \"=== POST to Server Action ===\" && curl -s -X POST http://localhost:3123/ \\\n  -H \"Content-Type: multipart/form-data\" \\\n  -H \"Next-Action: 40e0bdf0f55f3d8aab68e02b1b1a3fd2d126fb6322\" \\\n  -F \"1_title=My New Post\" \\\n  -F \"0=[\\\"My New Post\\\",\\\"Second post body\\\"]\" \\\n  -o /tmp/action-resp.txt -w \"HTTP %{http_code}\\n\" ; echo \"=== response head ===\" ; head -c 300 /tmp/action-resp.txt ; echo ; echo \"=== page after action ===\" ; curl -s http://localhost:3123/ | grep -oE '<strong>[^<]+</strong>'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && echo \"=== POST to Server Action (form fields) ===\" && curl -s -X POST http://localhost:3123/ \\\n  -H \"Next-Action: 40e0bdf0f55f3d8aab68e02b1b1a3fd2d126fb6322\" \\\n  -F \"title=My New Post\" \\\n  -F \"content=Second post body\" \\\n  -o /tmp/action-resp.txt -w \"HTTP %{http_code}\\n\" ; echo \"=== response head ===\" ; head -c 400 /tmp/action-resp.txt ; echo ; echo \"=== page after action ===\" ; curl -s http://localhost:3123/ | grep -oE '<strong>[^<]+</strong>'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cat /tmp/next-start.log | tail -30",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && grep -rl \"createPost\" .next/server/app/ 2>/dev/null | head; echo \"---\"; grep -rn \"a.get is not a function\\|\\.get(\" .next/server/chunks/ssr/*.js 2>/dev/null | grep -i \"formdata\\|get(\" | head -5",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && echo \"=== POST with RSC + multipart, plain fields ===\" && curl -s -X POST http://localhost:3123/ \\\n  -H \"Next-Action: 40e0bdf0f55f3d8aab68e02b1b1a3fd2d126fb6322\" \\\n  -H \"Accept: text/x-component\" \\\n  -F \"title=My New Post\" \\\n  -F \"content=Second post body\" \\\n  -o /tmp/action-resp.txt -w \"HTTP %{http_code}\\n\" ; echo \"=== response head ===\" ; head -c 400 /tmp/action-resp.txt ; echo ; echo \"=== server log tail ===\" ; tail -8 /tmp/next-start.log",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && curl -s http://localhost:3123/ | grep -oE '<form[^>]*>|<input[^>]*>|<button[^>]*>|name=\"[^\"]*\"' | head -20",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && echo \"=== POST as non-JS form ===\" && curl -s -X POST http://localhost:3123/ \\\n  -F '$ACTION_ID_40e0bdf0f55f3d8aab68e02b1b1a3fd2d126fb6322=' \\\n  -F 'title=My New Post' \\\n  -F 'content=Second post body' \\\n  -o /tmp/action-resp.html -w \"HTTP %{http_code}\\n\" ; echo \"=== response: post titles ===\" ; grep -oE '<strong>[^<]+</strong>' /tmp/action-resp.html ; echo \"=== server log tail ===\" ; tail -8 /tmp/next-start.log",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "cd /workspace && echo \"=== fresh GET after action ===\" && curl -s http://localhost:3123/ | grep -oE '<strong>[^<]+</strong>'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "pkill -f \"next start\" 2>/dev/null; pkill -f \"next-server\" 2>/dev/null; sleep 1; echo \"server stopped\"",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

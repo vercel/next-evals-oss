@@ -1,0 +1,254 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 10ms
+   × Catalog is cached, tagged, and revalidated by the sync action 9ms
+     → expected 'import { unstable_cache, revalidateTa…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  20:29:32
+   Duration  400ms (transform 71ms, setup 27ms, collect 41ms, tests 10ms, environment 0ms, prepare 127ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import { unstable_cache, revalidateTa…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import { unstable_cache, revalidateTag } from 'next/cache'
+import { after } from 'next/server'
+import { getAllProducts, syncCatalogFromERP } from '@/lib/db'
+
+// Cache the catalog read so day-to-day browsing is fast and does not re-query
+// the data source on every request. The \"products\" tag is what the sync action
+// invalidates, so every view that depends on this catalog stays consistent.
+const getProducts = unstable_cache(
+  async () => getAllProducts(),
+  ['admin-catalog'],
+  { tags: ['products'], revalidate: false },
+)
+
+// Inline Server Action: triggered by a regular HTML <form> on the page.
+// Running the (potentially long) ERP/PIM sync inside `after` lets the action
+// return immediately so the admin can keep working. We then mark the
+// \"products\" tag stale with the \"max\" profile, which serves the current
+// (briefly stale) catalog while fresh data is recomputed in the background
+// (stale-while-revalidate) across every view that reads the same tag.
+async function syncCatalog() {
+  'use server'
+
+  after(async () => {
+    try {
+      await syncCatalogFromERP()
+    } catch (error) {
+      console.error('[catalog] background sync failed:', error)
+    }
+    // Invalidate the catalog cache tag. With profile \"max\", the next request
+    // is served stale content while a revalidation runs in the background,
+    // so the catalog becomes up to date shortly after across all views.
+    revalidateTag('products', 'max')
+  })
+}
+
+export default async function AdminCatalogPage() {
+  const products = await getProducts()
+
+  return (
+    <main style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 960, margin: '0 auto', padding: 24 }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Product Catalog</h1>
+          <p style={{ margin: '4px 0 0', color: '#666' }}>
+            Admin view · cached for fast browsing · syncs in the background
+          </p>
+        </div>
+
+        {/* Regular HTML form invoking the inline Server Action above. */}
+        <form action={syncCatalog}>
+          <button
+            type=\"submit\"
+            style={{
+              padding: '10px 16px',
+              fontSize: 14,
+              fontWeight: 600,
+              background: '#111',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+          >
+            Sync latest catalog
+          </button>
+        </form>
+      </header>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 24 }}>
+        <thead>
+          <tr style={{ textAlign: 'left', borderBottom: '2px solid #eee' }}>
+            <th style={{ padding: '8px 12px' }}>SKU</th>
+            <th style={{ padding: '8px 12px' }}>Name</th>
+            <th style={{ padding: '8px 12px', textAlign: 'right' }}>Price</th>
+            <th style={{ padding: '8px 12px', textAlign: 'right' }}>Stock</th>
+            <th style={{ padding: '8px 12px' }}>Availability</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((product) => (
+            <tr key={product.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>
+                #{product.id}
+              </td>
+              <td style={{ padding: '8px 12px' }}>{product.name}</td>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                ${product.price}
+              </td>
+              <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                {product.stock}
+              </td>
+              <td style={{ padding: '8px 12px' }}>
+                {product.available ? (
+                  <span style={{ color: '#167f3f' }}>In stock</span>
+                ) : (
+                  <span style={{ color: '#b00020' }}>Unavailable</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p style={{ marginTop: 24, color: '#888', fontSize: 13 }}>
+        After submitting a sync, the list may briefly show the previous catalog
+        while the latest ERP/PIM data is refreshed in the background. It updates
+        shortly after, across any view that reads the same catalog data.
+      </p>
+    </main>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Home</h1>
+    </div>
+  )
+}
+
+// Simulated product catalog backed by an upstream ERP/PIM.
+//
+// `getAllProducts` is the read path used by catalog views. It is wrapped in
+// `unstable_cache` (tagged \"products\") at the call site so day-to-day browsing
+// is served from cache without re-querying the data source on every request.
+//
+// `syncCatalogFromERP` simulates pulling the latest pricing, inventory, and
+// availability from the upstream ERP/PIM. In production this would hit the
+// PIM API and write updated rows to the database; here it mutates the
+// in-memory source so a subsequent cache refill observes fresh data.
+
+let products = [
+  { id: 1, name: 'Laptop', price: 999, stock: 32, available: true },
+  { id: 2, name: 'Phone', price: 699, stock: 54, available: true },
+  { id: 3, name: 'Tablet', price: 499, stock: 18, available: true },
+  { id: 4, name: 'Headphones', price: 199, stock: 0, available: false },
+  { id: 5, name: 'Watch', price: 299, stock: 27, available: true },
+]
+
+export async function getAllProducts() {
+  // Simulate database / PIM read latency.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  // Return a defensive copy so callers cannot mutate the source of truth.
+  return products.map((p) => ({ ...p }))
+}
+
+// Simulate a sync job that pulls the latest catalog from the upstream ERP/PIM.
+// In practice this can touch thousands of SKUs, so it is intentionally run
+// out of the request path (via `after` in the Server Action) and the catalog
+// cache is invalidated with stale-while-revalidate semantics so admins keep
+// working while the refresh settles.
+export async function syncCatalogFromERP() {
+  // Simulate a long-running upstream sync (pricing, inventory, availability).
+  await new Promise((resolve) => setTimeout(resolve, 1500))
+
+  // Apply simulated upstream changes: price drift, restocks, availability flips.
+  products = products.map((p) => ({
+    ...p,
+    // Small price drift to mimic ERP repricing.
+    price: p.price + Math.round((Math.random() - 0.5) * 20),
+    // Restock a portion of inventory.
+    stock: Math.max(0, p.stock + Math.round((Math.random() - 0.3) * 40)),
+    // Flip availability when stock runs out.
+    available: p.stock > 0,
+  }))
+
+  return { syncedAt: new Date().toISOString(), skuCount: products.length }
+}
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

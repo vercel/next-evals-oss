@@ -1,0 +1,298 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 8ms
+   × Catalog is cached, tagged, and revalidated by the sync action 7ms
+     → expected '\'use client\'\n\nimport { useFormSta…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  00:24:47
+   Duration  268ms (transform 53ms, setup 21ms, collect 28ms, tests 8ms, environment 0ms, prepare 75ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected '\'use client\'\n\nimport { useFormSta…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useFormStatus } from 'react-dom'
+
+export function SyncButton() {
+  const { pending } = useFormStatus()
+  return (
+    <button
+      type=\"submit\"
+      disabled={pending}
+      style={{
+        background: pending ? '#9ca3af' : '#111',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 6,
+        padding: '8px 14px',
+        fontSize: 14,
+        cursor: pending ? 'default' : 'pointer',
+      }}
+    >
+      {pending ? 'Starting sync…' : 'Sync latest catalog'}
+    </button>
+  )
+}
+
+import { after } from 'next/server'
+import { revalidateTag } from 'next/cache'
+import { getProducts } from '@/lib/products'
+import { syncCatalogFromUpstream } from '@/lib/db'
+import { SyncButton } from './SyncButton'
+
+export const metadata = { title: 'Admin · Product Catalog' }
+
+/**
+ * Inline Server Action, triggered by the <form> below as a regular HTML
+ * form submit. It returns immediately so the admin can keep working
+ * while the list is briefly stale.
+ *
+ * The actual upstream sync is deferred to `after()`, which runs only
+ * after the response has been sent. Once the (slow, thousands-of-SKUs)
+ * sync completes, we invalidate the \"products\" cache tag so the next
+ * read — in this view or any other view that depends on the same
+ * catalog data — re-queries fresh data and repopulates the cache.
+ */
+async function syncCatalog() {
+  'use server'
+  after(async () => {
+    await syncCatalogFromUpstream()
+    // Purge the \"products\" cache so the next read (in this view or any
+    // other view sharing the tag) re-queries fresh data. The \"max\"
+    // profile keeps the repopulated cache long-lived until the next
+    // sync, preserving the fast read-heavy browsing path.
+    revalidateTag('products', 'max')
+  })
+}
+
+function formatTime(ms: number | null) {
+  if (!ms) return 'never'
+  return new Date(ms).toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  })
+}
+
+export default async function CatalogPage() {
+  const { items, lastSyncedAt } = await getProducts()
+
+  return (
+    <main
+      style={{
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        maxWidth: 960,
+        margin: '0 auto',
+        padding: 24,
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <h1 style={{ margin: 0 }}>Product Catalog</h1>
+          <p style={{ color: '#666', marginTop: 4, marginBottom: 0 }}>
+            Last synced: {formatTime(lastSyncedAt)}
+          </p>
+        </div>
+        <form action={syncCatalog}>
+          <SyncButton />
+        </form>
+      </header>
+
+      <p style={{ color: '#888', fontSize: 14, marginTop: 12 }}>
+        Syncing runs in the background. The list may stay briefly stale and
+        refresh shortly after the sync completes.
+      </p>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
+        <thead>
+          <tr style={{ textAlign: 'left', borderBottom: '2px solid #ddd' }}>
+            <th style={{ padding: '8px 4px' }}>SKU</th>
+            <th style={{ padding: '8px 4px' }}>Name</th>
+            <th style={{ padding: '8px 4px' }}>Price</th>
+            <th style={{ padding: '8px 4px' }}>Inventory</th>
+            <th style={{ padding: '8px 4px' }}>Available</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((p) => (
+            <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+              <td style={{ padding: '8px 4px' }}>#{p.id}</td>
+              <td style={{ padding: '8px 4px' }}>{p.name}</td>
+              <td style={{ padding: '8px 4px' }}>${p.price}</td>
+              <td style={{ padding: '8px 4px' }}>{p.inventory}</td>
+              <td style={{ padding: '8px 4px' }}>{p.available ? 'Yes' : 'No'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </main>
+  )
+}
+
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Create Next App',
+  description: 'Generated by create next app',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+export default function Page() {
+  return (
+    <div style={{ fontFamily: 'system-ui, sans-serif', padding: 24 }}>
+      <h1>Home</h1>
+      <p>
+        <a href=\"/admin/catalog\">Admin · Product Catalog</a>
+      </p>
+    </div>
+  )
+}
+
+// In-memory product store. In a real app this would be your database
+// tables; here it stands in for the catalog tables populated from the
+// upstream ERP/PIM. The store is mutable so a sync is observable.
+
+let products = [
+  { id: 1, name: 'Laptop', price: 999, inventory: 32, available: true },
+  { id: 2, name: 'Phone', price: 699, inventory: 120, available: true },
+  { id: 3, name: 'Tablet', price: 499, inventory: 0, available: false },
+  { id: 4, name: 'Headphones', price: 199, inventory: 75, available: true },
+  { id: 5, name: 'Watch', price: 299, inventory: 18, available: true },
+]
+
+let lastSyncedAt = null
+
+/**
+ * Raw catalog query. This is the expensive call we want to avoid
+ * repeating on every request, so it is wrapped in `unstable_cache`
+ * (see lib/products.js) and tagged \"products\".
+ */
+export async function getAllProducts() {
+  // Simulate a database round-trip.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  return products.map((p) => ({ ...p }))
+}
+
+export function getLastSyncedAt() {
+  return lastSyncedAt
+}
+
+/**
+ * Simulate pulling fresh pricing / inventory / availability from the
+ * upstream ERP/PIM. In production this can touch thousands of SKUs, so
+ * it must never block the admin request — it is run in the background
+ * via `after()` by the sync Server Action.
+ *
+ * Returns a summary of what was synced.
+ */
+export async function syncCatalogFromUpstream() {
+  // Simulate a slow upstream sync: network fetch + bulk writes.
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+
+  const syncedAt = Date.now()
+  products = products.map((p) => {
+    // Simulate upstream drift: inventory moves, availability flips,
+    // and occasional price changes.
+    const drift = Math.floor((Math.random() - 0.5) * 20)
+    const inventory = Math.max(0, p.inventory + drift)
+    return {
+      ...p,
+      inventory,
+      available: inventory > 0,
+      price: Math.random() > 0.8 ? Math.round(p.price * 1.05) : p.price,
+      syncedAt,
+    }
+  })
+  lastSyncedAt = syncedAt
+  return { count: products.length, syncedAt }
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts, getLastSyncedAt } from './db'
+
+// Read-heavy catalog access: cache the product query and tag it
+// \"products\" so every catalog view shares a single cache entry, and a
+// single `revalidateTag(\"products\")` refreshes them all. The data is
+// cached indefinitely and only re-queried when the \"products\" tag is
+// invalidated (by the sync action), which keeps day-to-day browsing fast.
+export const getProducts = unstable_cache(
+  async () => {
+    const items = await getAllProducts()
+    return { items, lastSyncedAt: getLastSyncedAt() }
+  },
+  ['products'],
+  { tags: ['products'] }
+)
+
+/// <reference types=\"next\" />
+/// <reference types=\"next/image-types/global\" />
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

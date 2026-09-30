@@ -1,0 +1,243 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 4 failed) 487380ms
+   × enables Partial Prefetching globally or for the project route 8ms
+     → expected false to be true // Object.is equality
+   × opts the project link into per-link prefetching 1ms
+     → expected 'import type { Metadata } from \'next\…' to match /<Link\b[^>]*\bprefetch(?:\s*=\s*\{tru…/
+   × uses the navigation cache stage 1ms
+     → expected null not to be null
+   × includes the project title in the selected prefetch 185332ms
+     → [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: The dashboard Link in app/page.tsx has no prefetch={true}, and next.config.ts enables cacheComponents without partialPrefetching (no prefetch = 'partial' either). A production static segment prefetch of /projects/acme, which that default link issues, returns only the shell fallback "Loading project..." and omits "Acme Storefront", so the params-dependent title stays behind the shell instead of being resolved by a selected per-link prefetch.
+   ✓ waits until navigation for project details  302036ms
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  23:44:36
+   Duration  487.72s (transform 80ms, setup 28ms, collect 40ms, tests 487.38s, environment 0ms, prepare 101ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > enables Partial Prefetching globally or for the project route
+AssertionError: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:57:5
+     55|     /partialPrefetching\s*:\s*true/.test(config) ||
+     56|       /export\s+const\s+prefetch\s*=\s*['"]partial['"]/.test(source)
+     57|   ).toBe(true)
+       |     ^
+     58| })
+     59| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  EVAL.ts > opts the project link into per-link prefetching
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /<Link\b[^>]*\bprefetch(?:\s*=\s*\{tru…/
+
+[32m- Expected:[39m 
+/<Link\b[^>]*\bprefetch(?:\s*=\s*\{true\})?(?:\s|>)/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Projects',
+  description: 'Project dashboard',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+
+const projects = [
+  { slug: 'acme', name: 'Acme Storefront' },
+  { slug: 'orbit', name: 'Orbit Analytics' },
+]
+
+export default function Dashboard() {
+  return (
+    <main>
+      <h1>Projects</h1>
+      <ul>
+        {projects.map((project) => (
+          <li key={project.slug}>
+            <Link href={`/projects/${project.slug}`}>{project.name}</Link>
+          </li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+
+---FILE---
+import { Suspense } from 'react'
+import { navigation } from 'next/cache'
+import { getProjectDetails, getProjectTitle } from '@/lib/data'
+
+export default function ProjectPage({ params }: PageProps<'/projects/[slug]'>) {
+  return (
+    <main>
+      <Suspense fallback={<h1>Loading project...</h1>}>
+        <ProjectTitle params={params} />
+      </Suspense>
+      <Suspense fallback={<p>Loading details...</p>}>
+        <ProjectDetails params={params} />
+      </Suspense>
+    </main>
+  )
+}
+
+async function ProjectTitle({
+  params,
+}: Pick<PageProps<'/projects/[slug]'>, 'params'>) {
+  const { slug } = await params
+  const title = await getProjectTitle(slug)
+  return <h1>{title}</h1>
+}
+
+async function ProjectDetails({
+  params,
+}: Pick<PageProps<'/projects/[slug]'>, 'params'>) {
+  
+  await navigation()
+  const { slug } = await params
+  const details = await getProjectDetails(slug)
+
+  return (
+    <>
+      <p>{details.description}</p>
+      <h2>Recent activity</h2>
+      <ul>
+        {details.activity.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+---FILE---
+const projects: Record<
+  string,
+  { title: string; description: string; activity: string[] }
+> = {
+  acme: {
+    title: 'Acme Storefront',
+    description: 'Commerce storefront and checkout.',
+    activity: ['Production deployment', 'Checkout updated', 'Domain verified'],
+  },
+  orbit: {
+    title: 'Orbit Analytics',
+    description: 'Product analytics and reporting.',
+    activity: ['Report published', 'Data source added', 'Team invited'],
+  },
+}
+
+export async function getProjectTitle(slug: string) {
+  'use cache'
+  return projects[slug]?.title ?? 'Unknown project'
+}
+
+export async function getProjectDetails(slug: string) {
+  'use cache'
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  return (
+    projects[slug] ?? {
+      title: 'Unknown project',
+      description: 'This project could not be found.',
+      activity: [],
+    }
+  )
+}
+
+---FILE---
+
+
+import \"./.next/types/routes.d.ts\";
+import \"./.next/types/root-params.d.ts\";
+
+
+
+
+---FILE---
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+---FILE---
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    
+    
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:61:18
+     59| 
+     60| test('opts the project link into per-link prefetching', () => {
+     61|   expect(source).toMatch(/<Link\b[^>]*\bprefetch(?:\s*=\s*\{true\})?(?…
+       |                  ^
+     62| })
+     63| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  EVAL.ts > uses the navigation cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:68:32
+     66|     /\bunstable_navigation(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     67|   )
+     68|   expect(navigationImport).not.toBeNull()
+       |                                ^
+     69| 
+     70|   const localName = navigationImport?.[1] ?? 'unstable_navigation'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  EVAL.ts > includes the project title in the selected prefetch
+Error: [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind unstable_navigation(), disable prefetching, or prefetch the entire page.
+  reason: The dashboard Link in app/page.tsx has no prefetch={true}, and next.config.ts enables cacheComponents without partialPrefetching (no prefetch = 'partial' either). A production static segment prefetch of /projects/acme, which that default link issues, returns only the shell fallback "Loading project..." and omits "Acme Storefront", so the params-dependent title stays behind the shell instead of being resolved by a selected per-link prefetch.
+ ❯ EVAL.ts:75:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
