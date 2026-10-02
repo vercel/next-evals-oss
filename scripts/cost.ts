@@ -48,7 +48,7 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // AI Gateway catalog, 2026-09-22.
   'claude-opus-5.5-high': { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-  // Introductory pricing through 2026-08-31; standard is 3/15/0.3/3.75 after.
+  // Anthropic's Sonnet 5.5 announcement confirms Sonnet 5 still costs 2/10/0.2/2.5.
   'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   'claude-opus-4.6': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.7': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
@@ -69,10 +69,8 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'gpt-5.3-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.4-xhigh': { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
   'gpt-5.5-pro': { input: 30, output: 180, cacheRead: 0, cacheWrite: 0 }, // never caches; cacheRead moot
-  // Cut from 5/30/0.5/6.25; gateway and models.dev vercel entry agree as of
-  // 2026-08-26. OpenAI-direct lists 4/20/0.4/5 (8/30 over 200k context), but
-  // these runs bill at the gateway rate.
-  'gpt-5.6-sol-ultra': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  // AI Gateway base-context standard-service prices, verified 2026-10-02.
+  'gpt-5.6-sol-ultra': { input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5 },
   // openai/gpt-6-astra's base context tier; the gateway catalog and models.dev
   // vercel entry agree as of 2026-09-08. Over 272k context it doubles to
   // 20/75/2/25 — this table has no tiers, and eval runs stay far below that.
@@ -90,8 +88,8 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'glm-5.2': { input: 0.8, output: 2.55, cacheRead: 0.16, cacheWrite: 0 },
   'grok-4.5': { input: 2, output: 6, cacheRead: 0.3, cacheWrite: 0 },
   'grok-4.6': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 }, // same in/out as 4.5, pricier cache reads
-  // AI Gateway catalog, 2026-09-21. Caching is implicit, with no write rate.
-  'grok-4.7': { input: 1.2, output: 3.6, cacheRead: 0.3, cacheWrite: 0 },
+  // AI Gateway base-context prices, verified 2026-10-02. No cache-write rate.
+  'grok-4.7': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
 };
@@ -133,7 +131,7 @@ function parseLines(raw: string): Array<Record<string, unknown>> {
  * The format is sniffed from event shape rather than passed in, so it stays
  * correct as harnesses are added:
  * - codex: one `turn.completed` with cumulative usage; input_tokens includes
- *   cached_input_tokens, so uncached input = input_tokens - cached.
+ *   cache reads and writes, which are priced separately from uncached input.
  * - opencode: per `step-finish` part; reasoning tokens billed as output.
  * - claude-code: one API response spans several content-block events that
  *   repeat the same message.id + usage — dedupe by id (max per field) or it
@@ -153,8 +151,10 @@ export function extractRunTokens(raw: string): Usage | null {
     if (type === 'turn.completed' && d.usage) {
       const x = obj(d.usage);
       const cached = num(x.cached_input_tokens);
-      u.input += num(x.input_tokens) - cached;
+      const cacheWrite = num(x.cache_write_input_tokens);
+      u.input += num(x.input_tokens) - cached - cacheWrite;
       u.cacheRead += cached;
+      u.cacheWrite += cacheWrite;
       u.output += num(x.output_tokens);
       got = true;
     } else if (type === 'step_finish' && d.part) {
