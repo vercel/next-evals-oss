@@ -4,8 +4,10 @@ import { isNextApp } from '../lib/setup.js';
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
   evals: process.env.EVAL_FILTER ?? '*',
-  // See mistral-large-4.ts — same harness, id, and provider-default reasoning
-  // effort; only the AGENTS.md treatment below differs.
+  // See mistral-large-4.ts — same harness, id, provider-default reasoning
+  // effort, and timeout rationale; only the AGENTS.md treatment below differs.
+  // That file also records the AI Gateway provider-allowlist block that
+  // currently stops this pair from running.
   model: 'vercel/mistral/mistral-large-4',
   agentOptions: {
     binaryUrl:
@@ -30,7 +32,9 @@ const config: ExperimentConfig = {
   scripts: ['build'],
   runs: 4,
   earlyExit: true,
-  timeout: 1800,
+  // Keep in step with mistral-large-4.ts — the pair must share a budget for
+  // the AGENTS.md comparison to mean anything.
+  timeout: 2400,
   sandbox: 'vercel',
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
