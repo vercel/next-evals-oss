@@ -94,6 +94,8 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'grok-4.7': { input: 1.2, output: 3.6, cacheRead: 0.3, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
+  // AI Gateway catalog, 2026-10-07. No cache-write rate is listed.
+  'mistral-large-4': { input: 0.68, output: 2.09, cacheRead: 0.07, cacheWrite: 0 },
 };
 
 /** USD for one run at the given list price. */

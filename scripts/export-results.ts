@@ -85,6 +85,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'grok-4.5--agents-md': 'grok-4.5',
   'grok-4.6--agents-md': 'grok-4.6',
   'grok-4.7--agents-md': 'grok-4.7',
+  'mistral-large-4--agents-md': 'mistral-large-4',
 };
 
 /**
@@ -288,6 +289,8 @@ const MODEL_NAMES: Record<string, string> = {
   'grok-4.6--agents-md': 'Grok 4.6 + AGENTS.md',
   'grok-4.7': 'Grok 4.7',
   'grok-4.7--agents-md': 'Grok 4.7 + AGENTS.md',
+  'mistral-large-4': 'Mistral Large 4',
+  'mistral-large-4--agents-md': 'Mistral Large 4 + AGENTS.md',
 };
 
 const HARNESS_NAMES: Record<string, string> = {
