@@ -50,9 +50,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   // Introductory pricing through 2026-08-31; standard is 3/15/0.3/3.75 after.
   'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
-  // Same rate card as Sonnet 5: AI Gateway catalog `anthropic/claude-sonnet-5.5`
-  // (2026-10-07) and Anthropic's launch post agree on 2/10/0.2/2.5.
-  'claude-sonnet-5.5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  // Same in/out/cache-write as Sonnet 5, but Anthropic halved cache reads to
+  // 0.1 on 2026-10-07 (Haiku 5.5 launch post). AI Gateway catalog
+  // `anthropic/claude-sonnet-5.5` agrees on 2/10/0.1/2.5 as of 2026-10-08.
+  'claude-sonnet-5.5': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   'claude-opus-4.6': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.7': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.8': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
