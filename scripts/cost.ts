@@ -50,6 +50,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'claude-opus-5': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   // Introductory pricing through 2026-08-31; standard is 3/15/0.3/3.75 after.
   'claude-sonnet-5': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  // Same in/out/cache-write as Sonnet 5, but Anthropic halved cache reads to
+  // 0.1 on 2026-10-07 (Haiku 5.5 launch post). AI Gateway catalog
+  // `anthropic/claude-sonnet-5.5` agrees on 2/10/0.1/2.5 as of 2026-10-08.
+  'claude-sonnet-5.5': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   'claude-opus-4.6': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.7': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   'claude-opus-4.8': { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
@@ -79,6 +83,9 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'gpt-6-astra-high': { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
   // Base-context standard-service prices from AI Gateway, 2026-09-22.
   'gpt-6-sol-high': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  // Same in/out/cache-write as GPT 6 Sol, but cache reads halve to 0.1. AI
+  // Gateway catalog `openai/gpt-6.1-sol` base context tier, 2026-10-07.
+  'gpt-6.1-sol-high': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   'gpt-6-luna-high': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
   'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
@@ -88,6 +95,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // Cut from 1.4/4.4/0.26 (zai's own rate); gateway and models.dev vercel
   // entry agree as of 2026-08-26.
   'glm-5.2': { input: 0.8, output: 2.55, cacheRead: 0.16, cacheWrite: 0 },
+  // AI Gateway catalog `zai/glm-5.3`, 2026-10-07. Not carried over from
+  // glm-5.2: input/output are higher (Z.ai's own 1.4/4.4) and cache reads are
+  // 0.14, below Z.ai's direct 0.26. No cache-write rate listed, so 0.
+  'glm-5.3': { input: 1.4, output: 4.4, cacheRead: 0.14, cacheWrite: 0 },
   'grok-4.5': { input: 2, output: 6, cacheRead: 0.3, cacheWrite: 0 },
   'grok-4.6': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 }, // same in/out as 4.5, pricier cache reads
   // AI Gateway catalog, 2026-09-21. Caching is implicit, with no write rate.
