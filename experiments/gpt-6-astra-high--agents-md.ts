@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/codex',
@@ -8,7 +9,7 @@ const config: ExperimentConfig = {
   // AGENTS.md pointer written below.
   model: 'openai/gpt-6-astra?reasoningEffort=high',
   scripts: ['build'],
-  runs: 1,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 1200,
   sandbox: 'vercel',

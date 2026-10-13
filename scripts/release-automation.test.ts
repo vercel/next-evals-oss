@@ -6,6 +6,7 @@ import { afterEach, test } from 'node:test';
 
 import {
   buildReleaseNotification,
+  buildReleaseReport,
   findInvalidRunReason,
   validateReleaseResults,
   validateReleaseTarget,
@@ -52,7 +53,7 @@ test('release metadata is pinned to a stable tag and full SHA', () => {
   );
 });
 
-test('the publish gate distinguishes assertion failures from infrastructure failures', () => {
+test('the reporting gate distinguishes assertion failures from infrastructure failures', () => {
   assert.equal(
     findInvalidRunReason({
       result: { status: 'failed' },
@@ -78,7 +79,54 @@ test('the publish gate distinguishes assertion failures from infrastructure fail
   );
 });
 
-test('agent notification points at the validated results PR', () => {
+test('agent notification points at the standalone workflow artifact', () => {
+  const report = buildReleaseReport(
+    {
+      metadata: {
+        measurement: {
+          metric: 'pass@1',
+          scoredAttempts: 1,
+          infrastructureFailuresExcluded: true,
+        },
+        experiments: [
+          {
+            name: 'model',
+            modelName: 'Model',
+            agentHarness: 'Harness',
+            docsImpact: {
+              newlyPassed: ['task-b'],
+              newlyFailed: [],
+            },
+          },
+        ],
+      },
+      results: {
+        model: [
+          { evalPath: 'task-a', result: { success: true } },
+          { evalPath: 'task-b', result: { success: true } },
+        ],
+      },
+    },
+    {
+      metric: 'pass@1',
+      confirmationAttemptsPerFailure: 2,
+      experiments: [
+        {
+          experiment: 'model',
+          tasks: [
+            {
+              evalName: 'task-b',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 1 },
+                { outcome: 'passed', infrastructureRetries: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  );
   const notification = buildReleaseNotification({
     target: {
       kind: 'backport',
@@ -88,23 +136,27 @@ test('agent notification points at the validated results PR', () => {
       sourceRunUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
       evaluatedAt: '2026-10-13T12:00:00.000Z',
     },
-    prUrl: 'https://github.com/vercel/next-evals-oss/pull/123',
+    workflowUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
+    artifactUrl:
+      'https://github.com/vercel/next.js/actions/runs/12345/artifacts/67890',
+    report,
   });
 
-  assert.equal(notification.schemaVersion, 2);
+  assert.equal(notification.schemaVersion, 3);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
   assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
-  assert.equal(
-    notification.prUrl,
-    'https://github.com/vercel/next-evals-oss/pull/123',
-  );
+  assert.equal(notification.report.scores.withoutAgentsMd.passed, 1);
+  assert.equal(notification.report.scores.withAgentsMd.passed, 2);
+  assert.equal(notification.report.failures[0].reproducible, false);
   assert.deepEqual(Object.keys(notification).sort(), [
+    'artifactUrl',
     'metric',
-    'prUrl',
+    'report',
     'schemaVersion',
     'target',
     'validation',
+    'workflowUrl',
   ]);
 });
 
@@ -141,7 +193,7 @@ async function makeResult(
   return { root, experiment };
 }
 
-test('complete model failures are publishable', async () => {
+test('complete model failures are reportable', async () => {
   const { root, experiment } = await makeResult({
     evalOutput: 'AssertionError: expected 1 to be 2',
   });

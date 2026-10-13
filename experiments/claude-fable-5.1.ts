@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
 import { installNext, isNextApp } from "../lib/setup.js";
+import { releaseEvalRuns } from "../lib/release-runs.js";
 
 const config: ExperimentConfig = {
   agent: "vercel-ai-gateway/claude-code",
@@ -19,7 +20,7 @@ const config: ExperimentConfig = {
     effort: "high",
   },
   scripts: ["build"],
-  runs: 1,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // Same budget as the claude-fable-5 pair. Fable-tier turns run long, so this
   // is the first number to revisit if runs start timing out rather than failing.

@@ -10,7 +10,7 @@ const config: ExperimentConfig = {
     effort: "max",
   },
   scripts: ["build"],
-  runs: 1,
+  runs: 4,
   earlyExit: true,
   timeout: 720,
   sandbox: "vercel",

@@ -110,7 +110,7 @@ cannot actually run.
 | `pnpm export-results` | Write `agent-results.json` for nextjs.org/evals. |
 | `pnpm typecheck` | `tsc --noEmit` over experiments, shared helpers, and TypeScript scripts. |
 | `pnpm test:cost` | Unit tests for token extraction and pricing in `scripts/cost.ts`. |
-| `pnpm test:release` | Unit tests for release targeting and the result publish gate. |
+| `pnpm test:release` | Unit tests for release targeting and the reporting gate. |
 
 Anything that runs an eval takes experiment names or globs — `pnpm eval:run
 'claude-*'`. Some experiments also honour `EVAL_FILTER` (an eval name, a glob, or a
@@ -120,9 +120,11 @@ experiment before relying on it.
 Results are memoized by a fingerprint of the eval content plus the experiment
 config, so a re-run only covers what actually changed. `--force` ignores the cache.
 
-Every new run is pass@1. Setting `NEXT_EVAL_VERSION` to an exact version such as
-`16.2.4` installs and verifies `next@16.2.4` in each existing Next.js fixture;
-without it, local runs continue to use `next@canary`.
+Normal runs retain the experiment's configured pass@4 behavior. Release and
+backport automation sets `NEXT_RELEASE_EVAL_RUNS=1` for its separate pass@1
+measurement. Setting `NEXT_EVAL_VERSION` to an exact version such as `16.2.4`
+installs and verifies `next@16.2.4` in each existing Next.js fixture; without it,
+local runs continue to use `next@canary`.
 
 ### `pnpm export-results`
 
@@ -240,33 +242,34 @@ fixed eval suite. Existing Next.js fixtures install the exact published package,
 so agents read the documentation bundled in that release from
 `node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
 the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
-scores from normal and backport releases remain comparable. Framework-choice
-controls remain empty by design, since preinstalling Next.js would answer those
-tasks for the agent.
+release and backport measurements remain comparable.
 
-Infrastructure attempts are discarded and retried up to three times. Before
-opening a PR, the workflow requires one valid result for every eval and rejects
-missing transcripts, missing evaluator output, agent-runner exit 143, and known
-evaluator startup failures. Genuine assertion failures remain valid pass@1 data.
-Each genuine first-attempt model failure then receives two isolated confirmation
-attempts. Those attempts never change the pass@1 score; they are recorded in
-`release-diagnostics.json` so the summary can distinguish a reproducible failure
-from an unstable first attempt.
-The workflow never merges: it opens or updates
-`automation/next-<version>-evals`, and a human reviews, approves, and merges the
-results PR. The existing main-branch workflow then publishes the JSON and
-revalidates nextjs.org/evals.
+Release and backport measurements always use pass@1 through the
+`NEXT_RELEASE_EVAL_RUNS=1` workflow override. Normal local runs and publishable
+benchmark runs retain their configured pass@4 behavior. This keeps the
+release-monitoring series separate from the public leaderboard.
 
-After the PR exists, the workflow sends a small validated event to the
-[Eve release agent](apps/release-agent). The agent resolves that same-repository
-PR to its immutable head SHA, reads the proposed `agent-results.json`, and
-compares it with the published data on `main`. It writes one concise message to
+Infrastructure attempts are discarded and retried up to three times. The
+reporting gate requires one valid result for every eval and rejects missing
+transcripts, missing evaluator output, agent-runner exit 143, and known evaluator
+startup failures. Genuine assertion failures remain valid pass@1 data. Each
+genuine first-attempt model failure then receives two isolated confirmation
+attempts. Those attempts never change the pass@1 score; they only distinguish a
+reproducible failure from an unstable first attempt.
+
+The workflow exports an isolated pass@1 measurement and retains the compact
+results, release provenance, and failure diagnostics as a GitHub Actions
+artifact for 90 days. Per-model raw artifacts remain available for seven days.
+The workflow does not create a branch or pull request, change
+`agent-results.json` on `main`, or publish anything to `nextjs.org/evals`.
+
+After the artifact is stored, the workflow sends a compact validated report to
+the [Eve release agent](apps/release-agent). Eve writes one concise message to
 `team-agent-measurements` with the release path, pass@1 totals with and without
-AGENTS.md, comparable prior-run deltas, and meaningful changed task/model cells.
-The first automated run establishes the pass@1 baseline instead of comparing it
-with historical pass@4 scores. Failed cells are highlighted as reproducible only
-when both non-scoring confirmation attempts also fail. The Slack thread remains
-available for follow-up questions backed by the same PR data.
+AGENTS.md, and meaningful model/task failures. The summary links the workflow and
+artifact and explicitly identifies the measurement as separate from the public
+pass@4 board. Follow-up questions in that Slack thread use the same report
+context; questions about published data use Eve's read-only repository tool.
 
 The Next.js caller passes credentials from its existing release and upgrade-eval
 setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers
@@ -275,16 +278,11 @@ Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
 and the release agent's OIDC-protected intake route. The same pull exports the
 existing `CURSOR_API_KEY` for the direct Cursor experiment; direct agents cannot
 substitute OIDC for their own credential. No model-provider secrets are copied
-into this repository. The caller also passes its release GitHub App credentials
-and the non-secret Eve deployment URL.
+into this repository.
 
 Slack installation tokens and request verification stay in the
 `slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does
 not hold a Slack webhook or bot token.
-
-The GitHub App must be installed on `vercel/next-evals-oss` with Contents and
-Pull requests write permission. The corresponding caller workflow in
-`vercel/next.js` is deliberately a separate repository change.
 
 ## Publishing to nextjs.org/evals
 
@@ -352,16 +350,15 @@ reproducible.
 
 ## Scoring and cost methodology
 
-**New measurements use pass@1.** Each eval gets one valid model attempt
-(`runs: 1`), so another model attempt cannot turn a failure into a pass. This
-gives us a stricter baseline for identifying saturated tasks: after several
-automated release and backport runs, consistently >90% tasks can be reviewed for
-a regression suite and the remaining tasks can be audited individually.
-Historical measurements keep the methodology they were recorded with until
-their model is rerun. Infrastructure failures (rate limits, sandbox faults,
-missing transcripts, and evaluator startup failures) are invalid data: they are
-discarded and retried, and they block the automated results PR if no valid
-result survives the retries.
+**The published board remains pass@4.** Normal experiment configs use four runs
+with early exit, preserving the existing public methodology. Release and
+backport automation applies a workflow-only pass@1 override and keeps those
+measurements in Actions artifacts instead of publishing them. This supplies the
+stricter repeated-release baseline used to identify saturated tasks without
+mixing pass@1 and pass@4 scores on the leaderboard. Infrastructure failures
+(rate limits, sandbox faults, missing transcripts, and evaluator startup
+failures) are invalid data: the release workflow discards and retries them and
+does not report an incomplete measurement.
 
 **Costs use provider-reported token counts.** Each run's usage (input, output,
 cache read/write) comes from the token counts the model's own API reported in

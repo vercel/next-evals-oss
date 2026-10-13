@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   // OpenCode over the AI Gateway, not the `gemini` (Gemini CLI) harness the
@@ -59,7 +60,7 @@ const config: ExperimentConfig = {
     // never sent.
   },
   scripts: ['build'],
-  runs: 1,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // 2400, not the 1200 the other current OpenCode pairs use. "Flash" is about
   // per-token speed, not about how long the agentic loop runs: the prefetch

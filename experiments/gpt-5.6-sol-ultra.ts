@@ -6,7 +6,7 @@ const config: ExperimentConfig = {
   evals: process.env.EVAL_FILTER ?? '*',
   model: "openai/gpt-5.6-sol?reasoningEffort=ultra",
   scripts: ["build"],
-  runs: 1,
+  runs: 4,
   earlyExit: true,
   timeout: 1200,
   sandbox: "vercel",

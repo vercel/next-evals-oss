@@ -31,7 +31,7 @@ const config: ExperimentConfig = {
     },
   },
   scripts: ['build'],
-  runs: 1,
+  runs: 4,
   earlyExit: true,
   timeout: 1200,
   sandbox: 'vercel',

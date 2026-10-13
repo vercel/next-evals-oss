@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/codex',
@@ -16,7 +17,7 @@ const config: ExperimentConfig = {
   // ceiling would price and rank the model on a setting nobody pays for.
   model: 'openai/gpt-6-astra?reasoningEffort=high',
   scripts: ['build'],
-  runs: 1,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // Same budget as the gpt-5.6-sol-ultra pair, and `high` is a cheaper rung
   // than the ceiling this pair used to sit on, so it has more headroom than

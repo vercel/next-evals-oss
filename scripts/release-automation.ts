@@ -114,30 +114,246 @@ export function findInvalidRunReason(options: {
 }
 
 export interface ReleaseNotification {
-  schemaVersion: 2;
+  schemaVersion: 3;
   target: ReleaseTarget;
-  prUrl: string;
+  workflowUrl: string;
+  artifactUrl: string;
   metric: 'pass@1';
   validation: {
     complete: true;
     infrastructureFailuresExcluded: true;
     modelFailureConfirmationAttempts: 2;
   };
+  report: ReleaseReport;
 }
 
 export function buildReleaseNotification(options: {
   target: ReleaseTarget;
-  prUrl: string;
+  workflowUrl: string;
+  artifactUrl: string;
+  report: ReleaseReport;
 }): ReleaseNotification {
+  if (
+    !/^https:\/\/github\.com\/vercel\/next\.js\/actions\/runs\/\d+$/.test(
+      options.workflowUrl,
+    )
+  ) {
+    throw new Error('workflowUrl must point to a vercel/next.js Actions run');
+  }
+  if (
+    !/^https:\/\/github\.com\/vercel\/next\.js\/actions\/runs\/\d+\/artifacts\/\d+$/.test(
+      options.artifactUrl,
+    )
+  ) {
+    throw new Error(
+      'artifactUrl must point to a vercel/next.js Actions artifact',
+    );
+  }
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     target: options.target,
-    prUrl: options.prUrl,
+    workflowUrl: options.workflowUrl,
+    artifactUrl: options.artifactUrl,
     metric: 'pass@1',
     validation: {
       complete: true,
       infrastructureFailuresExcluded: true,
       modelFailureConfirmationAttempts: 2,
+    },
+    report: options.report,
+  };
+}
+
+interface ExportedResult {
+  evalPath: string;
+  notAvailable?: boolean;
+  result: { success: boolean };
+}
+
+interface ExportedExperiment {
+  name: string;
+  modelName: string;
+  agentHarness: string;
+  docsImpact?: {
+    newlyPassed: string[];
+    newlyFailed: string[];
+  };
+}
+
+interface ExportedReleaseData {
+  metadata: {
+    measurement?: {
+      metric: string;
+      scoredAttempts: number;
+      infrastructureFailuresExcluded: boolean;
+    };
+    experiments: ExportedExperiment[];
+  };
+  results: Record<string, ExportedResult[]>;
+}
+
+interface ReleaseDiagnosticsData {
+  metric: string;
+  confirmationAttemptsPerFailure: number;
+  experiments: Array<{
+    experiment: string;
+    tasks: Array<{
+      evalName: string;
+      scoredFailureReason: string;
+      confirmations: Array<{
+        outcome: 'passed' | 'failed';
+        infrastructureRetries: number;
+      }>;
+    }>;
+  }>;
+}
+
+export interface ReleaseScore {
+  passed: number;
+  total: number;
+  percentage: number | null;
+}
+
+export interface ReleaseReport {
+  scores: {
+    withoutAgentsMd: ReleaseScore;
+    withAgentsMd: ReleaseScore;
+  };
+  experiments: Array<{
+    name: string;
+    model: string;
+    agentHarness: string;
+    withoutAgentsMd: ReleaseScore;
+    withAgentsMd: ReleaseScore;
+  }>;
+  failures: Array<{
+    experiment: string;
+    model: string;
+    evalName: string;
+    agentsMd: boolean;
+    reproducible: boolean;
+    confirmationPasses: number;
+    confirmationFailures: number;
+    infrastructureRetries: number;
+    scoredFailureReason: string;
+  }>;
+  comparison: {
+    available: false;
+    note: string;
+  };
+}
+
+function score(values: boolean[]): ReleaseScore {
+  const passed = values.filter(Boolean).length;
+  return {
+    passed,
+    total: values.length,
+    percentage:
+      values.length === 0
+        ? null
+        : Math.round((passed / values.length) * 1000) / 10,
+  };
+}
+
+function baseSuccess(
+  experiment: ExportedExperiment,
+  result: ExportedResult,
+): boolean {
+  if (experiment.docsImpact?.newlyPassed.includes(result.evalPath))
+    return false;
+  if (experiment.docsImpact?.newlyFailed.includes(result.evalPath)) return true;
+  return result.result.success;
+}
+
+export function buildReleaseReport(
+  data: ExportedReleaseData,
+  diagnostics: ReleaseDiagnosticsData,
+): ReleaseReport {
+  if (
+    data.metadata.measurement?.metric !== 'pass@1' ||
+    data.metadata.measurement.scoredAttempts !== 1 ||
+    data.metadata.measurement.infrastructureFailuresExcluded !== true
+  ) {
+    throw new Error(
+      'Release report requires validated pass@1 measurement data',
+    );
+  }
+  if (
+    diagnostics.metric !== 'pass@1' ||
+    diagnostics.confirmationAttemptsPerFailure !== 2
+  ) {
+    throw new Error('Release report requires two pass@1 confirmation attempts');
+  }
+
+  const metadata = new Map(
+    data.metadata.experiments.map((experiment) => [
+      experiment.name,
+      experiment,
+    ]),
+  );
+  const allWithout: boolean[] = [];
+  const allWith: boolean[] = [];
+  const experiments = data.metadata.experiments
+    .map((experiment) => {
+      const cells = (data.results[experiment.name] ?? []).filter(
+        (result) => !result.notAvailable,
+      );
+      const without = cells.map((result) => baseSuccess(experiment, result));
+      const withAgents = cells.map((result) => result.result.success);
+      allWithout.push(...without);
+      allWith.push(...withAgents);
+      return {
+        name: experiment.name,
+        model: experiment.modelName,
+        agentHarness: experiment.agentHarness,
+        withoutAgentsMd: score(without),
+        withAgentsMd: score(withAgents),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const failures = diagnostics.experiments
+    .flatMap((experiment) => {
+      const agentsMd = experiment.experiment.endsWith('--agents-md');
+      const baseExperiment = experiment.experiment.replace(/--agents-md$/, '');
+      const model = metadata.get(baseExperiment)?.modelName ?? baseExperiment;
+      return experiment.tasks.map((task) => {
+        const confirmationPasses = task.confirmations.filter(
+          (attempt) => attempt.outcome === 'passed',
+        ).length;
+        return {
+          experiment: baseExperiment,
+          model,
+          evalName: task.evalName,
+          agentsMd,
+          reproducible: confirmationPasses === 0,
+          confirmationPasses,
+          confirmationFailures: task.confirmations.length - confirmationPasses,
+          infrastructureRetries: task.confirmations.reduce(
+            (total, attempt) => total + attempt.infrastructureRetries,
+            0,
+          ),
+          scoredFailureReason: task.scoredFailureReason,
+        };
+      });
+    })
+    .sort(
+      (a, b) =>
+        a.evalName.localeCompare(b.evalName) ||
+        a.experiment.localeCompare(b.experiment) ||
+        Number(a.agentsMd) - Number(b.agentsMd),
+    );
+
+  return {
+    scores: {
+      withoutAgentsMd: score(allWithout),
+      withAgentsMd: score(allWith),
+    },
+    experiments,
+    failures,
+    comparison: {
+      available: false,
+      note: 'This standalone run does not replace or compare with the published pass@4 board.',
     },
   };
 }
@@ -280,7 +496,7 @@ export async function validateReleaseResults(options: {
 
   if (problems.length > 0) {
     throw new Error(
-      `Release results are not publishable:\n- ${problems.join('\n- ')}`,
+      `Release results are not reportable:\n- ${problems.join('\n- ')}`,
     );
   }
 }
@@ -357,25 +573,23 @@ async function main(): Promise<void> {
       sourceRunUrl: process.env.SOURCE_RUN_URL ?? '',
       evaluatedAt: process.env.EVALUATED_AT ?? '',
     });
-    const prUrl = process.env.PR_URL ?? '';
-    if (
-      !/^https:\/\/github\.com\/vercel\/next-evals-oss\/pull\/\d+$/.test(prUrl)
-    ) {
-      throw new Error(
-        'PR_URL must point to a vercel/next-evals-oss pull request',
-      );
-    }
+    const data = JSON.parse(
+      await readFile('agent-results.json', 'utf8'),
+    ) as ExportedReleaseData;
+    const diagnostics = JSON.parse(
+      await readFile('release-diagnostics.json', 'utf8'),
+    ) as ReleaseDiagnosticsData;
     const notification = buildReleaseNotification({
       target,
-      prUrl,
+      workflowUrl: process.env.WORKFLOW_URL ?? '',
+      artifactUrl: process.env.ARTIFACT_URL ?? '',
+      report: buildReleaseReport(data, diagnostics),
     });
     await writeFile(
       process.env.AGENT_PAYLOAD_PATH ?? 'release-notification.json',
       `${JSON.stringify(notification, null, 2)}\n`,
     );
-    console.log(
-      'Prepared the validated release-evals event for the agent.',
-    );
+    console.log('Prepared the validated release-evals event for the agent.');
     return;
   }
 

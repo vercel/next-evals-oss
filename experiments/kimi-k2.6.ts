@@ -9,7 +9,7 @@ const config: ExperimentConfig = {
     binaryUrl: 'https://ymdea60kblwwhidh.public.blob.vercel-storage.com/opencode-linux-x64-kimi-k2.6-v1',
   },
   scripts: ['build'],
-  runs: 1,
+  runs: 4,
   earlyExit: true,
   timeout: 720,
   sandbox: 'vercel',

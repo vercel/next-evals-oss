@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
@@ -27,7 +28,7 @@ const config: ExperimentConfig = {
     },
   },
   scripts: ['build'],
-  runs: 1,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // The initial matrix hit 41 attempt timeouts; successful tasks took up to 20 minutes.
   timeout: 2400,

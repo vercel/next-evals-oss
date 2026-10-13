@@ -6,7 +6,7 @@ const config: ExperimentConfig = {
   evals: process.env.EVAL_FILTER ?? "*",
   model: 'vercel/minimax/minimax-m2.7',
   scripts: ['build'],
-  runs: 1,
+  runs: 4,
   earlyExit: true,
   timeout: 720,
   sandbox: 'vercel',

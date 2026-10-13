@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
 import { installNext } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
@@ -32,7 +33,7 @@ const config: ExperimentConfig = {
     },
   },
   scripts: ['build'],
-  runs: 1,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 1200,
   sandbox: 'vercel',

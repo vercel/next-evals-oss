@@ -1,12 +1,17 @@
 # Next.js release evals agent
 
-This Eve agent receives validated release/backport events from the reusable
-GitHub Actions workflow. It resolves each results PR to an immutable
-same-repository commit, queries the proposed `agent-results.json`, writes the
-high-level report in `team-agent-measurements`, and answers follow-up questions
-about that run or the currently published board. Release result PRs also include
-`release-diagnostics.json`, which records two non-scoring confirmation attempts
-for every first-attempt model failure.
+This Eve agent receives validated standalone release/backport reports from the
+reusable GitHub Actions workflow. It writes a high-level report in
+`team-agent-measurements` and answers follow-up questions from the compact
+pass@1 report carried in that Slack thread.
+
+The release pipeline does not create a results pull request and does not update
+the published pass@4 leaderboard. The exported pass@1 measurement, release
+provenance, and failure confirmations remain available in the linked GitHub
+Actions artifact for 90 days; per-model raw artifacts remain for seven days. The
+agent's `query_evals` tool
+continues to answer separate questions about the currently published
+`nextjs.org/evals` data.
 
 The intake route accepts only a Vercel OIDC token minted for the
 `vercel-labs/next.js` project in its Development environment. Slack credentials
