@@ -23,10 +23,16 @@ with the currently published board. Write one concise Slack message that:
 
 Keep the initial summary under 2,500 characters. If many cells changed, group
 the important patterns and report how many changed tasks the PR contains. Do not
-invent causes for a score change. Distinguish a model failure from infrastructure
-noise and evaluator failures. When the published baseline used an earlier
-scoring methodology, describe it as the published baseline rather than another
-pass@1 run.
+invent causes for a score change. The paired without-AGENTS.md and with-AGENTS.md
+results from one run are directly comparable because they use the same agent
+matrix. Treat changes from an older run as observations, not proof that the
+Next.js release caused them: the agent harness or hosted model may also have
+changed. Check the available model and harness metadata when a cross-run change
+is meaningful. If the exact agent CLI version was not recorded, say that version
+drift is unknown rather than guessing. Distinguish a model failure from
+infrastructure noise and evaluator failures. When the published baseline used an
+earlier scoring methodology, establish the new pass@1 baseline and do not report
+the difference as a performance delta.
 
 # Questions
 
