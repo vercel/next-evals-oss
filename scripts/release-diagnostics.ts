@@ -18,6 +18,12 @@ const confirmationAttempts = 2;
 const maxInfrastructureRetries = 3;
 const diagnosticConcurrency = 4;
 
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
 interface Summary {
   passedRuns: number;
   totalRuns: number;
@@ -391,7 +397,7 @@ async function main(): Promise<void> {
       );
     }
     const diagnostics = await diagnoseExperiment({
-      root: process.cwd(),
+      root: resolve(requiredEnv('RELEASE_EVAL_WORKSPACE')),
       experiment,
       startedAt: process.env.EVALUATED_AT ?? '',
       outputPath: join(outputDir, `${experiment}.json`),
@@ -408,7 +414,7 @@ async function main(): Promise<void> {
     if (!partsDir) throw new Error('DIAGNOSTIC_PARTS_DIR is required');
     const diagnostics = await mergeDiagnostics({
       partsDir,
-      outputPath: resolve('release-diagnostics.json'),
+      outputPath: resolve(requiredEnv('RELEASE_DIAGNOSTICS_PATH')),
     });
     console.log(
       `Merged diagnostics for ${diagnostics.experiments.length} experiments.`,

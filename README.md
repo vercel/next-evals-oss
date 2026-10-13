@@ -257,11 +257,13 @@ genuine first-attempt model failure then receives two isolated confirmation
 attempts. Those attempts never change the pass@1 score; they only distinguish a
 reproducible failure from an unstable first attempt.
 
-The workflow exports an isolated pass@1 measurement and retains the compact
-results, release provenance, and failure diagnostics as a GitHub Actions
-artifact for 90 days. Per-model raw artifacts remain available for seven days.
-The workflow does not create a branch or pull request, change
-`agent-results.json` on `main`, or publish anything to `nextjs.org/evals`.
+The workflow runs and aggregates release measurements in a temporary workspace
+outside the repository. It uploads `release-measurement.json`, release
+provenance, and failure diagnostics as a GitHub Actions artifact for 90 days;
+per-model raw artifacts remain available for seven days. The workflow never
+writes to the repository's publishable `results/` tree or `agent-results.json`,
+and it does not create a branch, pull request, or publish anything to
+`nextjs.org/evals`.
 
 After the artifact is stored, the workflow sends a compact validated report to
 the [Eve release agent](apps/release-agent). Eve writes one concise message to

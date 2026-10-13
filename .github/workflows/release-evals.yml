@@ -168,7 +168,13 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-eval-suite
-          path: evals
+          path: ${{ runner.temp }}/release-eval-suite
+
+      - name: Prepare an isolated release workspace
+        env:
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
+          RELEASE_EVAL_SUITE_PATH: ${{ runner.temp }}/release-eval-suite
+        run: pnpm tsx scripts/release-automation.ts prepare-workspace
 
       - name: Install Vercel CLI
         run: npm install --global vercel@59.11.0
@@ -186,7 +192,10 @@ jobs:
           EXPERIMENT: ${{ matrix.experiment }}
           NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
           NEXT_RELEASE_EVAL_RUNS: "1"
-        run: pnpm preflight "$EXPERIMENT"
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
+        run: |
+          cd "$RELEASE_EVAL_WORKSPACE"
+          node "$GITHUB_WORKSPACE/scripts/preflight.mjs" "$EXPERIMENT"
 
       - name: Run all evals against the release package
         id: run
@@ -195,13 +204,15 @@ jobs:
           EXPERIMENT: ${{ matrix.experiment }}
           NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
           NEXT_RELEASE_EVAL_RUNS: "1"
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
         run: |
           set +e
-          pnpm eval:run --force "$EXPERIMENT"
+          cd "$RELEASE_EVAL_WORKSPACE"
+          node "$GITHUB_WORKSPACE/node_modules/@vercel/agent-eval/dist/cli.js" run --force "$EXPERIMENT"
           initial_status=$?
           for retry in 1 2 3; do
             echo "Infrastructure recovery pass $retry/3"
-            pnpm eval:run "$EXPERIMENT"
+            node "$GITHUB_WORKSPACE/node_modules/@vercel/agent-eval/dist/cli.js" run "$EXPERIMENT"
           done
           final_status=$?
           set -e
@@ -214,6 +225,7 @@ jobs:
           EXPERIMENT: ${{ matrix.experiment }}
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
           NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
           DIAGNOSTIC_OUTPUT_DIR: ${{ runner.temp }}/release-diagnostic-summaries
           DIAGNOSTIC_RESULTS_DIR: ${{ runner.temp }}/release-diagnostic-runs
         run: pnpm tsx scripts/release-diagnostics.ts run
@@ -222,14 +234,14 @@ jobs:
         shell: bash
         env:
           EXPERIMENT: ${{ matrix.experiment }}
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
         run: |
-          files="$RUNNER_TEMP/$EXPERIMENT-files"
-          git ls-files --others --exclude-standard -z -- "results/$EXPERIMENT" > "$files"
-          if [[ ! -s "$files" ]]; then
+          experiment_results="$RELEASE_EVAL_WORKSPACE/results/$EXPERIMENT"
+          if [[ ! -d "$experiment_results" ]]; then
             echo "The runner produced no new result files for $EXPERIMENT" >&2
             exit 1
           fi
-          tar --null -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" --files-from="$files"
+          tar -C "$RELEASE_EVAL_WORKSPACE/results" -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" "$EXPERIMENT"
           tar -tzf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" | head -1
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -274,33 +286,44 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-eval-suite
-          path: evals
+          path: ${{ runner.temp }}/release-eval-suite
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-result-*
-          path: release-results
+          path: ${{ runner.temp }}/release-result-archives
           merge-multiple: true
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: release-diagnostic-summary-*
-          path: release-diagnostic-parts
+          path: ${{ runner.temp }}/release-diagnostic-parts
           merge-multiple: true
 
+      - name: Prepare an isolated release workspace
+        env:
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
+          RELEASE_EVAL_SUITE_PATH: ${{ runner.temp }}/release-eval-suite
+        run: pnpm tsx scripts/release-automation.ts prepare-workspace
+
       - name: Extract only this release's results
+        env:
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
         run: |
-          rm -rf results
-          for archive in release-results/*.tar.gz; do tar -xzf "$archive"; done
+          for archive in "$RUNNER_TEMP"/release-result-archives/*.tar.gz; do
+            tar -C "$RELEASE_EVAL_WORKSPACE/results" -xzf "$archive"
+          done
 
       - name: Block incomplete or infrastructure-corrupted results
         env:
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
         run: pnpm tsx scripts/release-automation.ts validate-results
 
       - name: Merge failure diagnostics
         env:
-          DIAGNOSTIC_PARTS_DIR: release-diagnostic-parts
+          DIAGNOSTIC_PARTS_DIR: ${{ runner.temp }}/release-diagnostic-parts
+          RELEASE_DIAGNOSTICS_PATH: ${{ runner.temp }}/release-diagnostics.json
         run: pnpm tsx scripts/release-diagnostics.ts merge
 
       - name: Export the standalone pass@1 measurement
@@ -311,10 +334,24 @@ jobs:
           NEXT_SHA: ${{ needs.prepare.outputs.next-sha }}
           SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
+          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
+          RELEASE_MEASUREMENT_PATH: ${{ runner.temp }}/release-measurement.json
         run: |
           pnpm tsx scripts/release-automation.ts write-target
-          pnpm export-results
-          pnpm export-results --check
+          cd "$RELEASE_EVAL_WORKSPACE"
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/export-results.ts"
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" "$GITHUB_WORKSPACE/scripts/export-results.ts" --check
+          mv agent-results.json "$RELEASE_MEASUREMENT_PATH"
+          mv evaluation-target.json "$RUNNER_TEMP/evaluation-target.json"
+
+      - name: Verify publishable results were untouched
+        run: |
+          git status --porcelain -- results agent-results.json > "$RUNNER_TEMP/publishable-status"
+          if [[ -s "$RUNNER_TEMP/publishable-status" ]]; then
+            cat "$RUNNER_TEMP/publishable-status" >&2
+            echo "Release automation wrote into the publishable result paths" >&2
+            exit 1
+          fi
 
       - name: Retain the standalone measurement
         id: measurement-artifact
@@ -322,9 +359,9 @@ jobs:
         with:
           name: next-${{ needs.prepare.outputs.next-version }}-release-evals
           path: |
-            agent-results.json
-            evaluation-target.json
-            release-diagnostics.json
+            ${{ runner.temp }}/release-measurement.json
+            ${{ runner.temp }}/evaluation-target.json
+            ${{ runner.temp }}/release-diagnostics.json
           if-no-files-found: error
           retention-days: 90
 
@@ -346,6 +383,8 @@ jobs:
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ARTIFACT_URL: ${{ steps.measurement-artifact.outputs.artifact-url }}
           AGENT_PAYLOAD_PATH: ${{ runner.temp }}/release-notification.json
+          RELEASE_MEASUREMENT_PATH: ${{ runner.temp }}/release-measurement.json
+          RELEASE_DIAGNOSTICS_PATH: ${{ runner.temp }}/release-diagnostics.json
         run: pnpm tsx scripts/release-automation.ts agent-notification
 
       - name: Ask the Eve agent to summarize in team-agent-measurements

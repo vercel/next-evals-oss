@@ -1,11 +1,15 @@
 import {
   appendFile,
+  cp,
+  mkdir,
   readFile,
   readdir,
+  rm,
   stat,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { TIER_ONE_RELEASE_MATRIX } from '../lib/tier-one.js';
 
@@ -507,8 +511,64 @@ async function writeOutput(name: string, value: string): Promise<void> {
   await appendFile(outputPath, `${name}=${value}\n`);
 }
 
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function releaseWorkspace(): string {
+  return resolve(requiredEnv('RELEASE_EVAL_WORKSPACE'));
+}
+
+export async function prepareReleaseWorkspace(options: {
+  root: string;
+  workspace: string;
+  evals: string;
+}): Promise<void> {
+  const root = resolve(options.root);
+  const workspace = resolve(options.workspace);
+  const relativePath = relative(root, workspace);
+  if (
+    relativePath === '' ||
+    (!relativePath.startsWith('..') && !isAbsolute(relativePath))
+  ) {
+    throw new Error('Release eval workspace must be outside the repository');
+  }
+
+  await rm(workspace, { recursive: true, force: true });
+  await mkdir(workspace, { recursive: true });
+  await Promise.all(
+    ['experiments', 'lib'].map((directory) =>
+      cp(join(root, directory), join(workspace, directory), {
+        recursive: true,
+      }),
+    ),
+  );
+  await cp(resolve(options.evals), join(workspace, 'evals'), {
+    recursive: true,
+  });
+  await mkdir(join(workspace, 'results'));
+  await symlink(
+    join(root, 'node_modules'),
+    join(workspace, 'node_modules'),
+    'dir',
+  );
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2];
+  if (command === 'prepare-workspace') {
+    const workspace = releaseWorkspace();
+    await prepareReleaseWorkspace({
+      root: process.cwd(),
+      workspace,
+      evals: process.env.RELEASE_EVAL_SUITE_PATH ?? 'evals',
+    });
+    console.log(`Prepared isolated release workspace at ${workspace}.`);
+    return;
+  }
+
   if (command === 'prepare') {
     const evaluatedAt = new Date().toISOString();
     const target = validateReleaseTarget({
@@ -539,7 +599,7 @@ async function main(): Promise<void> {
 
   if (command === 'validate-results') {
     await validateReleaseResults({
-      root: process.cwd(),
+      root: releaseWorkspace(),
       startedAt: process.env.EVALUATED_AT ?? '',
     });
     console.log(
@@ -558,7 +618,7 @@ async function main(): Promise<void> {
       evaluatedAt: process.env.EVALUATED_AT ?? '',
     });
     await writeFile(
-      'evaluation-target.json',
+      join(releaseWorkspace(), 'evaluation-target.json'),
       `${JSON.stringify(target, null, 2)}\n`,
     );
     return;
@@ -574,10 +634,10 @@ async function main(): Promise<void> {
       evaluatedAt: process.env.EVALUATED_AT ?? '',
     });
     const data = JSON.parse(
-      await readFile('agent-results.json', 'utf8'),
+      await readFile(requiredEnv('RELEASE_MEASUREMENT_PATH'), 'utf8'),
     ) as ExportedReleaseData;
     const diagnostics = JSON.parse(
-      await readFile('release-diagnostics.json', 'utf8'),
+      await readFile(requiredEnv('RELEASE_DIAGNOSTICS_PATH'), 'utf8'),
     ) as ReleaseDiagnosticsData;
     const notification = buildReleaseNotification({
       target,
@@ -594,7 +654,7 @@ async function main(): Promise<void> {
   }
 
   throw new Error(
-    'Usage: release-automation.ts <prepare|validate-results|write-target|agent-notification>',
+    'Usage: release-automation.ts <prepare|prepare-workspace|validate-results|write-target|agent-notification>',
   );
 }
 

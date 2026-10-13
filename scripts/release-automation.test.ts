@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -8,6 +8,7 @@ import {
   buildReleaseNotification,
   buildReleaseReport,
   findInvalidRunReason,
+  prepareReleaseWorkspace,
   validateReleaseResults,
   validateReleaseTarget,
 } from './release-automation.js';
@@ -50,6 +51,39 @@ test('release metadata is pinned to a stable tag and full SHA', () => {
         sourceRunUrl: 'https://example.com/actions/runs/1',
       }),
     /vercel\/next\.js/,
+  );
+});
+
+test('release results are prepared outside the publishable repository tree', async () => {
+  const parent = await mkdtemp(join(tmpdir(), 'next-evals-workspace-'));
+  tempDirs.push(parent);
+  const root = join(parent, 'repository');
+  const evals = join(parent, 'fixed-evals');
+  const workspace = join(parent, 'release-workspace');
+  for (const directory of ['experiments', 'lib', 'node_modules']) {
+    await mkdir(join(root, directory), { recursive: true });
+  }
+  await mkdir(join(evals, 'task'), { recursive: true });
+  await writeFile(join(root, 'experiments', 'model.ts'), 'export default {}');
+  await writeFile(join(root, 'lib', 'setup.ts'), 'export const setup = true');
+  await writeFile(join(evals, 'task', 'eval.ts'), 'export default {}');
+
+  await prepareReleaseWorkspace({ root, workspace, evals });
+
+  assert.equal(
+    await readFile(join(workspace, 'experiments', 'model.ts'), 'utf8'),
+    'export default {}',
+  );
+  assert.equal(
+    await readFile(join(workspace, 'evals', 'task', 'eval.ts'), 'utf8'),
+    'export default {}',
+  );
+  await assert.rejects(() =>
+    prepareReleaseWorkspace({
+      root,
+      workspace: join(root, 'release-results'),
+      evals,
+    }),
   );
 });
 
