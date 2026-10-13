@@ -1,14 +1,16 @@
 # Next.js release evals agent
 
 This Eve agent receives validated standalone release/backport reports from the
-reusable GitHub Actions workflow. It writes a high-level report in
-`team-agent-measurements` and answers follow-up questions from the compact
-pass@1 report carried in that Slack thread.
+reusable GitHub Actions workflow. It writes a decision-focused report in
+`team-agent-measurements`, follows it with detailed task, agent, and failure
+replies, and answers questions from the compact pass@1 report carried in that
+Slack thread.
 
 The `release-eval-report` skill gives automated summaries a fixed Slack
 structure focused on saturation candidates, audit candidates, reproducible
-failures, and unstable first attempts. The validated payload includes per-task
-and per-model scores so teammates can ask for the full breakdown in-thread.
+failures, and unstable first attempts. A Slack renderer turns the agent's four
+report sections into one root post and three replies containing the full task
+and model breakdowns.
 
 The release pipeline does not create a results pull request and does not update
 the published pass@4 leaderboard. The exported pass@1 measurement, release

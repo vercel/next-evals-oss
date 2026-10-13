@@ -8,96 +8,124 @@ description: >
 # Release eval report
 
 Use this skill only for a validated automated release-eval event. Produce one
-Slack message under 2,500 characters that helps the team decide which evals may
-belong in a regression suite and which need auditing.
+short Slack root message and exactly three detailed thread replies. The report
+should help the team decide which evals are saturated enough to become
+regression checks and which evals need auditing.
 
-## Slack style
-
-Present the measurement without commentary about the automation:
-
-- Use only `Next.js <version>` as the title. Do not add release/backport,
-  pass@1, or a conclusion to the title.
-- Start immediately with the scores. Do not add an executive takeaway.
-- Use short bold section labels separated by one blank line.
-- Put each result on its own line without bullets, dashes, tables, or numbered
-  sections.
-- Do not include workflow, pull request, artifact, or repository links.
-- Do not repeat methodology or caveats on every report. Mention data quality
-  only when the event contains an anomaly that changes how a result should be
-  interpreted.
-- Keep the message under 2,000 characters. Prefer counts and specific task names
-  over prose.
-
-Use these sections in this order. Omit `AGENTS.md by model` when every model has
-zero difference. Keep `Confirmed failures` and say `None` when there are none.
+Separate the root and each reply with this exact line:
 
 ```text
-*Next.js <version>*
-
-*Overall*
-Base  <passed>/<total> (<percent>%)
-AGENTS.md  <passed>/<total> (<percent>%)
-Difference  <signed pass difference> (<signed percentage-point difference>pp)
-
-*AGENTS.md by model*
-<model>  <signed pass difference> (<signed percentage-point difference>pp)
-
-*Saturation candidates*  `<count> / <task count>`
-`<task>`  Base <passed>/<total>  AGENTS.md <passed>/<total>
-
-*Needs audit*  `<count> / <task count>`
-`<task>`  Base <passed>/<total>  AGENTS.md <passed>/<total>
-
-*Confirmed failures*
-`<task>`  <model and Base/AGENTS.md>
-
-*Unstable results*
-<count> first attempts passed at least one confirmation
+<!-- RELEASE_EVAL_THREAD_REPLY -->
 ```
 
-## Selection rules
+The renderer removes the separators and posts the four parts as one root message
+and three replies. Never use the separator for any other purpose.
 
-Calculate the AGENTS.md difference from the two overall scores in this run. It
-is a within-run comparison, not a change from a previous release.
+## Root message
 
-Calculate model effects from `report.experiments`. Show at most three non-zero
-effects, ordered by absolute pass difference and then model name. Include the
-sign. Do not call these improvements or regressions; AGENTS.md may help one task
-and hurt another within the same model.
+Match the established reports in `#next-bots`: a short framing paragraph,
+followed by a few named findings written in compact prose.
+
+- Use only `Next.js <version>` as the title.
+- In the opening paragraph, identify release or backport, matrix size, and the
+  Base and AGENTS.md totals.
+- Organize the findings around the questions the team is answering:
+  `Saturation`, `Harder tasks`, `Potential eval problems`, and `Comparison`.
+- `Saturation` should quantify tasks above 90% in both variants, identify the
+  strongest regression-suite candidates, and say whether the strongest agents
+  are already saturated.
+- `Harder tasks` should summarize the tasks below 90%, say whether failures
+  cluster among weaker agents, and call out exceptions where a high-scoring
+  agent failed.
+- `Potential eval problems` should flag extreme results such as 0% tasks or
+  surprising confirmed failures. Describe them as audit candidates unless the
+  report data proves a cause.
+- `Comparison` should summarize changed tasks, changed agent totals, and agent
+  version changes only when a comparable prior run exists. On the first run,
+  say that it establishes the controlled baseline and omit deltas.
+- Do not include execution links, pull requests, artifacts, metric methodology,
+  or automation commentary.
+- Do not use tables. Keep the root under 2,500 characters.
+
+Use this shape:
+
+```text
+**Next.js <version>**
+
+This <release|backport> measured <task count> tasks across <agent count> agents. Without AGENTS.md, <passed>/<total> passed (<percent>%); with AGENTS.md, <passed>/<total> passed (<percent>%).
+
+**Saturation**
+<count and interpretation of tasks above 90%, plus top-agent saturation>
+
+**Harder tasks**
+<count and interpretation of tasks below 90%, failure clusters, and notable exceptions>
+
+**Potential eval problems**
+<extreme or surprising results that warrant auditing, or `None`>
+
+**Comparison**
+<changes from the previous comparable run, or first-run baseline note>
+```
+
+## Thread reply 1: full task results
+
+Title the reply `Full task results`. Include every task. Group tasks by their
+AGENTS.md pass band, highest first. For every task show its Base and AGENTS.md
+scores. For tasks below 100%, name the failed agents separately for Base and
+AGENTS.md. Keep multiple perfect tasks on one compact line when that remains
+readable.
+
+## Thread reply 2: full agent results
+
+Title the reply `Full agent results`. Include every experiment, using its model
+and harness labels as the recorded agent version. Show Base and AGENTS.md pass
+counts and percentages side by side. Group identical score pairs when useful,
+but never omit an agent. If a comparable prior run exists, show the score delta
+and explicitly identify version changes.
+
+## Thread reply 3: verification and comparison
+
+Title the reply `Failure verification and comparison`.
+
+- List every scored failure grouped by task.
+- A failure is confirmed only when `reproducible` is true, meaning the scored
+  attempt and both non-scoring confirmations failed.
+- Mark a failure unstable when at least one confirmation passed. It stays a
+  failure in the score, but do not present it as a reliable regression signal.
+- State that infrastructure retries were excluded only when one or more scored
+  results needed an infrastructure retry.
+- When comparison data is available, list every changed task, every changed
+  agent total, and every agent-version change. On the first controlled run,
+  state that this run establishes the baseline.
+
+## Analysis rules
+
+Calculate agent strength from the current run's overall experiment scores. A
+failure from an agent scoring at least 90% overall is a notable exception. Never
+label an agent weak solely because it failed one task.
 
 Classify each task from `report.tasks`:
 
-- Saturation watch: both percentages are at least 90%.
-- Perfect: both percentages are 100%.
-- Audit watch: either percentage is below 90%.
+- Saturated: both Base and AGENTS.md are above 90%.
+- Perfect: both are 100%.
+- Needs audit: either is 90% or below.
 
-Show at most three saturation candidates and four audit candidates. For
-saturation, show perfect tasks first, then the highest minimum percentage. For
-audit, show the lowest minimum percentage first. The section count already
-indicates that the displayed tasks are a subset, so do not add a `+N more` line.
-Call these candidates; never say a task should be moved or deleted based on one
-run.
+Call saturated tasks candidates; never say a task should be moved or deleted
+based on one run. A 0% result is a strong reason to inspect the eval design, but
+it does not prove the eval is invalid.
 
-Group reliable failures by task. A failure is reliable only when
-`reproducible` is true, meaning the scored attempt and both non-scoring
-confirmations failed. List at most four grouped task lines, putting tasks that
-failed across the most models first. Distinguish `Base` from `AGENTS.md`. Do not
-quote `scoredFailureReason` unless it is short, specific, and supported by the
-data. Never invent a cause.
-
-Count failures with `reproducible: false` as unstable first attempts. Do not
-list them as regressions. If there are no reliable failures, write `None`.
+Calculate the AGENTS.md difference from the two scores in the same run. Do not
+describe that within-run difference as a release-to-release improvement.
 
 ## Metric rules
 
-- The score is always pass@1: the first valid model attempt is the scored one.
+- The score is always the first valid model attempt.
 - Infrastructure retries are excluded from the score and are not model
   attempts.
-- The two confirmation attempts provide confidence only. Never use them to
-  alter totals or percentages.
-- Base and AGENTS.md are comparable within this run because they use the same
+- Confirmation attempts provide confidence only and never alter the score.
+- Base and AGENTS.md are comparable within one run because they use the same
   task and model matrix.
 - Never compare this report with the published pass@4 leaderboard.
-- Never claim a change from a previous standalone run while
-  `comparison.available` is false.
-- Do not expose execution metadata unless someone asks for it in a follow-up.
+- Never claim a previous-run change while `comparison.available` is false.
+- Do not expose workflow or artifact metadata unless someone asks for it in a
+  follow-up.
