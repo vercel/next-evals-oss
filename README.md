@@ -248,6 +248,10 @@ Infrastructure attempts are discarded and retried up to three times. Before
 opening a PR, the workflow requires one valid result for every eval and rejects
 missing transcripts, missing evaluator output, agent-runner exit 143, and known
 evaluator startup failures. Genuine assertion failures remain valid pass@1 data.
+Each genuine first-attempt model failure then receives two isolated confirmation
+attempts. Those attempts never change the pass@1 score; they are recorded in
+`release-diagnostics.json` so the summary can distinguish a reproducible failure
+from an unstable first attempt.
 The workflow never merges: it opens or updates
 `automation/next-<version>-evals`, and a human reviews, approves, and merges the
 results PR. The existing main-branch workflow then publishes the JSON and
@@ -258,8 +262,11 @@ After the PR exists, the workflow sends a small validated event to the
 PR to its immutable head SHA, reads the proposed `agent-results.json`, and
 compares it with the published data on `main`. It writes one concise message to
 `team-agent-measurements` with the release path, pass@1 totals with and without
-AGENTS.md, prior-run deltas, and meaningful changed task/model cells. The Slack
-thread remains available for follow-up questions backed by the same PR data.
+AGENTS.md, comparable prior-run deltas, and meaningful changed task/model cells.
+The first automated run establishes the pass@1 baseline instead of comparing it
+with historical pass@4 scores. Failed cells are highlighted as reproducible only
+when both non-scoring confirmation attempts also fail. The Slack thread remains
+available for follow-up questions backed by the same PR data.
 
 The Next.js caller passes credentials from its existing release and upgrade-eval
 setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers

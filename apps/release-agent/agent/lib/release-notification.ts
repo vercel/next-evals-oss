@@ -19,6 +19,7 @@ export const releaseNotificationSchema = z.object({
   validation: z.object({
     complete: z.literal(true),
     infrastructureFailuresExcluded: z.literal(true),
+    modelFailureConfirmationAttempts: z.literal(2),
   }),
 });
 

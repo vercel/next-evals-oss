@@ -157,6 +157,11 @@ interface DocsImpact {
 interface ExportedData {
   metadata: {
     exportedAt: string;
+    measurement?: {
+      metric: 'pass@1';
+      scoredAttempts: 1;
+      infrastructureFailuresExcluded: true;
+    };
     evaluationTarget?: {
       kind: 'release' | 'backport';
       version: string;
@@ -385,6 +390,11 @@ async function main(): Promise<void> {
     exportedData.metadata.evaluationTarget = JSON.parse(
       await readFile(join(process.cwd(), 'evaluation-target.json'), 'utf8'),
     ) as NonNullable<ExportedData['metadata']['evaluationTarget']>;
+    exportedData.metadata.measurement = {
+      metric: 'pass@1',
+      scoredAttempts: 1,
+      infrastructureFailuresExcluded: true,
+    };
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT') throw error;

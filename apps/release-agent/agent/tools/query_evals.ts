@@ -28,6 +28,13 @@ const evalDataSchema = z.object({
   metadata: z
     .object({
       exportedAt: z.string(),
+      measurement: z
+        .object({
+          metric: z.literal("pass@1"),
+          scoredAttempts: z.literal(1),
+          infrastructureFailuresExcluded: z.literal(true),
+        })
+        .optional(),
       evaluationTarget: z.record(z.string(), z.unknown()).optional(),
       experiments: z.array(
         z
@@ -53,12 +60,42 @@ const evalDataSchema = z.object({
   results: z.record(z.string(), z.array(resultSchema)),
 });
 
+const releaseDiagnosticsSchema = z.object({
+  schemaVersion: z.literal(1),
+  metric: z.literal("pass@1"),
+  confirmationAttemptsPerFailure: z.literal(2),
+  experiments: z.array(
+    z.object({
+      schemaVersion: z.literal(1),
+      experiment: z.string().min(1),
+      metric: z.literal("pass@1"),
+      confirmationAttempts: z.literal(2),
+      tasks: z.array(
+        z.object({
+          evalName: z.string().min(1),
+          scoredFailureReason: z.string().min(1),
+          confirmations: z.array(
+            z.object({
+              attempt: z.number().int().positive(),
+              outcome: z.enum(["passed", "failed"]),
+              infrastructureRetries: z.number().int().nonnegative(),
+              failureReason: z.string().optional(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  ),
+});
+
 type EvalData = z.infer<typeof evalDataSchema>;
 type EvalResult = z.infer<typeof resultSchema>;
+type ReleaseDiagnostics = z.infer<typeof releaseDiagnosticsSchema>;
 
 interface EvalSource {
   kind: "published" | "pull-request";
   resultsUrl: string;
+  diagnosticsUrl?: string;
   prUrl?: string;
   headSha?: string;
 }
@@ -86,9 +123,27 @@ async function loadData(url: string): Promise<EvalData> {
   return evalDataSchema.parse(await fetchJson(url));
 }
 
+async function loadOptionalDiagnostics(
+  url: string,
+): Promise<ReleaseDiagnostics | undefined> {
+  const response = await fetch(url, {
+    headers: {
+      accept: "application/vnd.github+json",
+      "user-agent": "next-evals-release-agent",
+    },
+  });
+  if (response.status === 404) return undefined;
+  if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
+  const body = await response.text();
+  if (body.length > maxResponseBytes)
+    throw new Error("GitHub response is too large");
+  return releaseDiagnosticsSchema.parse(JSON.parse(body) as unknown);
+}
+
 async function resolveSource(prUrl?: string): Promise<{
   source: EvalSource;
   data: EvalData;
+  diagnostics?: ReleaseDiagnostics;
 }> {
   if (!prUrl) {
     return {
@@ -129,14 +184,21 @@ async function resolveSource(prUrl?: string): Promise<{
   }
 
   const resultsUrl = `https://raw.githubusercontent.com/${repository}/${pull.head.sha}/agent-results.json`;
+  const diagnosticsUrl = `https://raw.githubusercontent.com/${repository}/${pull.head.sha}/release-diagnostics.json`;
+  const [data, diagnostics] = await Promise.all([
+    loadData(resultsUrl),
+    loadOptionalDiagnostics(diagnosticsUrl),
+  ]);
   return {
     source: {
       kind: "pull-request",
       prUrl,
       headSha: pull.head.sha,
       resultsUrl,
+      diagnosticsUrl,
     },
-    data: await loadData(resultsUrl),
+    data,
+    diagnostics,
   };
 }
 
@@ -288,6 +350,68 @@ function compareResults(
   };
 }
 
+function measurementsAreComparable(current: EvalData, previous: EvalData) {
+  return (
+    current.metadata.measurement?.metric === "pass@1" &&
+    previous.metadata.measurement?.metric === "pass@1"
+  );
+}
+
+function summarizeDiagnostics(
+  diagnostics: ReleaseDiagnostics | undefined,
+  data: EvalData,
+  names: Set<string>,
+  evalName: string | undefined,
+  limit: number,
+) {
+  if (!diagnostics) return undefined;
+  const entries = diagnostics.experiments
+    .flatMap((experiment) => {
+      const agentsMd = experiment.experiment.endsWith("--agents-md");
+      const baseExperiment = experiment.experiment.replace(/--agents-md$/, "");
+      if (!names.has(baseExperiment)) return [];
+      return experiment.tasks
+        .filter((task) => !evalName || task.evalName === evalName)
+        .map((task) => {
+          const confirmationPasses = task.confirmations.filter(
+            (attempt) => attempt.outcome === "passed",
+          ).length;
+          return {
+            experiment: baseExperiment,
+            model: modelName(data, baseExperiment),
+            evalName: task.evalName,
+            agentsMd,
+            scoredOutcome: "failed" as const,
+            confirmationPasses,
+            confirmationFailures:
+              task.confirmations.length - confirmationPasses,
+            reproducible: confirmationPasses === 0,
+            infrastructureRetries: task.confirmations.reduce(
+              (total, attempt) => total + attempt.infrastructureRetries,
+              0,
+            ),
+            scoredFailureReason: task.scoredFailureReason,
+          };
+        });
+    })
+    .sort(
+      (a, b) =>
+        a.evalName.localeCompare(b.evalName) ||
+        a.experiment.localeCompare(b.experiment) ||
+        Number(a.agentsMd) - Number(b.agentsMd),
+    );
+
+  return {
+    scoredFailureCount: entries.length,
+    reproducibleFailureCount: entries.filter((entry) => entry.reproducible)
+      .length,
+    unstableFailureCount: entries.filter((entry) => !entry.reproducible).length,
+    confirmationAttemptsPerFailure: diagnostics.confirmationAttemptsPerFailure,
+    failures: entries.slice(0, limit),
+    truncated: entries.length > limit,
+  };
+}
+
 export default defineTool({
   description:
     "Query Next.js eval results from the published board or a validated same-repository results PR. PR summaries compare the proposed immutable result data with main.",
@@ -310,6 +434,13 @@ export default defineTool({
 
     const selectedNames = experiment ? new Set([experiment]) : names;
     const published = prUrl ? await resolveSource() : undefined;
+    const failureDiagnostics = summarizeDiagnostics(
+      current.diagnostics,
+      current.data,
+      selectedNames,
+      evalName,
+      changeLimit,
+    );
     const selectedResults = evalName
       ? [...selectedNames].flatMap((name) => {
           const cell = findResult(current.data, name, evalName);
@@ -339,6 +470,7 @@ export default defineTool({
         experiment,
         model: experiment ? modelName(current.data, experiment) : undefined,
         evalName,
+        failureDiagnostics,
         results:
           selectedResults ??
           (current.data.results[experiment!] ?? []).map((cell) => ({
@@ -369,16 +501,28 @@ export default defineTool({
         withoutAgentsMd: conditionScore(current.data, new Set([name]), false),
         withAgentsMd: conditionScore(current.data, new Set([name]), true),
       })),
+      failureDiagnostics,
       comparison: published
-        ? {
-            source: published.source,
-            note: "The published baseline may use an earlier scoring methodology.",
-            scores: {
-              withoutAgentsMd: conditionScore(published.data, names, false),
-              withAgentsMd: conditionScore(published.data, names, true),
-            },
-            ...compareResults(current.data, published.data, names, changeLimit),
-          }
+        ? measurementsAreComparable(current.data, published.data)
+          ? {
+              source: published.source,
+              comparable: true,
+              scores: {
+                withoutAgentsMd: conditionScore(published.data, names, false),
+                withAgentsMd: conditionScore(published.data, names, true),
+              },
+              ...compareResults(
+                current.data,
+                published.data,
+                names,
+                changeLimit,
+              ),
+            }
+          : {
+              source: published.source,
+              comparable: false,
+              note: "The published baseline does not identify itself as pass@1. This run establishes the pass@1 baseline, so performance deltas are intentionally omitted.",
+            }
         : undefined,
     };
   },

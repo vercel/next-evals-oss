@@ -121,6 +121,7 @@ export interface ReleaseNotification {
   validation: {
     complete: true;
     infrastructureFailuresExcluded: true;
+    modelFailureConfirmationAttempts: 2;
   };
 }
 
@@ -136,6 +137,7 @@ export function buildReleaseNotification(options: {
     validation: {
       complete: true,
       infrastructureFailuresExcluded: true,
+      modelFailureConfirmationAttempts: 2,
     },
   };
 }

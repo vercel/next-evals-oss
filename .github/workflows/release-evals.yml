@@ -210,6 +210,15 @@ jobs:
           echo "final-exit-code=$final_status" >> "$GITHUB_OUTPUT"
           echo "The runner exits nonzero for genuine model failures; the publish gate validates the result files."
 
+      - name: Confirm first-attempt model failures
+        env:
+          EXPERIMENT: ${{ matrix.experiment }}
+          EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
+          NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
+          DIAGNOSTIC_OUTPUT_DIR: ${{ runner.temp }}/release-diagnostic-summaries
+          DIAGNOSTIC_RESULTS_DIR: ${{ runner.temp }}/release-diagnostic-runs
+        run: pnpm tsx scripts/release-diagnostics.ts run
+
       - name: Package this experiment's new results
         shell: bash
         env:
@@ -228,6 +237,13 @@ jobs:
         with:
           name: release-result-${{ matrix.experiment }}
           path: ${{ runner.temp }}/${{ matrix.experiment }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-diagnostic-summary-${{ matrix.experiment }}
+          path: ${{ runner.temp }}/release-diagnostic-summaries/${{ matrix.experiment }}.json
           if-no-files-found: error
           retention-days: 7
 
@@ -288,6 +304,12 @@ jobs:
           path: release-results
           merge-multiple: true
 
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-diagnostic-summary-*
+          path: release-diagnostic-parts
+          merge-multiple: true
+
       - name: Extract result artifacts
         run: |
           for archive in release-results/*.tar.gz; do tar -xzf "$archive"; done
@@ -296,6 +318,11 @@ jobs:
         env:
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
         run: pnpm tsx scripts/release-automation.ts validate-results
+
+      - name: Merge failure diagnostics
+        env:
+          DIAGNOSTIC_PARTS_DIR: release-diagnostic-parts
+        run: pnpm tsx scripts/release-diagnostics.ts merge
 
       - name: Export the proposed website data
         env:
@@ -318,7 +345,7 @@ jobs:
         run: |
           git config user.name "$APP_SLUG[bot]"
           git config user.email "$APP_USER_ID+$APP_SLUG[bot]@users.noreply.github.com"
-          git add results agent-results.json evaluation-target.json
+          git add results agent-results.json evaluation-target.json release-diagnostics.json
           git commit -m "Update evals for Next.js v$NEXT_VERSION"
 
       - name: Push the proposal branch
@@ -362,7 +389,7 @@ jobs:
           - Release workflow: $SOURCE_RUN_URL
           - Matrix: 14 models, with and without AGENTS.md (28 experiments)
 
-          The automation validated that every eval produced a complete result and rejected known infrastructure and evaluator-startup failures. A human must review, approve, and merge this PR before the results publish to nextjs.org/evals.
+          The automation validated that every eval produced a complete pass@1 result and rejected known infrastructure and evaluator-startup failures. Each genuine first-attempt model failure also received two isolated, non-scoring confirmation attempts recorded in `release-diagnostics.json`. A human must review, approve, and merge this PR before the results publish to nextjs.org/evals.
           EOF
           url="$(gh pr create --base main --head "$BRANCH" --title "Update evals for Next.js v$NEXT_VERSION" --body-file "$RUNNER_TEMP/pr-body.md")"
           echo "Opened results PR: $url" | tee -a "$GITHUB_STEP_SUMMARY"

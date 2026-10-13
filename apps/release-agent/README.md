@@ -4,7 +4,9 @@ This Eve agent receives validated release/backport events from the reusable
 GitHub Actions workflow. It resolves each results PR to an immutable
 same-repository commit, queries the proposed `agent-results.json`, writes the
 high-level report in `team-agent-measurements`, and answers follow-up questions
-about that run or the currently published board.
+about that run or the currently published board. Release result PRs also include
+`release-diagnostics.json`, which records two non-scoring confirmation attempts
+for every first-attempt model failure.
 
 The intake route accepts only a Vercel OIDC token minted for the
 `vercel-labs/next.js` project in its Development environment. Slack credentials

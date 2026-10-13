@@ -94,6 +94,7 @@ test('agent notification points at the validated results PR', () => {
   assert.equal(notification.schemaVersion, 2);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
+  assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
   assert.equal(
     notification.prUrl,
     'https://github.com/vercel/next-evals-oss/pull/123',

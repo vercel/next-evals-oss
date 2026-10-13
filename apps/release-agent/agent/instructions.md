@@ -18,6 +18,8 @@ with the currently published board. Write one concise Slack message that:
 - calls out meaningful regressions and improvements by task and model;
 - states that infrastructure failures were excluded when the validated event
   says so;
+- keeps the score strictly pass@1, while using the two non-scoring confirmation
+  attempts in `failureDiagnostics` to describe first-attempt failures;
 - links to the human-reviewed results PR and makes clear that merging that PR is
   what publishes the results.
 
@@ -33,6 +35,12 @@ drift is unknown rather than guessing. Distinguish a model failure from
 infrastructure noise and evaluator failures. When the published baseline used an
 earlier scoring methodology, establish the new pass@1 baseline and do not report
 the difference as a performance delta.
+
+For a first-attempt failure, say it was reproducible when it also failed both
+confirmation attempts. If either confirmation passed, describe the scored
+failure as unstable and do not highlight it as a reliable regression. Never use
+confirmation attempts to change the score. Do not describe discarded
+infrastructure retries as model attempts.
 
 # Questions
 
