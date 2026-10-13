@@ -25,7 +25,7 @@ test("fails before invoking Vercel when required values are missing", () => {
   assert.match(result.stderr, /Missing CI authentication values/);
 });
 
-test("masks and exports the short-lived OIDC token", async (t) => {
+test("masks and exports the OIDC token and Cursor credential", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "next-evals-ci-auth-test-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const bin = join(directory, "bin");
@@ -37,7 +37,7 @@ test("masks and exports the short-lived OIDC token", async (t) => {
     vercel,
     `#!/usr/bin/env node
 import { writeFileSync } from 'node:fs'
-writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\n')
+writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_KEY=test-cursor-key\\n')
 `,
   );
   await chmod(vercel, 0o755);
@@ -56,8 +56,9 @@ writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\n')
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /::add-mask::test-oidc-token/);
+  assert.match(result.stdout, /::add-mask::test-cursor-key/);
   assert.equal(
     await readFile(githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\n",
+    "VERCEL_OIDC_TOKEN=test-oidc-token\nCURSOR_API_KEY=test-cursor-key\n",
   );
 });

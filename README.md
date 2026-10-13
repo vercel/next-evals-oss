@@ -77,8 +77,9 @@ names neither the variable you forgot nor the path you meant. `pnpm preflight`
 calls this out.
 
 **Agents.** Each experiment names an `agent`, and the agent decides which key it
-reads. `VERCEL_OIDC_TOKEN` is the fallback for all of them, so the OIDC path above
-can cover this whole table on its own.
+reads. `VERCEL_OIDC_TOKEN` authenticates `vercel-ai-gateway/*` agents. Direct
+agents still require their own credential, so the release matrix also pulls the
+existing `CURSOR_API_KEY` from its linked Vercel project.
 
 | Agent | Key |
 |-------|-----|
@@ -252,18 +253,26 @@ The workflow never merges: it opens or updates
 results PR. The existing main-branch workflow then publishes the JSON and
 revalidates nextjs.org/evals.
 
-After the PR exists, the workflow posts one message to
-`team-agent-measurements`: release or backport, pass@1 totals with and without
-AGENTS.md, and every task/agent cell that changed from that experiment's
-previous run. The message links the results PR for the full data.
+After the PR exists, the workflow sends a structured, validated result payload
+to the [Eve release agent](apps/release-agent). The agent writes one concise
+message to `team-agent-measurements` with the release path, pass@1 totals with
+and without AGENTS.md, prior-run deltas, and meaningful changed task/model
+cells. The Slack thread remains available for follow-up questions, and the
+message links the results PR for the complete data.
 
 The Next.js caller passes credentials from its existing release and upgrade-eval
 setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers
 mint a short-lived `VERCEL_OIDC_TOKEN` in every matrix job. That token authenticates
-Vercel Sandbox, AI Gateway, all tier-1 model runners, and infrastructure failure
-classification. No model-provider secrets are duplicated into this repository.
-The caller also passes its release GitHub App credentials and an
-`EVALS_SLACK_WEBHOOK_URL` configured for `team-agent-measurements`.
+Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
+and the release agent's OIDC-protected intake route. The same pull exports the
+existing `CURSOR_API_KEY` for the direct Cursor experiment; direct agents cannot
+substitute OIDC for their own credential. No model-provider secrets are copied
+into this repository. The caller also passes its release GitHub App credentials
+and the non-secret Eve deployment URL.
+
+Slack installation tokens and request verification stay in the
+`slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does
+not hold a Slack webhook or bot token.
 
 The GitHub App must be installed on `vercel/next-evals-oss` with Contents and
 Pull requests write permission. The corresponding caller workflow in

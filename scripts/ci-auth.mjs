@@ -39,13 +39,22 @@ try {
     { stdio: "inherit" },
   );
 
-  const oidcToken = parse(readFileSync(envFile)).VERCEL_OIDC_TOKEN;
+  const credentials = parse(readFileSync(envFile));
+  const oidcToken = credentials.VERCEL_OIDC_TOKEN;
   if (!oidcToken || /[\r\n]/.test(oidcToken)) {
     throw new Error("Vercel did not provide a single-line OIDC token");
   }
+  const cursorApiKey = credentials.CURSOR_API_KEY;
+  if (!cursorApiKey || /[\r\n]/.test(cursorApiKey)) {
+    throw new Error("Vercel did not provide a single-line CURSOR_API_KEY");
+  }
 
   console.log(`::add-mask::${oidcToken}`);
-  appendFileSync(process.env.GITHUB_ENV, `VERCEL_OIDC_TOKEN=${oidcToken}\n`);
+  console.log(`::add-mask::${cursorApiKey}`);
+  appendFileSync(
+    process.env.GITHUB_ENV,
+    `VERCEL_OIDC_TOKEN=${oidcToken}\nCURSOR_API_KEY=${cursorApiKey}\n`,
+  );
 } finally {
   process.umask(mask);
   rmSync(directory, { recursive: true, force: true });

@@ -120,18 +120,51 @@ interface ScoreSnapshot {
   previous?: boolean;
 }
 
+interface ConditionScore {
+  passed: number;
+  total: number;
+  percentage: number;
+  previousPassed: number;
+  previousTotal: number;
+  previousPercentage?: number;
+  deltaPercentagePoints?: number;
+}
+
+export interface ReleaseNotification {
+  schemaVersion: 1;
+  target: ReleaseTarget;
+  prUrl: string;
+  metric: 'pass@1';
+  validation: {
+    complete: true;
+    infrastructureFailuresExcluded: true;
+  };
+  scores: {
+    withoutAgentsMd: ConditionScore;
+    withAgentsMd: ConditionScore;
+  };
+  changedTasks: Array<{
+    evalName: string;
+    results: Array<{
+      experiment: string;
+      model: string;
+      agentsMd: boolean;
+      previous: boolean;
+      current: boolean;
+    }>;
+  }>;
+}
+
 function percentage(passed: number, total: number): number {
   return total === 0 ? 0 : Math.round((passed / total) * 1000) / 10;
 }
 
-export function formatReleaseSummary(options: {
+export function buildReleaseNotification(options: {
   target: ReleaseTarget;
   prUrl: string;
   snapshots: ScoreSnapshot[];
-}): string {
-  const condition = (experiment: string) =>
-    experiment.endsWith('--agents-md') ? 'with AGENTS.md' : 'without AGENTS.md';
-  const scoreLine = (agentsMd: boolean) => {
+}): ReleaseNotification {
+  const score = (agentsMd: boolean): ConditionScore => {
     const current = options.snapshots.filter((snapshot) =>
       agentsMd
         ? snapshot.experiment.endsWith('--agents-md')
@@ -144,17 +177,30 @@ export function formatReleaseSummary(options: {
     const previousPassed = previous.filter(
       (snapshot) => snapshot.previous,
     ).length;
-    const delta =
-      percentage(currentPassed, current.length) -
-      percentage(previousPassed, previous.length);
-    const deltaLabel =
+    const currentPercentage = percentage(currentPassed, current.length);
+    const previousPercentage =
       previous.length > 0
-        ? ` (${delta >= 0 ? '+' : ''}${delta.toFixed(1)} pp)`
-        : '';
-    return `• ${agentsMd ? 'With' : 'Without'} AGENTS.md: ${currentPassed}/${current.length} passed (${percentage(currentPassed, current.length).toFixed(1)}%)${deltaLabel}`;
+        ? percentage(previousPassed, previous.length)
+        : undefined;
+    return {
+      passed: currentPassed,
+      total: current.length,
+      percentage: currentPercentage,
+      previousPassed,
+      previousTotal: previous.length,
+      ...(previousPercentage === undefined
+        ? {}
+        : {
+            previousPercentage,
+            deltaPercentagePoints: currentPercentage - previousPercentage,
+          }),
+    };
   };
 
-  const changesByEval = new Map<string, string[]>();
+  const changesByEval = new Map<
+    string,
+    ReleaseNotification['changedTasks'][number]['results']
+  >();
   for (const snapshot of options.snapshots) {
     if (
       snapshot.previous === undefined ||
@@ -162,47 +208,41 @@ export function formatReleaseSummary(options: {
     )
       continue;
     const model = snapshot.experiment.replace(/--agents-md$/, '');
-    const change = `${model} ${condition(snapshot.experiment)} ${snapshot.previous ? '✅' : '❌'}→${snapshot.current ? '✅' : '❌'}`;
     const changes = changesByEval.get(snapshot.evalName) ?? [];
-    changes.push(change);
+    changes.push({
+      experiment: snapshot.experiment,
+      model,
+      agentsMd: snapshot.experiment.endsWith('--agents-md'),
+      previous: snapshot.previous,
+      current: snapshot.current,
+    });
     changesByEval.set(snapshot.evalName, changes);
   }
 
-  const changeLines = [...changesByEval]
+  const changedTasks = [...changesByEval]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(
-      ([evalName, changes]) => `• ${evalName}: ${changes.sort().join('; ')}`,
-    );
-  const heading = `*Next.js ${options.target.ref} ${options.target.kind} evals — pass@1*`;
-  const fixedLines = [
-    heading,
-    scoreLine(false),
-    scoreLine(true),
-    `*Changed task/agent results since their previous run (${changeLines.length} tasks):*`,
-  ];
+    .map(([evalName, results]) => ({
+      evalName,
+      results: results.sort((a, b) =>
+        a.experiment.localeCompare(b.experiment),
+      ),
+    }));
 
-  const included: string[] = [];
-  let omitted = 0;
-  for (const line of changeLines) {
-    const candidate = [
-      ...fixedLines,
-      ...included,
-      line,
-      `<${options.prUrl}|Review the results PR>`,
-    ].join('\n');
-    if (candidate.length > 3600) omitted++;
-    else included.push(line);
-  }
-  if (changeLines.length === 0)
-    included.push('• No task/agent result changed.');
-  if (omitted > 0)
-    included.push(`• …and ${omitted} more changed tasks in the PR.`);
-
-  return [
-    ...fixedLines,
-    ...included,
-    `<${options.prUrl}|Review the results PR>`,
-  ].join('\n');
+  return {
+    schemaVersion: 1,
+    target: options.target,
+    prUrl: options.prUrl,
+    metric: 'pass@1',
+    validation: {
+      complete: true,
+      infrastructureFailuresExcluded: true,
+    },
+    scores: {
+      withoutAgentsMd: score(false),
+      withAgentsMd: score(true),
+    },
+    changedTasks,
+  };
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -478,7 +518,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (command === 'slack-summary') {
+  if (command === 'agent-notification') {
     const target = validateReleaseTarget({
       kind: (process.env.RELEASE_KIND ?? '') as ReleaseTarget['kind'],
       version: process.env.NEXT_VERSION ?? '',
@@ -495,7 +535,7 @@ async function main(): Promise<void> {
         'PR_URL must point to a vercel/next-evals-oss pull request',
       );
     }
-    const text = formatReleaseSummary({
+    const notification = buildReleaseNotification({
       target,
       prUrl,
       snapshots: await collectScoreSnapshots({
@@ -504,15 +544,17 @@ async function main(): Promise<void> {
       }),
     });
     await writeFile(
-      process.env.SLACK_PAYLOAD_PATH ?? 'slack-summary.json',
-      `${JSON.stringify({ text }, null, 2)}\n`,
+      process.env.AGENT_PAYLOAD_PATH ?? 'release-notification.json',
+      `${JSON.stringify(notification, null, 2)}\n`,
     );
-    console.log(text);
+    console.log(
+      `Prepared ${notification.changedTasks.length} changed task(s) for the release-evals agent.`,
+    );
     return;
   }
 
   throw new Error(
-    'Usage: release-automation.ts <prepare|validate-results|write-target|slack-summary>',
+    'Usage: release-automation.ts <prepare|validate-results|write-target|agent-notification>',
   );
 }
 

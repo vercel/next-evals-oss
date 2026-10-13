@@ -35,15 +35,16 @@ on:
         description: GitHub App client ID used to open the reviewed results PR
         required: true
         type: string
+      releaseAgentUrl:
+        description: Production URL for the Eve release-evals agent
+        required: true
+        type: string
     secrets:
       VERCEL_TOKEN:
         description: Vercel access token allowed to pull the linked project's OIDC token
         required: true
       RELEASE_GITHUB_APP_PRIVATE_KEY:
         description: GitHub App private key used to open the reviewed results PR
-        required: true
-      EVALS_SLACK_WEBHOOK_URL:
-        description: Incoming webhook for the team-agent-measurements summary
         required: true
 
 concurrency:
@@ -88,12 +89,12 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
-          EVALS_SLACK_WEBHOOK_URL: ${{ secrets.EVALS_SLACK_WEBHOOK_URL }}
+          RELEASE_AGENT_URL: ${{ inputs.releaseAgentUrl }}
           RELEASE_GITHUB_APP_CLIENT_ID: ${{ inputs.releaseGitHubAppClientId }}
           RELEASE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.RELEASE_GITHUB_APP_PRIVATE_KEY }}
         run: |
           missing=()
-          for name in VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID EVALS_SLACK_WEBHOOK_URL RELEASE_GITHUB_APP_CLIENT_ID RELEASE_GITHUB_APP_PRIVATE_KEY; do
+          for name in VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID RELEASE_AGENT_URL RELEASE_GITHUB_APP_CLIENT_ID RELEASE_GITHUB_APP_PRIVATE_KEY; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( ${#missing[@]} > 0 )); then
@@ -273,6 +274,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Install Vercel CLI
+        run: npm install --global vercel@59.11.0
+
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-eval-suite
@@ -364,7 +368,14 @@ jobs:
           echo "Opened results PR: $url" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Build the Slack summary
+      - name: Pull the release project's short-lived credentials
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
+          VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
+        run: node scripts/ci-auth.mjs
+
+      - name: Build the agent notification
         env:
           RELEASE_KIND: ${{ needs.prepare.outputs.release-kind }}
           NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
@@ -373,14 +384,16 @@ jobs:
           SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
           PR_URL: ${{ steps.pull-request.outputs.url }}
-          SLACK_PAYLOAD_PATH: ${{ runner.temp }}/slack-summary.json
-        run: pnpm tsx scripts/release-automation.ts slack-summary
+          AGENT_PAYLOAD_PATH: ${{ runner.temp }}/release-notification.json
+        run: pnpm tsx scripts/release-automation.ts agent-notification
 
-      - name: Post one summary to team-agent-measurements
+      - name: Ask the Eve agent to summarize in team-agent-measurements
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.EVALS_SLACK_WEBHOOK_URL }}
+          RELEASE_AGENT_URL: ${{ inputs.releaseAgentUrl }}
         run: |
           curl --fail-with-body --retry 3 --retry-all-errors \
+            -H "authorization: Bearer $VERCEL_OIDC_TOKEN" \
+            -H "x-vercel-trusted-oidc-idp-token: $VERCEL_OIDC_TOKEN" \
             -H 'content-type: application/json' \
-            --data-binary "@$RUNNER_TEMP/slack-summary.json" \
-            "$SLACK_WEBHOOK_URL"
+            --data-binary "@$RUNNER_TEMP/release-notification.json" \
+            "${RELEASE_AGENT_URL%/}/release-evals"

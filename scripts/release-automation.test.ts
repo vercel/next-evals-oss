@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 
 import {
+  buildReleaseNotification,
   findInvalidRunReason,
-  formatReleaseSummary,
   validateReleaseResults,
   validateReleaseTarget,
 } from './release-automation.js';
@@ -78,8 +78,8 @@ test('the publish gate distinguishes assertion failures from infrastructure fail
   );
 });
 
-test('Slack summary separates AGENTS.md and lists changed task/agent cells', () => {
-  const text = formatReleaseSummary({
+test('agent notification separates AGENTS.md and preserves changed cells', () => {
+  const notification = buildReleaseNotification({
     target: {
       kind: 'backport',
       version: '16.2.4',
@@ -105,10 +105,47 @@ test('Slack summary separates AGENTS.md and lists changed task/agent cells', () 
     ],
   });
 
-  assert.match(text, /v16\.2\.4 backport evals — pass@1/);
-  assert.match(text, /Without AGENTS\.md: 1\/1 passed/);
-  assert.match(text, /kimi-k3 without AGENTS\.md ❌→✅/);
-  assert.match(text, /kimi-k3 with AGENTS\.md ✅→❌/);
+  assert.equal(notification.metric, 'pass@1');
+  assert.equal(notification.target.kind, 'backport');
+  assert.deepEqual(notification.scores.withoutAgentsMd, {
+    passed: 1,
+    total: 1,
+    percentage: 100,
+    previousPassed: 0,
+    previousTotal: 1,
+    previousPercentage: 0,
+    deltaPercentagePoints: 100,
+  });
+  assert.deepEqual(notification.scores.withAgentsMd, {
+    passed: 0,
+    total: 1,
+    percentage: 0,
+    previousPassed: 1,
+    previousTotal: 1,
+    previousPercentage: 100,
+    deltaPercentagePoints: -100,
+  });
+  assert.deepEqual(notification.changedTasks, [
+    {
+      evalName: 'agent-030-hard',
+      results: [
+        {
+          experiment: 'kimi-k3',
+          model: 'kimi-k3',
+          agentsMd: false,
+          previous: false,
+          current: true,
+        },
+        {
+          experiment: 'kimi-k3--agents-md',
+          model: 'kimi-k3',
+          agentsMd: true,
+          previous: true,
+          current: false,
+        },
+      ],
+    },
+  ]);
 });
 
 async function makeResult(
