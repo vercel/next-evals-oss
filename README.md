@@ -228,11 +228,11 @@ refreshing, and record the rest in `ACCEPTED_STALE`.
 
 ### Stable release and backport automation
 
-[`release-evals.yml`](.github/workflows/release-evals.yml) accepts two repository
-dispatch events from `vercel/next.js`: `next-stable-release` and
-`next-backport-release`. Both are sent after the stable package is published and
-carry its exact version, tag, commit SHA, and source workflow URL. A manual
-dispatch accepts the same fields for testing and recovery.
+[`release-evals.yml`](.github/workflows/release-evals.yml) is a reusable workflow
+called by `vercel/next.js` after a stable package is published. The caller passes
+the exact version, tag, commit SHA, release or backport classification, and source
+workflow URL. Manual recovery runs start from the calling Next.js workflow too,
+so they use the same credentials and inputs as automatic runs.
 
 The workflow runs every tier-1 model both with and without AGENTS.md against a
 fixed eval suite. Existing Next.js fixtures install the exact published package,
@@ -257,17 +257,16 @@ After the PR exists, the workflow posts one message to
 AGENTS.md, and every task/agent cell that changed from that experiment's
 previous run. The message links the results PR for the full data.
 
-The repository needs these Actions credentials before the first dispatch:
-
-- `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` for Sandbox
-- `AI_GATEWAY_API_KEY` and `CURSOR_API_KEY` for the tier-1 model matrix
-- `EVALS_SLACK_WEBHOOK_URL`, configured for `team-agent-measurements`, for one
-  compact summary per successful run
-- `RELEASE_GITHUB_APP_PRIVATE_KEY` plus the
-  `RELEASE_GITHUB_APP_CLIENT_ID` repository variable for the reviewed results PR
+The Next.js caller passes credentials from its existing release and upgrade-eval
+setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers
+mint a short-lived `VERCEL_OIDC_TOKEN` in every matrix job. That token authenticates
+Vercel Sandbox, AI Gateway, all tier-1 model runners, and infrastructure failure
+classification. No model-provider secrets are duplicated into this repository.
+The caller also passes its release GitHub App credentials and an
+`EVALS_SLACK_WEBHOOK_URL` configured for `team-agent-measurements`.
 
 The GitHub App must be installed on `vercel/next-evals-oss` with Contents and
-Pull requests write permission. The corresponding dispatch step in
+Pull requests write permission. The corresponding caller workflow in
 `vercel/next.js` is deliberately a separate repository change.
 
 ## Publishing to nextjs.org/evals

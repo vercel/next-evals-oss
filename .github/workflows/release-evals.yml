@@ -1,17 +1,12 @@
 name: Evaluate a Next.js release
 
 on:
-  repository_dispatch:
-    types: [next-stable-release, next-backport-release]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       releaseKind:
         description: Whether this package came from the normal release line or a backport branch
         required: true
-        type: choice
-        options:
-          - release
-          - backport
+        type: string
       nextVersion:
         description: Exact published Next.js version (for example, 16.2.4)
         required: true
@@ -28,6 +23,28 @@ on:
         description: GitHub Actions URL for the Next.js release
         required: true
         type: string
+      vercelTeamId:
+        description: Existing Vercel project team ID used to mint the short-lived OIDC token
+        required: true
+        type: string
+      vercelProjectId:
+        description: Existing Vercel project ID used to mint the short-lived OIDC token
+        required: true
+        type: string
+      releaseGitHubAppClientId:
+        description: GitHub App client ID used to open the reviewed results PR
+        required: true
+        type: string
+    secrets:
+      VERCEL_TOKEN:
+        description: Vercel access token allowed to pull the linked project's OIDC token
+        required: true
+      RELEASE_GITHUB_APP_PRIVATE_KEY:
+        description: GitHub App private key used to open the reviewed results PR
+        required: true
+      EVALS_SLACK_WEBHOOK_URL:
+        description: Incoming webhook for the team-agent-measurements summary
+        required: true
 
 concurrency:
   group: next-release-evals
@@ -51,8 +68,12 @@ jobs:
       matrix: ${{ steps.release.outputs.matrix }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vercel/next-evals-oss
+          ref: main
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -65,16 +86,14 @@ jobs:
         shell: bash
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
+          VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           EVALS_SLACK_WEBHOOK_URL: ${{ secrets.EVALS_SLACK_WEBHOOK_URL }}
-          RELEASE_GITHUB_APP_CLIENT_ID: ${{ vars.RELEASE_GITHUB_APP_CLIENT_ID }}
+          RELEASE_GITHUB_APP_CLIENT_ID: ${{ inputs.releaseGitHubAppClientId }}
           RELEASE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.RELEASE_GITHUB_APP_PRIVATE_KEY }}
         run: |
           missing=()
-          for name in VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID AI_GATEWAY_API_KEY CURSOR_API_KEY EVALS_SLACK_WEBHOOK_URL RELEASE_GITHUB_APP_CLIENT_ID RELEASE_GITHUB_APP_PRIVATE_KEY; do
+          for name in VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID EVALS_SLACK_WEBHOOK_URL RELEASE_GITHUB_APP_CLIENT_ID RELEASE_GITHUB_APP_PRIVATE_KEY; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( ${#missing[@]} > 0 )); then
@@ -85,11 +104,11 @@ jobs:
       - name: Validate dispatch payload
         id: release
         env:
-          RELEASE_KIND: ${{ github.event_name == 'repository_dispatch' && (github.event.action == 'next-backport-release' && 'backport' || 'release') || inputs.releaseKind }}
-          NEXT_VERSION: ${{ github.event.client_payload.nextVersion || inputs.nextVersion }}
-          NEXT_REF: ${{ github.event.client_payload.nextRef || inputs.nextRef }}
-          NEXT_SHA: ${{ github.event.client_payload.nextSha || inputs.nextSha }}
-          SOURCE_RUN_URL: ${{ github.event.client_payload.sourceRunUrl || inputs.sourceRunUrl }}
+          RELEASE_KIND: ${{ inputs.releaseKind }}
+          NEXT_VERSION: ${{ inputs.nextVersion }}
+          NEXT_REF: ${{ inputs.nextRef }}
+          NEXT_SHA: ${{ inputs.nextSha }}
+          SOURCE_RUN_URL: ${{ inputs.sourceRunUrl }}
         run: pnpm tsx scripts/release-automation.ts prepare
 
       - name: Verify the npm release exists
@@ -100,7 +119,22 @@ jobs:
           test "$published" = "$NEXT_VERSION"
 
       - name: Sync the fixed eval suite
-        run: pnpm sync-evals "${{ steps.release.outputs.suite-ref }}"
+        env:
+          SUITE_REF: ${{ steps.release.outputs.suite-ref }}
+        run: pnpm sync-evals "$SUITE_REF"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@59.11.0
+
+      - name: Check the existing Vercel project credentials
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
+          VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
+        run: node scripts/ci-auth.mjs
+
+      - name: Preflight the release matrix
+        run: pnpm preflight
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -120,8 +154,12 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vercel/next-evals-oss
+          ref: main
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -135,33 +173,35 @@ jobs:
           name: release-eval-suite
           path: evals
 
-      - name: Check the experiment can run
+      - name: Install Vercel CLI
+        run: npm install --global vercel@59.11.0
+
+      - name: Pull short-lived Vercel OIDC token
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
+          VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
+        run: node scripts/ci-auth.mjs
+
+      - name: Check the experiment can run
+        env:
+          EXPERIMENT: ${{ matrix.experiment }}
           NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
-        run: pnpm preflight "${{ matrix.experiment }}"
+        run: pnpm preflight "$EXPERIMENT"
 
       - name: Run all evals against the release package
         id: run
         shell: bash
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          EXPERIMENT: ${{ matrix.experiment }}
           NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
         run: |
           set +e
-          pnpm eval:run --force "${{ matrix.experiment }}"
+          pnpm eval:run --force "$EXPERIMENT"
           initial_status=$?
           for retry in 1 2 3; do
             echo "Infrastructure recovery pass $retry/3"
-            pnpm eval:run "${{ matrix.experiment }}"
+            pnpm eval:run "$EXPERIMENT"
           done
           final_status=$?
           set -e
@@ -201,7 +241,7 @@ jobs:
         id: release-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ vars.RELEASE_GITHUB_APP_CLIENT_ID }}
+          client-id: ${{ inputs.releaseGitHubAppClientId }}
           private-key: ${{ secrets.RELEASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: next-evals-oss
@@ -211,17 +251,20 @@ jobs:
       - name: Get GitHub App identity
         id: release-app-user
         env:
+          APP_SLUG: ${{ steps.release-app-token.outputs.app-slug }}
           GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
         run: |
-          user_id="$(gh api "/users/${{ steps.release-app-token.outputs.app-slug }}[bot]" --jq .id)"
+          user_id="$(gh api "/users/$APP_SLUG[bot]" --jq .id)"
           echo "user-id=$user_id" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          repository: vercel/next-evals-oss
+          ref: main
           token: ${{ steps.release-app-token.outputs.token }}
           persist-credentials: true
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
