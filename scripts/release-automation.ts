@@ -113,25 +113,8 @@ export function findInvalidRunReason(options: {
   return undefined;
 }
 
-interface ScoreSnapshot {
-  experiment: string;
-  evalName: string;
-  current: boolean;
-  previous?: boolean;
-}
-
-interface ConditionScore {
-  passed: number;
-  total: number;
-  percentage: number;
-  previousPassed: number;
-  previousTotal: number;
-  previousPercentage?: number;
-  deltaPercentagePoints?: number;
-}
-
 export interface ReleaseNotification {
-  schemaVersion: 1;
+  schemaVersion: 2;
   target: ReleaseTarget;
   prUrl: string;
   metric: 'pass@1';
@@ -139,97 +122,14 @@ export interface ReleaseNotification {
     complete: true;
     infrastructureFailuresExcluded: true;
   };
-  scores: {
-    withoutAgentsMd: ConditionScore;
-    withAgentsMd: ConditionScore;
-  };
-  changedTasks: Array<{
-    evalName: string;
-    results: Array<{
-      experiment: string;
-      model: string;
-      agentsMd: boolean;
-      previous: boolean;
-      current: boolean;
-    }>;
-  }>;
-}
-
-function percentage(passed: number, total: number): number {
-  return total === 0 ? 0 : Math.round((passed / total) * 1000) / 10;
 }
 
 export function buildReleaseNotification(options: {
   target: ReleaseTarget;
   prUrl: string;
-  snapshots: ScoreSnapshot[];
 }): ReleaseNotification {
-  const score = (agentsMd: boolean): ConditionScore => {
-    const current = options.snapshots.filter((snapshot) =>
-      agentsMd
-        ? snapshot.experiment.endsWith('--agents-md')
-        : !snapshot.experiment.endsWith('--agents-md'),
-    );
-    const previous = current.filter(
-      (snapshot) => snapshot.previous !== undefined,
-    );
-    const currentPassed = current.filter((snapshot) => snapshot.current).length;
-    const previousPassed = previous.filter(
-      (snapshot) => snapshot.previous,
-    ).length;
-    const currentPercentage = percentage(currentPassed, current.length);
-    const previousPercentage =
-      previous.length > 0
-        ? percentage(previousPassed, previous.length)
-        : undefined;
-    return {
-      passed: currentPassed,
-      total: current.length,
-      percentage: currentPercentage,
-      previousPassed,
-      previousTotal: previous.length,
-      ...(previousPercentage === undefined
-        ? {}
-        : {
-            previousPercentage,
-            deltaPercentagePoints: currentPercentage - previousPercentage,
-          }),
-    };
-  };
-
-  const changesByEval = new Map<
-    string,
-    ReleaseNotification['changedTasks'][number]['results']
-  >();
-  for (const snapshot of options.snapshots) {
-    if (
-      snapshot.previous === undefined ||
-      snapshot.previous === snapshot.current
-    )
-      continue;
-    const model = snapshot.experiment.replace(/--agents-md$/, '');
-    const changes = changesByEval.get(snapshot.evalName) ?? [];
-    changes.push({
-      experiment: snapshot.experiment,
-      model,
-      agentsMd: snapshot.experiment.endsWith('--agents-md'),
-      previous: snapshot.previous,
-      current: snapshot.current,
-    });
-    changesByEval.set(snapshot.evalName, changes);
-  }
-
-  const changedTasks = [...changesByEval]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([evalName, results]) => ({
-      evalName,
-      results: results.sort((a, b) =>
-        a.experiment.localeCompare(b.experiment),
-      ),
-    }));
-
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     target: options.target,
     prUrl: options.prUrl,
     metric: 'pass@1',
@@ -237,11 +137,6 @@ export function buildReleaseNotification(options: {
       complete: true,
       infrastructureFailuresExcluded: true,
     },
-    scores: {
-      withoutAgentsMd: score(false),
-      withAgentsMd: score(true),
-    },
-    changedTasks,
   };
 }
 
@@ -250,73 +145,6 @@ async function exists(path: string): Promise<boolean> {
     () => true,
     () => false,
   );
-}
-
-async function collectScoreSnapshots(options: {
-  root: string;
-  startedAt: string;
-  experiments?: readonly string[];
-}): Promise<ScoreSnapshot[]> {
-  const startTime = Date.parse(options.startedAt);
-  const experiments = options.experiments ?? TIER_ONE_RELEASE_MATRIX;
-  const snapshots: ScoreSnapshot[] = [];
-
-  for (const experiment of experiments) {
-    const experimentDir = join(options.root, 'results', experiment);
-    const batches = (await readdir(experimentDir, { withFileTypes: true }))
-      .filter(
-        (entry) =>
-          entry.isDirectory() &&
-          Number.isFinite(parseResultTimestamp(entry.name)),
-      )
-      .sort(
-        (a, b) => parseResultTimestamp(b.name) - parseResultTimestamp(a.name),
-      );
-    const evalNames = new Set<string>();
-    for (const batch of batches.filter(
-      (entry) => parseResultTimestamp(entry.name) >= startTime,
-    )) {
-      const entries = await readdir(join(experimentDir, batch.name), {
-        withFileTypes: true,
-      });
-      for (const entry of entries)
-        if (entry.isDirectory()) evalNames.add(entry.name);
-    }
-
-    for (const evalName of evalNames) {
-      let current: boolean | undefined;
-      let previous: boolean | undefined;
-      for (const batch of batches) {
-        let summary: Summary;
-        try {
-          summary = JSON.parse(
-            await readFile(
-              join(experimentDir, batch.name, evalName, 'summary.json'),
-              'utf8',
-            ),
-          ) as Summary;
-        } catch {
-          continue;
-        }
-        if (summary.valid === false) continue;
-        const passed = summary.passedRuns > 0;
-        if (
-          parseResultTimestamp(batch.name) >= startTime &&
-          current === undefined
-        )
-          current = passed;
-        if (
-          parseResultTimestamp(batch.name) < startTime &&
-          previous === undefined
-        )
-          previous = passed;
-      }
-      if (current !== undefined)
-        snapshots.push({ experiment, evalName, current, previous });
-    }
-  }
-
-  return snapshots;
 }
 
 export async function validateReleaseResults(options: {
@@ -538,17 +366,13 @@ async function main(): Promise<void> {
     const notification = buildReleaseNotification({
       target,
       prUrl,
-      snapshots: await collectScoreSnapshots({
-        root: process.cwd(),
-        startedAt: target.evaluatedAt,
-      }),
     });
     await writeFile(
       process.env.AGENT_PAYLOAD_PATH ?? 'release-notification.json',
       `${JSON.stringify(notification, null, 2)}\n`,
     );
     console.log(
-      `Prepared ${notification.changedTasks.length} changed task(s) for the release-evals agent.`,
+      'Prepared the validated release-evals event for the agent.',
     );
     return;
   }

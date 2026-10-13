@@ -253,12 +253,13 @@ The workflow never merges: it opens or updates
 results PR. The existing main-branch workflow then publishes the JSON and
 revalidates nextjs.org/evals.
 
-After the PR exists, the workflow sends a structured, validated result payload
-to the [Eve release agent](apps/release-agent). The agent writes one concise
-message to `team-agent-measurements` with the release path, pass@1 totals with
-and without AGENTS.md, prior-run deltas, and meaningful changed task/model
-cells. The Slack thread remains available for follow-up questions, and the
-message links the results PR for the complete data.
+After the PR exists, the workflow sends a small validated event to the
+[Eve release agent](apps/release-agent). The agent resolves that same-repository
+PR to its immutable head SHA, reads the proposed `agent-results.json`, and
+compares it with the published data on `main`. It writes one concise message to
+`team-agent-measurements` with the release path, pass@1 totals with and without
+AGENTS.md, prior-run deltas, and meaningful changed task/model cells. The Slack
+thread remains available for follow-up questions backed by the same PR data.
 
 The Next.js caller passes credentials from its existing release and upgrade-eval
 setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers

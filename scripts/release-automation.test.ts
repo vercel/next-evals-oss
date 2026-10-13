@@ -78,7 +78,7 @@ test('the publish gate distinguishes assertion failures from infrastructure fail
   );
 });
 
-test('agent notification separates AGENTS.md and preserves changed cells', () => {
+test('agent notification points at the validated results PR', () => {
   const notification = buildReleaseNotification({
     target: {
       kind: 'backport',
@@ -89,62 +89,21 @@ test('agent notification separates AGENTS.md and preserves changed cells', () =>
       evaluatedAt: '2026-10-13T12:00:00.000Z',
     },
     prUrl: 'https://github.com/vercel/next-evals-oss/pull/123',
-    snapshots: [
-      {
-        experiment: 'kimi-k3',
-        evalName: 'agent-030-hard',
-        previous: false,
-        current: true,
-      },
-      {
-        experiment: 'kimi-k3--agents-md',
-        evalName: 'agent-030-hard',
-        previous: true,
-        current: false,
-      },
-    ],
   });
 
+  assert.equal(notification.schemaVersion, 2);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
-  assert.deepEqual(notification.scores.withoutAgentsMd, {
-    passed: 1,
-    total: 1,
-    percentage: 100,
-    previousPassed: 0,
-    previousTotal: 1,
-    previousPercentage: 0,
-    deltaPercentagePoints: 100,
-  });
-  assert.deepEqual(notification.scores.withAgentsMd, {
-    passed: 0,
-    total: 1,
-    percentage: 0,
-    previousPassed: 1,
-    previousTotal: 1,
-    previousPercentage: 100,
-    deltaPercentagePoints: -100,
-  });
-  assert.deepEqual(notification.changedTasks, [
-    {
-      evalName: 'agent-030-hard',
-      results: [
-        {
-          experiment: 'kimi-k3',
-          model: 'kimi-k3',
-          agentsMd: false,
-          previous: false,
-          current: true,
-        },
-        {
-          experiment: 'kimi-k3--agents-md',
-          model: 'kimi-k3',
-          agentsMd: true,
-          previous: true,
-          current: false,
-        },
-      ],
-    },
+  assert.equal(
+    notification.prUrl,
+    'https://github.com/vercel/next-evals-oss/pull/123',
+  );
+  assert.deepEqual(Object.keys(notification).sort(), [
+    'metric',
+    'prUrl',
+    'schemaVersion',
+    'target',
+    'validation',
   ]);
 });
 
