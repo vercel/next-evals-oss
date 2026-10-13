@@ -1,0 +1,343 @@
+name: Evaluate a Next.js release
+
+on:
+  repository_dispatch:
+    types: [next-stable-release, next-backport-release]
+  workflow_dispatch:
+    inputs:
+      releaseKind:
+        description: Whether this package came from the normal release line or a backport branch
+        required: true
+        type: choice
+        options:
+          - release
+          - backport
+      nextVersion:
+        description: Exact published Next.js version (for example, 16.2.4)
+        required: true
+        type: string
+      nextRef:
+        description: Matching Next.js release tag (for example, v16.2.4)
+        required: true
+        type: string
+      nextSha:
+        description: Full commit SHA used for the release
+        required: true
+        type: string
+      sourceRunUrl:
+        description: GitHub Actions URL for the Next.js release
+        required: true
+        type: string
+
+concurrency:
+  group: next-release-evals
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Validate release
+    runs-on: ubuntu-latest
+    outputs:
+      next-version: ${{ steps.release.outputs.next-version }}
+      release-kind: ${{ steps.release.outputs.release-kind }}
+      next-ref: ${{ steps.release.outputs.next-ref }}
+      next-sha: ${{ steps.release.outputs.next-sha }}
+      source-run-url: ${{ steps.release.outputs.source-run-url }}
+      evaluated-at: ${{ steps.release.outputs.evaluated-at }}
+      suite-ref: ${{ steps.release.outputs.suite-ref }}
+      matrix: ${{ steps.release.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check required credentials
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          EVALS_SLACK_WEBHOOK_URL: ${{ secrets.EVALS_SLACK_WEBHOOK_URL }}
+          RELEASE_GITHUB_APP_CLIENT_ID: ${{ vars.RELEASE_GITHUB_APP_CLIENT_ID }}
+          RELEASE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.RELEASE_GITHUB_APP_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for name in VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID AI_GATEWAY_API_KEY CURSOR_API_KEY EVALS_SLACK_WEBHOOK_URL RELEASE_GITHUB_APP_CLIENT_ID RELEASE_GITHUB_APP_PRIVATE_KEY; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing release-eval credentials: ${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Validate dispatch payload
+        id: release
+        env:
+          RELEASE_KIND: ${{ github.event_name == 'repository_dispatch' && (github.event.action == 'next-backport-release' && 'backport' || 'release') || inputs.releaseKind }}
+          NEXT_VERSION: ${{ github.event.client_payload.nextVersion || inputs.nextVersion }}
+          NEXT_REF: ${{ github.event.client_payload.nextRef || inputs.nextRef }}
+          NEXT_SHA: ${{ github.event.client_payload.nextSha || inputs.nextSha }}
+          SOURCE_RUN_URL: ${{ github.event.client_payload.sourceRunUrl || inputs.sourceRunUrl }}
+        run: pnpm tsx scripts/release-automation.ts prepare
+
+      - name: Verify the npm release exists
+        env:
+          NEXT_VERSION: ${{ steps.release.outputs.next-version }}
+        run: |
+          published="$(npm view "next@$NEXT_VERSION" version)"
+          test "$published" = "$NEXT_VERSION"
+
+      - name: Sync the fixed eval suite
+        run: pnpm sync-evals "${{ steps.release.outputs.suite-ref }}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-eval-suite
+          path: evals
+          if-no-files-found: error
+          retention-days: 7
+
+  evaluate:
+    name: ${{ matrix.experiment }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-eval-suite
+          path: evals
+
+      - name: Check the experiment can run
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
+        run: pnpm preflight "${{ matrix.experiment }}"
+
+      - name: Run all evals against the release package
+        id: run
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          NEXT_EVAL_VERSION: ${{ needs.prepare.outputs.next-version }}
+        run: |
+          set +e
+          pnpm eval:run --force "${{ matrix.experiment }}"
+          initial_status=$?
+          for retry in 1 2 3; do
+            echo "Infrastructure recovery pass $retry/3"
+            pnpm eval:run "${{ matrix.experiment }}"
+          done
+          final_status=$?
+          set -e
+          echo "initial-exit-code=$initial_status" >> "$GITHUB_OUTPUT"
+          echo "final-exit-code=$final_status" >> "$GITHUB_OUTPUT"
+          echo "The runner exits nonzero for genuine model failures; the publish gate validates the result files."
+
+      - name: Package this experiment's new results
+        shell: bash
+        env:
+          EXPERIMENT: ${{ matrix.experiment }}
+        run: |
+          files="$RUNNER_TEMP/$EXPERIMENT-files"
+          git ls-files --others --exclude-standard -z -- "results/$EXPERIMENT" > "$files"
+          if [[ ! -s "$files" ]]; then
+            echo "The runner produced no new result files for $EXPERIMENT" >&2
+            exit 1
+          fi
+          tar --null -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" --files-from="$files"
+          tar -tzf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" | head -1
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-result-${{ matrix.experiment }}
+          path: ${{ runner.temp }}/${{ matrix.experiment }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  propose-results:
+    name: Open results PR
+    needs: [prepare, evaluate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Create GitHub App token
+        id: release-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: next-evals-oss
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Get GitHub App identity
+        id: release-app-user
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+        run: |
+          user_id="$(gh api "/users/${{ steps.release-app-token.outputs.app-slug }}[bot]" --jq .id)"
+          echo "user-id=$user_id" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ steps.release-app-token.outputs.token }}
+          persist-credentials: true
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-eval-suite
+          path: evals
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-result-*
+          path: release-results
+          merge-multiple: true
+
+      - name: Extract result artifacts
+        run: |
+          for archive in release-results/*.tar.gz; do tar -xzf "$archive"; done
+
+      - name: Block incomplete or infrastructure-corrupted results
+        env:
+          EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
+        run: pnpm tsx scripts/release-automation.ts validate-results
+
+      - name: Export the proposed website data
+        env:
+          RELEASE_KIND: ${{ needs.prepare.outputs.release-kind }}
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+          NEXT_REF: ${{ needs.prepare.outputs.next-ref }}
+          NEXT_SHA: ${{ needs.prepare.outputs.next-sha }}
+          SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
+          EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
+        run: |
+          pnpm tsx scripts/release-automation.ts write-target
+          pnpm export-results
+          pnpm export-results --check
+
+      - name: Commit the proposal
+        env:
+          APP_SLUG: ${{ steps.release-app-token.outputs.app-slug }}
+          APP_USER_ID: ${{ steps.release-app-user.outputs.user-id }}
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+        run: |
+          git config user.name "$APP_SLUG[bot]"
+          git config user.email "$APP_USER_ID+$APP_SLUG[bot]@users.noreply.github.com"
+          git add results agent-results.json evaluation-target.json
+          git commit -m "Update evals for Next.js v$NEXT_VERSION"
+
+      - name: Push the proposal branch
+        id: branch
+        env:
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+        run: |
+          branch="automation/next-$NEXT_VERSION-evals"
+          remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)"
+          if [[ -n "$remote_sha" ]]; then
+            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "HEAD:refs/heads/$branch"
+          else
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Open the human-reviewed results PR
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+          NEXT_REF: ${{ needs.prepare.outputs.next-ref }}
+          NEXT_SHA: ${{ needs.prepare.outputs.next-sha }}
+          SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
+          RELEASE_KIND: ${{ needs.prepare.outputs.release-kind }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          existing="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')"
+          if [[ -n "$existing" ]]; then
+            echo "Updated existing results PR: $existing" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "url=$existing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cat > "$RUNNER_TEMP/pr-body.md" <<EOF
+          Runs the tier-1 Next.js eval matrix against the bundled documentation in \`next@$NEXT_VERSION\`.
+
+          - Release: \`$NEXT_REF\`
+          - Release path: \`$RELEASE_KIND\`
+          - Commit: \`$NEXT_SHA\`
+          - Release workflow: $SOURCE_RUN_URL
+          - Matrix: 14 models, with and without AGENTS.md (28 experiments)
+
+          The automation validated that every eval produced a complete result and rejected known infrastructure and evaluator-startup failures. A human must review, approve, and merge this PR before the results publish to nextjs.org/evals.
+          EOF
+          url="$(gh pr create --base main --head "$BRANCH" --title "Update evals for Next.js v$NEXT_VERSION" --body-file "$RUNNER_TEMP/pr-body.md")"
+          echo "Opened results PR: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Build the Slack summary
+        env:
+          RELEASE_KIND: ${{ needs.prepare.outputs.release-kind }}
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+          NEXT_REF: ${{ needs.prepare.outputs.next-ref }}
+          NEXT_SHA: ${{ needs.prepare.outputs.next-sha }}
+          SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
+          EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
+          PR_URL: ${{ steps.pull-request.outputs.url }}
+          SLACK_PAYLOAD_PATH: ${{ runner.temp }}/slack-summary.json
+        run: pnpm tsx scripts/release-automation.ts slack-summary
+
+      - name: Post one summary to team-agent-measurements
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.EVALS_SLACK_WEBHOOK_URL }}
+        run: |
+          curl --fail-with-body --retry 3 --retry-all-errors \
+            -H 'content-type: application/json' \
+            --data-binary "@$RUNNER_TEMP/slack-summary.json" \
+            "$SLACK_WEBHOOK_URL"

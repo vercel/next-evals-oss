@@ -1,4 +1,5 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
+import { installNext } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   evals: process.env.EVAL_FILTER ?? '*',
@@ -11,13 +12,13 @@ const config: ExperimentConfig = {
     effort: "high",
   },
   scripts: ["build"],
-  runs: 4,
+  runs: 1,
   earlyExit: true,
   timeout: 1200,
   sandbox: "vercel",
   setup: async (sandbox) => {
-    // Bump Next.js to latest canary
-    await sandbox.runCommand("npm", ["install", "next@canary"]);
+    // Install the requested Next.js version
+    await installNext(sandbox);
   },
 };
 

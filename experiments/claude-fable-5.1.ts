@@ -1,5 +1,5 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
-import { isNextApp } from "../lib/setup.js";
+import { installNext, isNextApp } from "../lib/setup.js";
 
 const config: ExperimentConfig = {
   agent: "vercel-ai-gateway/claude-code",
@@ -19,7 +19,7 @@ const config: ExperimentConfig = {
     effort: "high",
   },
   scripts: ["build"],
-  runs: 4,
+  runs: 1,
   earlyExit: true,
   // Same budget as the claude-fable-5 pair. Fable-tier turns run long, so this
   // is the first number to revisit if runs start timing out rather than failing.
@@ -28,8 +28,8 @@ const config: ExperimentConfig = {
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    // Bump Next.js to latest canary
-    await sandbox.runCommand("npm", ["install", "next@canary"]);
+    // Install the requested Next.js version
+    await installNext(sandbox);
   },
 };
 

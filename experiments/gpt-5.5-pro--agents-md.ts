@@ -1,4 +1,5 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
+import { installNext } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   agent: "codex",
@@ -9,8 +10,8 @@ const config: ExperimentConfig = {
   timeout: 3600,
   sandbox: "vercel",
   setup: async (sandbox) => {
-    // Bump Next.js to latest canary
-    await sandbox.runCommand("npm", ["install", "next@canary"]);
+    // Install the requested Next.js version
+    await installNext(sandbox);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({

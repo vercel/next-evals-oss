@@ -1,4 +1,5 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
+import { installNext } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   agent: "vercel-ai-gateway/claude-code",
@@ -8,13 +9,13 @@ const config: ExperimentConfig = {
     cliPackage: "@anthropic-ai/claude-code@next",
   },
   scripts: ["build"],
-  runs: 4,
+  runs: 1,
   earlyExit: true,
   timeout: 1200,
   sandbox: "vercel",
   setup: async (sandbox) => {
-    // Bump Next.js to latest canary
-    await sandbox.runCommand("npm", ["install", "next@canary"]);
+    // Install the requested Next.js version
+    await installNext(sandbox);
   },
 };
 

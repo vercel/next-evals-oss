@@ -22,6 +22,7 @@ import {
   estimateUsageFromTranscript,
   priceUsage,
 } from './cost.js';
+import { TIER_ONE_EXPERIMENTS } from '../lib/tier-one.js';
 
 interface SummaryJson {
   totalRuns: number;
@@ -149,6 +150,14 @@ interface DocsImpact {
 interface ExportedData {
   metadata: {
     exportedAt: string;
+    evaluationTarget?: {
+      kind: 'release' | 'backport';
+      version: string;
+      ref: string;
+      sha: string;
+      sourceRunUrl: string;
+      evaluatedAt: string;
+    };
     experiments: Array<{
       name: string;
       timestamp: string;
@@ -177,42 +186,7 @@ interface ExportedData {
  * gemini-3.1-pro-preview qualifies by the rule but is exported as tier 2 until
  * it can actually be rerun (missing direct-provider API key).
  */
-const TIER_1 = new Set([
-  // Claude Fable 5.1 holds the Fable line's only tier-1 slot. It shipped
-  // 2026-09-01, and Fable 5 was already being measured here on 2026-06-09 — at
-  // least 84 days earlier, past the under-a-month carve-out — so the two do not
-  // share the slot and claude-fable-5 drops to tier 2.
-  'claude-fable-5.1',
-  // Opus 5.5 shipped 2026-09-22, about 60 days after Opus 5 (2026-07-24),
-  // outside the under-a-month carve-out; Opus 5 therefore drops to tier 2.
-  'claude-opus-5.5-high',
-  'claude-sonnet-5',
-  // GPT 6 Astra, Sol, and Luna are the current sibling profiles. Sol replaces
-  // GPT 5.6 Sol after roughly 75 days, outside the under-a-month carve-out;
-  // Luna has no previously measured predecessor on this board.
-  'gpt-6-astra-high',
-  'gpt-6-luna-high',
-  'gpt-6-sol-high',
-  // Gemini 3.8 Flash (released 2026-09-02) takes the Gemini *Flash* line's
-  // tier-1 slot. Lines are tiered separately here — Claude keeps Fable, Opus
-  // and Sonnet slots side by side — and Google still ships Pro and Flash
-  // alongside each other, so this does not displace the Pro line. The
-  // previous-version carve-out has nothing to attach to either: no Flash-line
-  // model has ever been measured on this board, so there is no predecessor to
-  // share the slot with. The Pro rows (Gemini 3.0 / 3.1 Pro Preview) stay
-  // tier 2 for the reason noted above — the Gemini CLI harness they use needs
-  // GEMINI_API_KEY and cannot be rerun here.
-  'gemini-3.8-flash',
-  'kimi-k3',
-  'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
-  'cursor-composer-2.5',
-  'glm-5.2',
-  'minimax-m3',
-  // Grok 4.7 (2026-09-21) replaces Grok 4.6 (2026-08-12), 40 days later, so
-  // the predecessor is outside the under-a-month carve-out and stays tier 2.
-  'grok-4.7',
-  'pixel-canary',
-]);
+const TIER_1 = new Set<string>(TIER_ONE_EXPERIMENTS);
 
 const MODEL_NAMES: Record<string, string> = {
   'pixel-canary': 'Pixel Canary',
@@ -393,6 +367,15 @@ async function main(): Promise<void> {
     },
     results: {},
   };
+
+  try {
+    exportedData.metadata.evaluationTarget = JSON.parse(
+      await readFile(join(process.cwd(), 'evaluation-target.json'), 'utf8'),
+    ) as NonNullable<ExportedData['metadata']['evaluationTarget']>;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') throw error;
+  }
 
   for (const experiment of experiments) {
     const expDir = join(resultsDir, experiment);

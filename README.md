@@ -107,8 +107,9 @@ cannot actually run.
 | `pnpm playground` | Web UI for browsing results in `results/`. |
 | `pnpm sync-evals [ref]` | Re-sync fixtures from `vercel/next.js`. |
 | `pnpm export-results` | Write `agent-results.json` for nextjs.org/evals. |
-| `pnpm typecheck` | `tsc --noEmit` over `experiments/`. |
+| `pnpm typecheck` | `tsc --noEmit` over experiments, shared helpers, and TypeScript scripts. |
 | `pnpm test:cost` | Unit tests for token extraction and pricing in `scripts/cost.ts`. |
+| `pnpm test:release` | Unit tests for release targeting and the result publish gate. |
 
 Anything that runs an eval takes experiment names or globs — `pnpm eval:run
 'claude-*'`. Some experiments also honour `EVAL_FILTER` (an eval name, a glob, or a
@@ -117,6 +118,10 @@ experiment before relying on it.
 
 Results are memoized by a fingerprint of the eval content plus the experiment
 config, so a re-run only covers what actually changed. `--force` ignores the cache.
+
+Every new run is pass@1. Setting `NEXT_EVAL_VERSION` to an exact version such as
+`16.2.4` installs and verifies `next@16.2.4` in each existing Next.js fixture;
+without it, local runs continue to use `next@canary`.
 
 ### `pnpm export-results`
 
@@ -221,6 +226,50 @@ runs an eval — it only checks that the cache is fresh or explicitly accepted a
 stale. To adopt upstream changes: bump the SHA, re-run the experiments you are
 refreshing, and record the rest in `ACCEPTED_STALE`.
 
+### Stable release and backport automation
+
+[`release-evals.yml`](.github/workflows/release-evals.yml) accepts two repository
+dispatch events from `vercel/next.js`: `next-stable-release` and
+`next-backport-release`. Both are sent after the stable package is published and
+carry its exact version, tag, commit SHA, and source workflow URL. A manual
+dispatch accepts the same fields for testing and recovery.
+
+The workflow runs every tier-1 model both with and without AGENTS.md against a
+fixed eval suite. Existing Next.js fixtures install the exact published package,
+so agents read the documentation bundled in that release from
+`node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
+the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
+scores from normal and backport releases remain comparable. Framework-choice
+controls remain empty by design, since preinstalling Next.js would answer those
+tasks for the agent.
+
+Infrastructure attempts are discarded and retried up to three times. Before
+opening a PR, the workflow requires one valid result for every eval and rejects
+missing transcripts, missing evaluator output, agent-runner exit 143, and known
+evaluator startup failures. Genuine assertion failures remain valid pass@1 data.
+The workflow never merges: it opens or updates
+`automation/next-<version>-evals`, and a human reviews, approves, and merges the
+results PR. The existing main-branch workflow then publishes the JSON and
+revalidates nextjs.org/evals.
+
+After the PR exists, the workflow posts one message to
+`team-agent-measurements`: release or backport, pass@1 totals with and without
+AGENTS.md, and every task/agent cell that changed from that experiment's
+previous run. The message links the results PR for the full data.
+
+The repository needs these Actions credentials before the first dispatch:
+
+- `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and `VERCEL_PROJECT_ID` for Sandbox
+- `AI_GATEWAY_API_KEY` and `CURSOR_API_KEY` for the tier-1 model matrix
+- `EVALS_SLACK_WEBHOOK_URL`, configured for `team-agent-measurements`, for one
+  compact summary per successful run
+- `RELEASE_GITHUB_APP_PRIVATE_KEY` plus the
+  `RELEASE_GITHUB_APP_CLIENT_ID` repository variable for the reviewed results PR
+
+The GitHub App must be installed on `vercel/next-evals-oss` with Contents and
+Pull requests write permission. The corresponding dispatch step in
+`vercel/next.js` is deliberately a separate repository change.
+
 ## Publishing to nextjs.org/evals
 
 After running evals:
@@ -263,7 +312,7 @@ unversioned.
 The published board is two tiers:
 
 - **Tier 1 (current)**: models with a complete run of the current eval set on a
-  recent Next.js canary. Per model family, tier 1 carries the **latest version,
+  recent Next.js target. Per model family, tier 1 carries the **latest version,
   plus the previous version if and only if the current version was released
   less than one month after it** (a just-superseded model is still what many
   people run; an older gap means it is simply outdated). A variant line the
@@ -287,12 +336,16 @@ reproducible.
 
 ## Scoring and cost methodology
 
-**Scoring is pass@4.** Each eval runs up to four attempts (`runs: 4`,
-`earlyExit: true`): the eval passes if any attempt passes, and remaining
-attempts abort on the first pass. A published failure means four genuine model
-failures — attempts that die on infrastructure (rate limits, sandbox faults,
-auth) are classified by the failure classifier, deleted, and rerun rather than
-counted against the model.
+**New measurements use pass@1.** Each eval gets one valid model attempt
+(`runs: 1`), so another model attempt cannot turn a failure into a pass. This
+gives us a stricter baseline for identifying saturated tasks: after several
+automated release and backport runs, consistently >90% tasks can be reviewed for
+a regression suite and the remaining tasks can be audited individually.
+Historical measurements keep the methodology they were recorded with until
+their model is rerun. Infrastructure failures (rate limits, sandbox faults,
+missing transcripts, and evaluator startup failures) are invalid data: they are
+discarded and retried, and they block the automated results PR if no valid
+result survives the retries.
 
 **Costs use provider-reported token counts.** Each run's usage (input, output,
 cache read/write) comes from the token counts the model's own API reported in

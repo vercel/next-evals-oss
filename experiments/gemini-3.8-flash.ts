@@ -1,5 +1,5 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { installNext, isNextApp } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   // OpenCode over the AI Gateway, not the `gemini` (Gemini CLI) harness the
@@ -59,7 +59,7 @@ const config: ExperimentConfig = {
     // never sent.
   },
   scripts: ['build'],
-  runs: 4,
+  runs: 1,
   earlyExit: true,
   // 2400, not the 1200 the other current OpenCode pairs use. "Flash" is about
   // per-token speed, not about how long the agentic loop runs: the prefetch
@@ -75,8 +75,8 @@ const config: ExperimentConfig = {
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    // Install the requested Next.js version
+    await installNext(sandbox);
   },
 };
 
