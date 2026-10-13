@@ -12,9 +12,10 @@
  * Use --check to verify the committed export without writing it.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import {
   MODEL_PRICING,
@@ -23,6 +24,12 @@ import {
   priceUsage,
 } from './cost.js';
 import { TIER_ONE_EXPERIMENTS } from '../lib/tier-one.js';
+
+const require = createRequire(import.meta.url);
+const agentEvalCli = join(
+  dirname(require.resolve('@vercel/agent-eval/package.json')),
+  'dist/cli.js',
+);
 
 interface SummaryJson {
   totalRuns: number;
@@ -312,10 +319,16 @@ async function main(): Promise<void> {
   // whose content changed keep their last measured result until the model
   // is rerun — the board shows the previous measurement, not a hole.
   const missingByExperiment = new Map<string, Set<string>>();
-  const statusRaw = execSync('pnpm exec agent-eval status --json', {
-    encoding: 'utf-8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  // Invoke the CLI directly. Running a nested `pnpm exec` from this pnpm
+  // script can prepend workspace warnings to stdout, corrupting the JSON.
+  const statusRaw = execFileSync(
+    process.execPath,
+    [agentEvalCli, 'status', '--json'],
+    {
+      encoding: 'utf-8',
+      maxBuffer: 64 * 1024 * 1024,
+    },
+  );
   const status = JSON.parse(statusRaw) as {
     work: Array<{ experiment: string; new: string[]; changed: string[] }>;
   };
