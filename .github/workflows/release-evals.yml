@@ -35,6 +35,10 @@ on:
         description: Production URL for the Eve release-evals agent
         required: true
         type: string
+      automationRef:
+        description: Immutable next-evals-oss commit containing this workflow and its scripts
+        required: true
+        type: string
     secrets:
       VERCEL_TOKEN:
         description: Vercel access token allowed to pull the linked project's OIDC token
@@ -64,7 +68,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: vercel/next-evals-oss
-          ref: main
+          ref: ${{ inputs.automationRef }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -123,6 +127,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
+          REQUIRE_CURSOR_API_KEY: "1"
         run: node scripts/ci-auth.mjs
 
       - name: Preflight the release matrix
@@ -148,7 +153,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: vercel/next-evals-oss
-          ref: main
+          ref: ${{ inputs.automationRef }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -173,6 +178,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
+          REQUIRE_CURSOR_API_KEY: ${{ startsWith(matrix.experiment, 'cursor-') && '1' || '0' }}
         run: node scripts/ci-auth.mjs
 
       - name: Check the experiment can run
@@ -250,7 +256,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: vercel/next-evals-oss
-          ref: main
+          ref: ${{ inputs.automationRef }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4

@@ -53,3 +53,15 @@ test('release runs stop when npm resolves a different version', async () => {
 
   await assert.rejects(() => installNext(sandbox), /Expected next@16\.2\.4/);
 });
+
+test('manual runs preserve the previous install failure behavior', async () => {
+  delete process.env.NEXT_EVAL_VERSION;
+  const sandbox = {
+    async runCommand() {
+      return { stdout: '', stderr: 'registry unavailable', exitCode: 1 };
+    },
+  } as unknown as Sandbox;
+
+  const result = await installNext(sandbox);
+  assert.equal(result.exitCode, 1);
+});

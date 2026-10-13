@@ -42,13 +42,16 @@ export function getNextPackageSpec(): string {
 /** Install the requested Next.js version into an eval sandbox. */
 export async function installNext(sandbox: Sandbox) {
   const packageSpec = getNextPackageSpec();
+  const requestedVersion = process.env.NEXT_EVAL_VERSION?.trim();
   console.log(`> Installing ${packageSpec}`);
   const install = await sandbox.runCommand('npm', ['install', packageSpec]);
   if (install.exitCode !== 0) {
-    throw new Error(`Failed to install ${packageSpec} in the eval sandbox.`);
+    if (requestedVersion) {
+      throw new Error(`Failed to install ${packageSpec} in the eval sandbox.`);
+    }
+    return install;
   }
 
-  const requestedVersion = process.env.NEXT_EVAL_VERSION?.trim();
   if (requestedVersion) {
     const installed = await sandbox.runCommand('node', [
       '-p',

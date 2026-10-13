@@ -275,10 +275,10 @@ The Next.js caller passes credentials from its existing release and upgrade-eval
 setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers
 mint a short-lived `VERCEL_OIDC_TOKEN` in every matrix job. That token authenticates
 Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
-and the release agent's OIDC-protected intake route. The same pull exports the
-existing `CURSOR_API_KEY` for the direct Cursor experiment; direct agents cannot
-substitute OIDC for their own credential. No model-provider secrets are copied
-into this repository.
+and the release agent's OIDC-protected intake route. Cursor matrix jobs also
+export the existing `CURSOR_API_KEY`; other model and reporting jobs do not.
+Direct agents cannot substitute OIDC for their own credential. No model-provider
+secrets are copied into this repository.
 
 Slack installation tokens and request verification stay in the
 `slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does
@@ -326,7 +326,7 @@ unversioned.
 The published board is two tiers:
 
 - **Tier 1 (current)**: models with a complete run of the current eval set on a
-  recent Next.js target. Per model family, tier 1 carries the **latest version,
+  recent Next.js canary. Per model family, tier 1 carries the **latest version,
   plus the previous version if and only if the current version was released
   less than one month after it** (a just-superseded model is still what many
   people run; an older gap means it is simply outdated). A variant line the

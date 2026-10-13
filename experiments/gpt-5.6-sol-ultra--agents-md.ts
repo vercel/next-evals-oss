@@ -1,5 +1,5 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
-import { installNext, isNextApp } from "../lib/setup.js";
+import { isNextApp } from "../lib/setup.js";
 
 const config: ExperimentConfig = {
   agent: "vercel-ai-gateway/codex",
@@ -13,8 +13,8 @@ const config: ExperimentConfig = {
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    // Install the requested Next.js version
-    await installNext(sandbox);
+    // Bump Next.js to latest canary
+    await sandbox.runCommand("npm", ["install", "next@canary"]);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({

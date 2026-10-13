@@ -15,6 +15,7 @@ const missing = required.filter((name) => !process.env[name]);
 if (missing.length > 0) {
   throw new Error(`Missing CI authentication values: ${missing.join(", ")}`);
 }
+const requireCursorApiKey = process.env.REQUIRE_CURSOR_API_KEY === "1";
 
 const directory = mkdtempSync(join(tmpdir(), "next-evals-auth-"));
 const envFile = join(directory, "credentials.env");
@@ -45,16 +46,16 @@ try {
     throw new Error("Vercel did not provide a single-line OIDC token");
   }
   const cursorApiKey = credentials.CURSOR_API_KEY;
-  if (!cursorApiKey || /[\r\n]/.test(cursorApiKey)) {
+  if (requireCursorApiKey && (!cursorApiKey || /[\r\n]/.test(cursorApiKey))) {
     throw new Error("Vercel did not provide a single-line CURSOR_API_KEY");
   }
 
   console.log(`::add-mask::${oidcToken}`);
-  console.log(`::add-mask::${cursorApiKey}`);
-  appendFileSync(
-    process.env.GITHUB_ENV,
-    `VERCEL_OIDC_TOKEN=${oidcToken}\nCURSOR_API_KEY=${cursorApiKey}\n`,
-  );
+  appendFileSync(process.env.GITHUB_ENV, `VERCEL_OIDC_TOKEN=${oidcToken}\n`);
+  if (requireCursorApiKey) {
+    console.log(`::add-mask::${cursorApiKey}`);
+    appendFileSync(process.env.GITHUB_ENV, `CURSOR_API_KEY=${cursorApiKey}\n`);
+  }
 } finally {
   process.umask(mask);
   rmSync(directory, { recursive: true, force: true });
