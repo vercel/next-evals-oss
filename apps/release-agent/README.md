@@ -5,6 +5,11 @@ reusable GitHub Actions workflow. It writes a high-level report in
 `team-agent-measurements` and answers follow-up questions from the compact
 pass@1 report carried in that Slack thread.
 
+The `release-eval-report` skill gives automated summaries a fixed Slack
+structure focused on saturation candidates, audit candidates, reproducible
+failures, and unstable first attempts. The validated payload includes per-task
+and per-model scores so teammates can ask for the full breakdown in-thread.
+
 The release pipeline does not create a results pull request and does not update
 the published pass@4 leaderboard. The exported pass@1 measurement, release
 provenance, and failure confirmations remain available in the linked GitHub

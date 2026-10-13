@@ -223,6 +223,11 @@ export interface ReleaseReport {
     withoutAgentsMd: ReleaseScore;
     withAgentsMd: ReleaseScore;
   };
+  tasks: Array<{
+    name: string;
+    withoutAgentsMd: ReleaseScore;
+    withAgentsMd: ReleaseScore;
+  }>;
   experiments: Array<{
     name: string;
     model: string;
@@ -297,6 +302,10 @@ export function buildReleaseReport(
   );
   const allWithout: boolean[] = [];
   const allWith: boolean[] = [];
+  const taskScores = new Map<
+    string,
+    { withoutAgentsMd: boolean[]; withAgentsMd: boolean[] }
+  >();
   const experiments = data.metadata.experiments
     .map((experiment) => {
       const cells = (data.results[experiment.name] ?? []).filter(
@@ -304,6 +313,15 @@ export function buildReleaseReport(
       );
       const without = cells.map((result) => baseSuccess(experiment, result));
       const withAgents = cells.map((result) => result.result.success);
+      cells.forEach((result, index) => {
+        const task = taskScores.get(result.evalPath) ?? {
+          withoutAgentsMd: [],
+          withAgentsMd: [],
+        };
+        task.withoutAgentsMd.push(without[index]);
+        task.withAgentsMd.push(withAgents[index]);
+        taskScores.set(result.evalPath, task);
+      });
       allWithout.push(...without);
       allWith.push(...withAgents);
       return {
@@ -348,11 +366,20 @@ export function buildReleaseReport(
         Number(a.agentsMd) - Number(b.agentsMd),
     );
 
+  const tasks = [...taskScores]
+    .map(([name, values]) => ({
+      name,
+      withoutAgentsMd: score(values.withoutAgentsMd),
+      withAgentsMd: score(values.withAgentsMd),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return {
     scores: {
       withoutAgentsMd: score(allWithout),
       withAgentsMd: score(allWith),
     },
+    tasks,
     experiments,
     failures,
     comparison: {

@@ -182,6 +182,18 @@ test('agent notification points at the standalone workflow artifact', () => {
   assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
   assert.equal(notification.report.scores.withoutAgentsMd.passed, 1);
   assert.equal(notification.report.scores.withAgentsMd.passed, 2);
+  assert.deepEqual(notification.report.tasks, [
+    {
+      name: 'task-a',
+      withoutAgentsMd: { passed: 1, total: 1, percentage: 100 },
+      withAgentsMd: { passed: 1, total: 1, percentage: 100 },
+    },
+    {
+      name: 'task-b',
+      withoutAgentsMd: { passed: 0, total: 1, percentage: 0 },
+      withAgentsMd: { passed: 1, total: 1, percentage: 100 },
+    },
+  ]);
   assert.equal(notification.report.failures[0].reproducible, false);
   assert.deepEqual(Object.keys(notification).sort(), [
     'artifactUrl',
