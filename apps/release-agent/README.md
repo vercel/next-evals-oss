@@ -1,7 +1,8 @@
 # Next.js release evals agent
 
-This Eve agent receives validated standalone release/backport reports from the
-reusable GitHub Actions workflow. It writes a decision-focused report in
+This Eve agent receives validated standalone release, backport, and canary
+reports from the reusable GitHub Actions workflow. It writes a decision-focused
+report in
 `team-agent-measurements`, follows it with detailed task, agent, and failure
 replies, and answers questions from the compact pass@1 report carried in that
 Slack thread.

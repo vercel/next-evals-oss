@@ -229,22 +229,23 @@ runs an eval — it only checks that the cache is fresh or explicitly accepted a
 stale. To adopt upstream changes: bump the SHA, re-run the experiments you are
 refreshing, and record the rest in `ACCEPTED_STALE`.
 
-### Stable release and backport automation
+### Release, backport, and canary automation
 
 [`release-evals.yml`](.github/workflows/release-evals.yml) is a reusable workflow
-called by `vercel/next.js` after a stable package is published. The caller passes
-the exact version, tag, commit SHA, release or backport classification, and source
-workflow URL. Manual recovery runs start from the calling Next.js workflow too,
-so they use the same credentials and inputs as automatic runs.
+called by `vercel/next.js` after a stable package is published or when someone
+requests a canary measurement. The caller passes the exact version, tag, commit
+SHA, release, backport, or canary classification, and source workflow URL.
+Manual runs start from the calling Next.js workflow too, so they use the same
+credentials and inputs as automatic runs.
 
 The workflow runs every tier-1 model both with and without AGENTS.md against a
 fixed eval suite. Existing Next.js fixtures install the exact published package,
 so agents read the documentation bundled in that release from
 `node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
 the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
-release and backport measurements remain comparable.
+release, backport, and canary measurements remain comparable.
 
-Release and backport measurements always use pass@1 through the
+Release, backport, and canary measurements always use pass@1 through the
 `NEXT_RELEASE_EVAL_RUNS=1` workflow override. Normal local runs and publishable
 benchmark runs retain their configured pass@4 behavior. This keeps the
 release-monitoring series separate from the public leaderboard.

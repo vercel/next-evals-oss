@@ -14,7 +14,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { TIER_ONE_RELEASE_MATRIX } from '../lib/tier-one.js';
 
 export interface ReleaseTarget {
-  kind: 'release' | 'backport';
+  kind: 'release' | 'backport' | 'canary';
   version: string;
   ref: string;
   sha: string;
@@ -22,7 +22,7 @@ export interface ReleaseTarget {
   evaluatedAt: string;
 }
 
-const stableVersionPattern = /^\d+\.\d+\.\d+$/;
+const exactVersionPattern = /^\d+\.\d+\.\d+(?:-canary\.\d+)?$/;
 const shaPattern = /^[0-9a-f]{40}$/i;
 
 export function validateReleaseTarget(input: ReleaseTarget): ReleaseTarget {
@@ -30,12 +30,18 @@ export function validateReleaseTarget(input: ReleaseTarget): ReleaseTarget {
     Object.entries(input).map(([key, value]) => [key, value.trim()]),
   ) as unknown as ReleaseTarget;
 
-  if (target.kind !== 'release' && target.kind !== 'backport') {
-    throw new Error('releaseKind must be release or backport');
+  if (!['release', 'backport', 'canary'].includes(target.kind)) {
+    throw new Error('releaseKind must be release, backport, or canary');
   }
-  if (!stableVersionPattern.test(target.version)) {
+  if (!exactVersionPattern.test(target.version)) {
     throw new Error(
-      `nextVersion must be a stable exact version; received ${JSON.stringify(target.version)}`,
+      `nextVersion must be an exact stable or canary version; received ${JSON.stringify(target.version)}`,
+    );
+  }
+  const isCanaryVersion = target.version.includes('-canary.');
+  if ((target.kind === 'canary') !== isCanaryVersion) {
+    throw new Error(
+      'releaseKind must be canary exactly when nextVersion is a canary version',
     );
   }
   if (target.ref !== `v${target.version}`) {

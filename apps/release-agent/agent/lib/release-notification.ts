@@ -49,9 +49,9 @@ const reportSchema = z.object({
 export const releaseNotificationSchema = z.object({
   schemaVersion: z.literal(3),
   target: z.object({
-    kind: z.enum(["release", "backport"]),
-    version: z.string().regex(/^\d+\.\d+\.\d+$/),
-    ref: z.string().regex(/^v\d+\.\d+\.\d+$/),
+    kind: z.enum(["release", "backport", "canary"]),
+    version: z.string().regex(/^\d+\.\d+\.\d+(?:-canary\.\d+)?$/),
+    ref: z.string().regex(/^v\d+\.\d+\.\d+(?:-canary\.\d+)?$/),
     sha: z.string().regex(/^[0-9a-f]{40}$/i),
     sourceRunUrl: z
       .url()

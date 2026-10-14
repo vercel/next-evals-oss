@@ -163,7 +163,7 @@ interface ExportedData {
       infrastructureFailuresExcluded: true;
     };
     evaluationTarget?: {
-      kind: 'release' | 'backport';
+      kind: 'release' | 'backport' | 'canary';
       version: string;
       ref: string;
       sha: string;

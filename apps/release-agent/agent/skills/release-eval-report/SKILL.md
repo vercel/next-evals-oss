@@ -1,8 +1,9 @@
 ---
 description: >
-  Format automated Next.js release and backport pass@1 measurements for the
-  team-agent-measurements Slack channel. Use for release-eval events containing
-  overall scores, per-task scores, model scores, and confirmed failures.
+  Format automated Next.js release, backport, and canary pass@1 measurements for
+  the team-agent-measurements Slack channel. Use for release-eval events
+  containing overall scores, per-task scores, model scores, and confirmed
+  failures.
 ---
 
 # Release eval report
@@ -27,7 +28,7 @@ Match the established reports in `#next-bots`: a short framing paragraph,
 followed by a few named findings written in compact prose.
 
 - Use only `Next.js <version>` as the title.
-- In the opening paragraph, identify release or backport, matrix size, and the
+- In the opening paragraph, identify release, backport, or canary, matrix size, and the
   Base and AGENTS.md totals.
 - Organize the findings around the questions the team is answering:
   `Saturation`, `Harder tasks`, `Potential eval problems`, and `Comparison`.
@@ -52,7 +53,7 @@ Use this shape:
 ```text
 **Next.js <version>**
 
-This <release|backport> measured <task count> tasks across <agent count> agents. Without AGENTS.md, <passed>/<total> passed (<percent>%); with AGENTS.md, <passed>/<total> passed (<percent>%).
+This <release|backport|canary> measured <task count> tasks across <agent count> agents. Without AGENTS.md, <passed>/<total> passed (<percent>%); with AGENTS.md, <passed>/<total> passed (<percent>%).
 
 **Saturation**
 <count and interpretation of tasks above 90%, plus top-agent saturation>

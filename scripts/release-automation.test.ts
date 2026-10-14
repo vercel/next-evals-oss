@@ -21,7 +21,7 @@ afterEach(async () => {
   );
 });
 
-test('release metadata is pinned to a stable tag and full SHA', () => {
+test('release metadata is pinned to an exact tag and full SHA', () => {
   const target = validateReleaseTarget({
     kind: 'release',
     version: '16.2.4',
@@ -32,9 +32,26 @@ test('release metadata is pinned to a stable tag and full SHA', () => {
   });
   assert.equal(target.version, '16.2.4');
 
+  const canary = validateReleaseTarget({
+    ...target,
+    kind: 'canary',
+    version: '16.3.0-canary.12',
+    ref: 'v16.3.0-canary.12',
+  });
+  assert.equal(canary.version, '16.3.0-canary.12');
+
   assert.throws(
-    () => validateReleaseTarget({ ...target, version: '16.2.4-canary.1' }),
-    /stable exact version/,
+    () => validateReleaseTarget({ ...target, kind: 'canary' }),
+    /releaseKind must be canary/,
+  );
+  assert.throws(
+    () =>
+      validateReleaseTarget({
+        ...target,
+        version: '16.3.0-canary.12',
+        ref: 'v16.3.0-canary.12',
+      }),
+    /releaseKind must be canary/,
   );
   assert.throws(
     () => validateReleaseTarget({ ...target, kind: 'other' as 'release' }),
