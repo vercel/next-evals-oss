@@ -259,20 +259,26 @@ attempts. Those attempts never change the pass@1 score; they only distinguish a
 reproducible failure from an unstable first attempt.
 
 The workflow runs and aggregates release measurements in a temporary workspace
-outside the repository. It uploads `release-measurement.json`, release
-provenance, and failure diagnostics as a GitHub Actions artifact for 90 days;
-per-model raw artifacts remain available for seven days. The workflow never
-writes to the repository's publishable `results/` tree or `agent-results.json`,
-and it does not create a branch, pull request, or publish anything to
-`nextjs.org/evals`.
+outside the repository. Matrix jobs validate their raw output in place, then
+retain only score summaries and compact failure confirmations for aggregation.
+Raw transcripts, generated applications, evaluator output, and command output
+never cross the job boundary. Before retaining generated measurement data, the
+workflow rejects it if it contains the exact value of a credential available to
+that job.
 
-After the artifact is stored, the workflow sends a compact validated report to
-the [Eve release agent](apps/release-agent). Eve writes one concise message to
+Each completed run opens a draft pull request under
+`measurements/releases/<version>/<run-id>/`. The pull request contains the
+aggregate measurement, release provenance, and failure confirmations. It never
+writes to the publishable `results/` tree or `agent-results.json`, so merging it
+records the measurement without publishing anything to `nextjs.org/evals`.
+
+After the draft pull request is opened, the workflow sends a compact validated
+report to the [Eve release agent](apps/release-agent). Eve writes one concise message to
 `team-agent-measurements` with the release path, pass@1 totals with and without
-AGENTS.md, and meaningful model/task failures. The summary links the workflow and
-artifact and explicitly identifies the measurement as separate from the public
-pass@4 board. Follow-up questions in that Slack thread use the same report
-context; questions about published data use Eve's read-only repository tool.
+AGENTS.md, and meaningful model/task failures. The summary identifies the
+measurement as separate from the public pass@4 board. Follow-up questions in
+that Slack thread use the same report context; questions about published data
+use Eve's read-only repository tool.
 
 The Next.js caller grants `id-token: write` and passes its existing release-eval
 Vercel project identifiers. Every job uses Vercel's official authentication
@@ -286,6 +292,11 @@ and the release agent's OIDC-protected intake route. Cursor matrix jobs also
 export the existing `CURSOR_API_KEY`; other model and reporting jobs do not.
 Direct agents cannot substitute OIDC for their own credential. No long-lived
 Vercel token or model-provider secrets are copied into this repository.
+
+Opening the measurement pull request requires a GitHub App installed on
+`vercel/next-evals-oss` with Contents and Pull requests write permissions. The
+caller supplies the app client ID and private key only to the final reporting
+job; model-running jobs never receive that credential.
 
 Slack installation tokens and request verification stay in the
 `slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does
@@ -360,12 +371,12 @@ reproducible.
 **The published board remains pass@4.** Normal experiment configs use four runs
 with early exit, preserving the existing public methodology. Release and
 backport automation applies a workflow-only pass@1 override and keeps those
-measurements in Actions artifacts instead of publishing them. This supplies the
-stricter repeated-release baseline used to identify saturated tasks without
-mixing pass@1 and pass@4 scores on the leaderboard. Infrastructure failures
-(rate limits, sandbox faults, missing transcripts, and evaluator startup
-failures) are invalid data: the release workflow discards and retries them and
-does not report an incomplete measurement.
+measurements in isolated measurement pull requests instead of publishing them.
+This supplies the stricter repeated-release baseline used to identify saturated
+tasks without mixing pass@1 and pass@4 scores on the leaderboard.
+Infrastructure failures (rate limits, sandbox faults, missing transcripts, and
+evaluator startup failures) are invalid data: the release workflow discards and
+retries them and does not report an incomplete measurement.
 
 **Costs use provider-reported token counts.** Each run's usage (input, output,
 cache read/write) comes from the token counts the model's own API reported in

@@ -35,6 +35,14 @@ on:
         description: Production URL for the Eve release-evals agent
         required: true
         type: string
+      releaseGitHubAppClientId:
+        description: GitHub App client ID used to open measurement pull requests
+        required: true
+        type: string
+    secrets:
+      releaseGitHubAppPrivateKey:
+        description: Private key for the measurement pull-request GitHub App
+        required: true
 concurrency:
   group: next-release-evals
   cancel-in-progress: false
@@ -134,7 +142,7 @@ jobs:
           name: release-eval-suite
           path: evals
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   evaluate:
     name: ${{ matrix.experiment }}
@@ -233,10 +241,11 @@ jobs:
           DIAGNOSTIC_RESULTS_DIR: ${{ runner.temp }}/release-diagnostic-runs
         run: pnpm tsx scripts/release-diagnostics.ts run
 
-      - name: Package this experiment's new results
+      - name: Validate and sanitize this experiment's new results
         shell: bash
         env:
           EXPERIMENT: ${{ matrix.experiment }}
+          EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
           RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
         run: |
           experiment_results="$RELEASE_EVAL_WORKSPACE/results/$EXPERIMENT"
@@ -244,22 +253,33 @@ jobs:
             echo "The runner produced no new result files for $EXPERIMENT" >&2
             exit 1
           fi
-          tar -C "$RELEASE_EVAL_WORKSPACE/results" -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" "$EXPERIMENT"
+
+          pnpm tsx scripts/release-automation.ts validate-results
+
+          # The raw result tree contains transcripts, generated applications,
+          # and command output. Only score summaries cross the job boundary.
+          cd "$RELEASE_EVAL_WORKSPACE/results"
+          find "$EXPERIMENT" -type f -name summary.json -print0 \
+            | tar --null -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" --files-from=-
           tar -tzf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" | head -1
+
+          node scripts/assert-no-secrets.mjs \
+            "$RUNNER_TEMP/$EXPERIMENT.tar.gz" \
+            "$RUNNER_TEMP/release-diagnostic-summaries/$EXPERIMENT.json"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-result-${{ matrix.experiment }}
+          name: release-score-summary-${{ matrix.experiment }}
           path: ${{ runner.temp }}/${{ matrix.experiment }}.tar.gz
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-diagnostic-summary-${{ matrix.experiment }}
           path: ${{ runner.temp }}/release-diagnostic-summaries/${{ matrix.experiment }}.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   report:
     name: Report release measurement
@@ -294,8 +314,8 @@ jobs:
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: release-result-*
-          path: ${{ runner.temp }}/release-result-archives
+          pattern: release-score-summary-*
+          path: ${{ runner.temp }}/release-score-summaries
           merge-multiple: true
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -314,15 +334,9 @@ jobs:
         env:
           RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
         run: |
-          for archive in "$RUNNER_TEMP"/release-result-archives/*.tar.gz; do
+          for archive in "$RUNNER_TEMP"/release-score-summaries/*.tar.gz; do
             tar -C "$RELEASE_EVAL_WORKSPACE/results" -xzf "$archive"
           done
-
-      - name: Block incomplete or infrastructure-corrupted results
-        env:
-          EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
-          RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
-        run: pnpm tsx scripts/release-automation.ts validate-results
 
       - name: Merge failure diagnostics
         env:
@@ -357,17 +371,104 @@ jobs:
             exit 1
           fi
 
-      - name: Retain the standalone measurement
-        id: measurement-artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Check the durable measurement for credentials
+        run: |
+          node scripts/assert-no-secrets.mjs \
+            "$RUNNER_TEMP/release-measurement.json" \
+            "$RUNNER_TEMP/evaluation-target.json" \
+            "$RUNNER_TEMP/release-diagnostics.json"
+
+      - name: Create a GitHub App token for the measurement PR
+        id: release-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          name: next-${{ needs.prepare.outputs.next-version }}-release-evals
-          path: |
-            ${{ runner.temp }}/release-measurement.json
-            ${{ runner.temp }}/evaluation-target.json
-            ${{ runner.temp }}/release-diagnostics.json
-          if-no-files-found: error
-          retention-days: 90
+          client-id: ${{ inputs.releaseGitHubAppClientId }}
+          private-key: ${{ secrets.releaseGitHubAppPrivateKey }}
+          owner: vercel
+          repositories: next-evals-oss
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Get the GitHub App identity
+        id: release-app-user
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+        run: |
+          user_id="$(gh api "/users/${{ steps.release-app-token.outputs.app-slug }}[bot]" --jq .id)"
+          echo "user-id=$user_id" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the measurement repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: vercel/next-evals-oss
+          token: ${{ steps.release-app-token.outputs.token }}
+          path: ${{ runner.temp }}/measurement-repository
+          persist-credentials: true
+
+      - name: Commit the standalone measurement
+        id: measurement
+        shell: bash
+        env:
+          APP_SLUG: ${{ steps.release-app-token.outputs.app-slug }}
+          APP_USER_ID: ${{ steps.release-app-user.outputs.user-id }}
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+          RUN_ID: ${{ github.run_id }}
+          MEASUREMENT_REPOSITORY: ${{ runner.temp }}/measurement-repository
+        run: |
+          destination="measurements/releases/$NEXT_VERSION/$RUN_ID"
+          mkdir -p "$MEASUREMENT_REPOSITORY/$destination"
+          cp "$RUNNER_TEMP/release-measurement.json" "$MEASUREMENT_REPOSITORY/$destination/measurement.json"
+          cp "$RUNNER_TEMP/evaluation-target.json" "$MEASUREMENT_REPOSITORY/$destination/target.json"
+          cp "$RUNNER_TEMP/release-diagnostics.json" "$MEASUREMENT_REPOSITORY/$destination/diagnostics.json"
+
+          cd "$MEASUREMENT_REPOSITORY"
+          branch="automation/measure-next-$NEXT_VERSION-$RUN_ID"
+          git checkout -b "$branch"
+          git config user.name "$APP_SLUG[bot]"
+          git config user.email "$APP_USER_ID+$APP_SLUG[bot]@users.noreply.github.com"
+          git add "$destination"
+          git commit -m "Record pass@1 measurement for Next.js v$NEXT_VERSION"
+
+          remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | cut -f1)"
+          if [[ -n "$remote_sha" ]]; then
+            git push --force-with-lease="refs/heads/$branch:$remote_sha" origin "HEAD:refs/heads/$branch"
+          else
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "destination=$destination" >> "$GITHUB_OUTPUT"
+
+      - name: Open the human-reviewed measurement PR
+        id: pull-request
+        env:
+          GH_TOKEN: ${{ steps.release-app-token.outputs.token }}
+          NEXT_VERSION: ${{ needs.prepare.outputs.next-version }}
+          NEXT_REF: ${{ needs.prepare.outputs.next-ref }}
+          NEXT_SHA: ${{ needs.prepare.outputs.next-sha }}
+          SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
+          RELEASE_KIND: ${{ needs.prepare.outputs.release-kind }}
+          BRANCH: ${{ steps.measurement.outputs.branch }}
+          DESTINATION: ${{ steps.measurement.outputs.destination }}
+        working-directory: ${{ runner.temp }}/measurement-repository
+        run: |
+          existing="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')"
+          if [[ -n "$existing" ]]; then
+            echo "url=$existing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cat > "$RUNNER_TEMP/measurement-pr-body.md" <<EOF
+          Records the standalone pass@1 measurement for `next@$NEXT_VERSION` at `$DESTINATION`.
+
+          - Release path: `$RELEASE_KIND`
+          - Tag: `$NEXT_REF`
+          - Commit: `$NEXT_SHA`
+          - Release workflow: $SOURCE_RUN_URL
+
+          This PR contains only validated aggregate scores, release provenance, and compact failure confirmations. Raw transcripts, generated applications, and command output are excluded. Merging it records the measurement without changing `results/` or `agent-results.json`, so it cannot publish to nextjs.org/evals.
+          EOF
+          url="$(gh pr create --draft --base main --head "$BRANCH" --title "Record Next.js v$NEXT_VERSION pass@1 measurement" --body-file "$RUNNER_TEMP/measurement-pr-body.md")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate Vercel CLI access
         uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
@@ -389,7 +490,7 @@ jobs:
           SOURCE_RUN_URL: ${{ needs.prepare.outputs.source-run-url }}
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
           WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          ARTIFACT_URL: ${{ steps.measurement-artifact.outputs.artifact-url }}
+          MEASUREMENT_URL: ${{ steps.pull-request.outputs.url }}
           AGENT_PAYLOAD_PATH: ${{ runner.temp }}/release-notification.json
           RELEASE_MEASUREMENT_PATH: ${{ runner.temp }}/release-measurement.json
           RELEASE_DIAGNOSTICS_PATH: ${{ runner.temp }}/release-diagnostics.json

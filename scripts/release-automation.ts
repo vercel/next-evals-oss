@@ -124,10 +124,10 @@ export function findInvalidRunReason(options: {
 }
 
 export interface ReleaseNotification {
-  schemaVersion: 3;
+  schemaVersion: 4;
   target: ReleaseTarget;
   workflowUrl: string;
-  artifactUrl: string;
+  measurementUrl: string;
   metric: 'pass@1';
   validation: {
     complete: true;
@@ -140,7 +140,7 @@ export interface ReleaseNotification {
 export function buildReleaseNotification(options: {
   target: ReleaseTarget;
   workflowUrl: string;
-  artifactUrl: string;
+  measurementUrl: string;
   report: ReleaseReport;
 }): ReleaseNotification {
   if (
@@ -151,19 +151,19 @@ export function buildReleaseNotification(options: {
     throw new Error('workflowUrl must point to a vercel/next.js Actions run');
   }
   if (
-    !/^https:\/\/github\.com\/vercel\/next\.js\/actions\/runs\/\d+\/artifacts\/\d+$/.test(
-      options.artifactUrl,
+    !/^https:\/\/github\.com\/vercel\/next-evals-oss\/pull\/\d+$/.test(
+      options.measurementUrl,
     )
   ) {
     throw new Error(
-      'artifactUrl must point to a vercel/next.js Actions artifact',
+      'measurementUrl must point to a vercel/next-evals-oss pull request',
     );
   }
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     target: options.target,
     workflowUrl: options.workflowUrl,
-    artifactUrl: options.artifactUrl,
+    measurementUrl: options.measurementUrl,
     metric: 'pass@1',
     validation: {
       complete: true,
@@ -631,12 +631,14 @@ async function main(): Promise<void> {
   }
 
   if (command === 'validate-results') {
+    const experiment = process.env.EXPERIMENT;
     await validateReleaseResults({
       root: releaseWorkspace(),
       startedAt: process.env.EVALUATED_AT ?? '',
+      experiments: experiment ? [experiment] : undefined,
     });
     console.log(
-      `Validated ${TIER_ONE_RELEASE_MATRIX.length} complete experiment runs.`,
+      `Validated ${experiment ? 1 : TIER_ONE_RELEASE_MATRIX.length} complete experiment run(s).`,
     );
     return;
   }
@@ -675,7 +677,7 @@ async function main(): Promise<void> {
     const notification = buildReleaseNotification({
       target,
       workflowUrl: process.env.WORKFLOW_URL ?? '',
-      artifactUrl: process.env.ARTIFACT_URL ?? '',
+      measurementUrl: process.env.MEASUREMENT_URL ?? '',
       report: buildReleaseReport(data, diagnostics),
     });
     await writeFile(

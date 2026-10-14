@@ -13,10 +13,10 @@ failures, and unstable first attempts. A Slack renderer turns the agent's four
 report sections into one root post and three replies containing the full task
 and model breakdowns.
 
-The release pipeline does not create a results pull request and does not update
-the published pass@4 leaderboard. The exported pass@1 measurement, release
-provenance, and failure confirmations remain available in the linked GitHub
-Actions artifact for 90 days; per-model raw artifacts remain for seven days. The
+The release pipeline does not create a publishable results pull request and does
+not update the pass@4 leaderboard. It opens a separate draft measurement pull
+request containing the exported pass@1 aggregate, release provenance, and
+failure confirmations. Raw transcripts and command output are excluded. The
 agent's `query_evals` tool
 continues to answer separate questions about the currently published
 `nextjs.org/evals` data.
