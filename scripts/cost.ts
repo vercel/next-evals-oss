@@ -65,6 +65,9 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // rates as of 2026-09-11. Caching is implicit (no write rate is published),
   // so cacheWrite is 0 rather than unpriced.
   'gemini-3.8-flash': { input: 0.75, output: 3.75, cacheRead: 0.075, cacheWrite: 0 },
+  // AI Gateway catalog, 2026-10-13. Caching is implicit, so there is no
+  // separately billed cache-write rate.
+  'gemini-4-argon': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 0 },
   'gpt-5.2-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.3-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.4-xhigh': { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },
