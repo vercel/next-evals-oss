@@ -77,9 +77,10 @@ names neither the variable you forgot nor the path you meant. `pnpm preflight`
 calls this out.
 
 **Agents.** Each experiment names an `agent`, and the agent decides which key it
-reads. `VERCEL_OIDC_TOKEN` authenticates `vercel-ai-gateway/*` agents. Direct
-agents still require their own credential. The automated release matrix contains
-only AI Gateway agents, so its project OIDC token covers every model it runs.
+reads. `VERCEL_OIDC_TOKEN` can authenticate `vercel-ai-gateway/*` agents, while
+direct agents still require their own credential. The automated release matrix
+contains only AI Gateway agents and deliberately uses the release project's
+separately budgeted `AI_GATEWAY_API_KEY` for every model call.
 
 | Agent | Key |
 |-------|-----|
@@ -288,12 +289,11 @@ action to exchange its GitHub Actions identity for short-lived CLI access, then
 pulls a short-lived `VERCEL_OIDC_TOKEN` from the release-eval project. The CLI
 policy should be restricted to the `vercel/next.js` repository and its caller
 workflow. The temporary CLI credential is cleared before the eval runner starts.
-The project OIDC token authenticates
-Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
-and the release agent's OIDC-protected intake route. Direct agents cannot
-substitute OIDC for their own credential and are excluded from this matrix. No
-long-lived Vercel token or model-provider secrets are copied into this
-repository.
+The project OIDC token authenticates Vercel Sandbox and the release agent's
+OIDC-protected intake route. Model-running jobs also receive the project's
+separately budgeted `AI_GATEWAY_API_KEY`; the reporting job does not. Direct
+agents are excluded from this matrix. No long-lived Vercel token or model-provider
+secret is copied into this repository or the calling Next.js repository.
 
 Opening the measurement pull request requires a GitHub App installed on
 `vercel/next-evals-oss` with Contents and Pull requests write permissions. The

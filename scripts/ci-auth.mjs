@@ -87,12 +87,25 @@ try {
     throw new Error("Vercel did not provide a single-line OIDC token");
   }
   console.log(`::add-mask::${oidcToken}`);
+
+  let gatewayCredential = "";
+  if (process.env.REQUIRE_AI_GATEWAY_API_KEY === "1") {
+    const gatewayApiKey = credentials.AI_GATEWAY_API_KEY;
+    if (!gatewayApiKey || /[\r\n]/.test(gatewayApiKey)) {
+      throw new Error(
+        "Vercel did not provide a single-line AI_GATEWAY_API_KEY",
+      );
+    }
+    console.log(`::add-mask::${gatewayApiKey}`);
+    gatewayCredential = `AI_GATEWAY_API_KEY=${gatewayApiKey}\n`;
+  }
+
   // The exchange credential is scoped to this process and its Vercel CLI child.
-  // Clear any inherited value for later steps so the eval runner can only
-  // select the project-scoped OIDC path.
+  // Clear any inherited value for later steps. Model-running jobs explicitly
+  // opt into the separately budgeted AI Gateway credential above.
   appendFileSync(
     process.env.GITHUB_ENV,
-    `VERCEL_OIDC_TOKEN=${oidcToken}\nVERCEL_TOKEN=\n`,
+    `VERCEL_OIDC_TOKEN=${oidcToken}\n${gatewayCredential}VERCEL_TOKEN=\n`,
   );
 } finally {
   process.umask(mask);
