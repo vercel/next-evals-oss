@@ -232,12 +232,14 @@ refreshing, and record the rest in `ACCEPTED_STALE`.
 
 ### Release, backport, and canary automation
 
-[`release-evals.yml`](.github/workflows/release-evals.yml) is a reusable workflow
-called by `vercel/next.js` after a stable package is published or when someone
-requests a canary measurement. The caller passes the exact version, tag, commit
-SHA, release, backport, or canary classification, and source workflow URL.
-Manual runs start from the calling Next.js workflow too, so they use the same
-credentials and inputs as automatic runs.
+[`release-evals.yml`](.github/workflows/release-evals.yml) runs entirely in this
+repository. An hourly check discovers stable releases and backports published
+after the monitor baseline in [`release-monitor.json`](release-monitor.json); a
+daily check measures the current npm canary. Manual dispatch accepts one exact
+published stable or canary version. Discovery resolves the matching public tag,
+commit SHA, successful `vercel/next.js` build-and-deploy run, and source branch
+before any model job starts. Existing measurement pull requests are skipped
+unless a maintainer explicitly requests a forced manual rerun.
 
 The workflow runs every tier-1 model both with and without AGENTS.md against a
 fixed eval suite. Existing Next.js fixtures install the exact published package,
@@ -283,22 +285,24 @@ measurement as separate from the public pass@4 board. Follow-up questions in
 that Slack thread use the same report context; questions about published data
 use Eve's read-only repository tool.
 
-The Next.js caller grants `id-token: write` and passes its existing release-eval
-Vercel project identifiers. Every job uses Vercel's official authentication
-action to exchange its GitHub Actions identity for short-lived CLI access, then
-pulls a short-lived `VERCEL_OIDC_TOKEN` from the release-eval project. The CLI
-policy should be restricted to the `vercel/next.js` repository and its caller
-workflow. The temporary CLI credential is cleared before the eval runner starts.
+Scheduled and manual runs are accepted only from this repository's `main`
+branch. Model jobs receive read-only repository access and `id-token: write`.
+They exchange the GitHub Actions identity for short-lived Vercel CLI access,
+then pull a short-lived `VERCEL_OIDC_TOKEN` from the release-eval project. The
+Vercel CLI policy must be restricted to `vercel/next-evals-oss` and this
+workflow on `main`. The temporary CLI credential is cleared before the eval
+runner starts.
 The project OIDC token authenticates Vercel Sandbox and the release agent's
 OIDC-protected intake route. Model-running jobs also receive the project's
 separately budgeted `AI_GATEWAY_API_KEY`; the reporting job does not. Direct
-agents are excluded from this matrix. No long-lived Vercel token or model-provider
-secret is copied into this repository or the calling Next.js repository.
+agents are excluded from this matrix. The non-secret Vercel project identifiers
+and agent URL are repository variables. No long-lived Vercel token or
+model-provider secret is stored in GitHub.
 
-Opening the measurement pull request requires a GitHub App installed on
-`vercel/next-evals-oss` with Contents and Pull requests write permissions. The
-caller supplies the app client ID and private key only to the final reporting
-job; model-running jobs never receive that credential.
+Only the final publishing job receives write-scoped `GITHUB_TOKEN` permissions
+after aggregation has produced and rechecked a sanitized measurement artifact.
+Model-running jobs cannot write to the repository, and no GitHub App private
+key is required.
 
 Slack installation tokens and request verification stay in the
 `slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does
