@@ -66,6 +66,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
   'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
   'gemini-3.8-flash--agents-md': 'gemini-3.8-flash',
+  'gemini-4-argon--agents-md': 'gemini-4-argon',
   'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
   'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
   'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
@@ -203,6 +204,10 @@ const TIER_1 = new Set([
   // tier 2 for the reason noted above — the Gemini CLI harness they use needs
   // GEMINI_API_KEY and cannot be rerun here.
   'gemini-3.8-flash',
+  // Argon (released 2026-10-13) is Google's current general reasoning line,
+  // distinct from the Flash line, so both remain current. No earlier Argon
+  // version has been measured on this board.
+  'gemini-4-argon',
   'kimi-k3',
   'kimi-k2.7-code', // kimi-k3 shipped 29 days after it
   'cursor-composer-2.5',
@@ -249,6 +254,8 @@ const MODEL_NAMES: Record<string, string> = {
   // comment in experiments/gemini-3.8-flash.ts.
   'gemini-3.8-flash': 'Gemini 3.8 Flash',
   'gemini-3.8-flash--agents-md': 'Gemini 3.8 Flash + AGENTS.md',
+  'gemini-4-argon': 'Gemini 4 Argon',
+  'gemini-4-argon--agents-md': 'Gemini 4 Argon + AGENTS.md',
   'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
   'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
