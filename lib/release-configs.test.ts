@@ -5,13 +5,22 @@ import test from "node:test";
 
 import type { ExperimentConfig, Sandbox } from "@vercel/agent-eval";
 
-import { TIER_ONE_RELEASE_MATRIX } from "./tier-one.js";
+import {
+  TIER_ONE_EXPERIMENTS,
+  TIER_ONE_RELEASE_MATRIX,
+} from "./tier-one.js";
 
 const experimentsDirectory = join(
   dirname(fileURLToPath(import.meta.url)),
   "..",
   "experiments",
 );
+
+test("release automation excludes direct agents without changing the public board", () => {
+  assert.ok(TIER_ONE_EXPERIMENTS.includes("cursor-composer-2.5"));
+  assert.ok(!TIER_ONE_RELEASE_MATRIX.includes("cursor-composer-2.5"));
+  assert.ok(!TIER_ONE_RELEASE_MATRIX.includes("cursor-composer-2.5--agents-md"));
+});
 
 test("every release experiment honors pass@1 and the exact Next.js version", async () => {
   const previousRuns = process.env.NEXT_RELEASE_EVAL_RUNS;
@@ -27,6 +36,11 @@ test("every release experiment honors pass@1 and the exact Next.js version", asy
       moduleUrl.searchParams.set("release-contract", experiment);
       const config = (await import(moduleUrl.href)).default as ExperimentConfig;
 
+      assert.match(
+        config.agent,
+        /^vercel-ai-gateway\//,
+        `${experiment} must use AI Gateway with the project API key`,
+      );
       assert.equal(config.runs, 1, `${experiment} must use pass@1`);
       assert.ok(config.setup, `${experiment} must define sandbox setup`);
 
