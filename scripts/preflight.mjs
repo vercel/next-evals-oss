@@ -252,7 +252,7 @@ function checkSandboxes(experiments) {
 function checkAgentCredentials(experiments, strict) {
   console.log(heading('Agent credentials'));
 
-  const byEnvVar = new Map();
+  const byCredential = new Map();
   for (const { name, config } of experiments) {
     let envVar;
     try {
@@ -261,24 +261,32 @@ function checkAgentCredentials(experiments, strict) {
       fail(`${name}: unknown agent "${config.agent}"`, err instanceof Error ? err.message : String(err));
       continue;
     }
-    if (!byEnvVar.has(envVar)) byEnvVar.set(envVar, []);
-    byEnvVar.get(envVar).push(name);
+    const oidcEligible = config.agent.startsWith('vercel-ai-gateway/');
+    const key = `${envVar}\0${oidcEligible}`;
+    if (!byCredential.has(key)) {
+      byCredential.set(key, { envVar, oidcEligible, users: [] });
+    }
+    byCredential.get(key).users.push(name);
   }
 
-  if (byEnvVar.size === 0) return;
+  if (byCredential.size === 0) return;
 
-  // VERCEL_OIDC_TOKEN authenticates the AI Gateway too, so the framework falls
-  // back to it for every agent.
+  // VERCEL_OIDC_TOKEN authenticates AI Gateway agents. Direct agents such as
+  // Cursor still require the credential returned by their adapter.
   const oidc = has('VERCEL_OIDC_TOKEN');
 
-  for (const [envVar, users] of [...byEnvVar].sort((a, b) => b[1].length - a[1].length)) {
+  for (const { envVar, oidcEligible, users } of [...byCredential.values()].sort(
+    (a, b) => b.users.length - a.users.length,
+  )) {
     const label = `${envVar} ${dim(`— ${users.length} experiment(s): ${list(users)}`)}`;
     if (has(envVar)) {
       pass(label);
-    } else if (oidc) {
+    } else if (oidcEligible && oidc) {
       pass(`${label}\n    ${dim('unset; falling back to VERCEL_OIDC_TOKEN')}`);
     } else {
-      const hint = `Unset, and no VERCEL_OIDC_TOKEN to fall back on — the runner skips these experiments.`;
+      const hint = oidcEligible
+        ? 'Unset, and no VERCEL_OIDC_TOKEN to authenticate AI Gateway — the runner skips these experiments.'
+        : `Unset — ${users.length === 1 ? users[0] : 'these direct-agent experiments'} cannot use VERCEL_OIDC_TOKEN as a substitute.`;
       if (strict) fail(label, hint);
       else caution(label, hint);
     }
