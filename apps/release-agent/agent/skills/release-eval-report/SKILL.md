@@ -98,6 +98,9 @@ Title the reply `Failure verification and comparison`.
 - When comparison data is available, list every changed task, every changed
   agent total, and every agent-version change. On the first controlled run,
   state that this run establishes the baseline.
+- End with `Full results and reasoning traces: <measurement PR link>`, using
+  the event's `measurementUrl`. Keep the link in this reply rather than the root
+  message.
 
 ## Analysis rules
 
@@ -129,4 +132,4 @@ describe that within-run difference as a release-to-release improvement.
 - Never compare this report with the published pass@4 leaderboard.
 - Never claim a previous-run change while `comparison.available` is false.
 - Do not expose workflow or artifact metadata unless someone asks for it in a
-  follow-up.
+  follow-up. The measurement pull request link is required in thread reply 3.

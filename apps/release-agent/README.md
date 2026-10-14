@@ -16,10 +16,11 @@ and model breakdowns.
 The release pipeline does not create a publishable results pull request and does
 not update the pass@4 leaderboard. It opens a separate draft measurement pull
 request containing the exported pass@1 aggregate, release provenance, and
-failure confirmations. Raw transcripts and command output are excluded. The
-agent's `query_evals` tool
-continues to answer separate questions about the currently published
-`nextjs.org/evals` data.
+failure confirmations, along with the complete sanitized scored and confirmation
+output. The final Slack thread reply links that pull request so maintainers can
+inspect transcripts, evaluator output, and command logs. The agent's
+`query_evals` tool continues to answer separate questions about the currently
+published `nextjs.org/evals` data.
 
 The intake route accepts only a Vercel OIDC token minted for the
 `vercel-labs/next.js` project in its Development environment. Slack credentials
