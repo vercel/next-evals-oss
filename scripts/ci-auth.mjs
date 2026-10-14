@@ -6,8 +6,7 @@ import { join } from "node:path";
 import { parse } from "dotenv";
 
 const required = [
-  "VERCEL_TOKEN",
-  "VERCEL_TEAM_ID",
+  "VERCEL_ORG_ID",
   "VERCEL_PROJECT_ID",
   "GITHUB_ENV",
 ];
@@ -30,12 +29,8 @@ try {
       envFile,
       "--yes",
       "--environment=development",
-      "--scope",
-      process.env.VERCEL_TEAM_ID,
       "--project",
       process.env.VERCEL_PROJECT_ID,
-      "--token",
-      process.env.VERCEL_TOKEN,
     ],
     { stdio: "inherit" },
   );
@@ -51,7 +46,13 @@ try {
   }
 
   console.log(`::add-mask::${oidcToken}`);
-  appendFileSync(process.env.GITHUB_ENV, `VERCEL_OIDC_TOKEN=${oidcToken}\n`);
+  // authenticate-cli-action exposes its short-lived exchange credential as
+  // VERCEL_TOKEN for the CLI. Clear it after pulling the project credentials so
+  // the eval runner can only select the project-scoped OIDC path.
+  appendFileSync(
+    process.env.GITHUB_ENV,
+    `VERCEL_OIDC_TOKEN=${oidcToken}\nVERCEL_TOKEN=\n`,
+  );
   if (requireCursorApiKey) {
     console.log(`::add-mask::${cursorApiKey}`);
     appendFileSync(process.env.GITHUB_ENV, `CURSOR_API_KEY=${cursorApiKey}\n`);

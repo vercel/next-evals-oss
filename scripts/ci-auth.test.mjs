@@ -38,6 +38,7 @@ test("masks and exports the OIDC token and Cursor credential", async (t) => {
     `#!/usr/bin/env node
 import { writeFileSync } from 'node:fs'
 writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_KEY=test-cursor-key\\n')
+if (process.argv.includes('--token') || process.argv.includes('--scope')) process.exit(2)
 `,
   );
   await chmod(vercel, 0o755);
@@ -49,7 +50,7 @@ writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_K
       PATH: `${bin}:${process.env.PATH}`,
       GITHUB_ENV: githubEnv,
       VERCEL_TOKEN: "test-access-token",
-      VERCEL_TEAM_ID: "test-team",
+      VERCEL_ORG_ID: "team_test",
       VERCEL_PROJECT_ID: "test-project",
       REQUIRE_CURSOR_API_KEY: "1",
     },
@@ -60,7 +61,7 @@ writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_K
   assert.match(result.stdout, /::add-mask::test-cursor-key/);
   assert.equal(
     await readFile(githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\nCURSOR_API_KEY=test-cursor-key\n",
+    "VERCEL_OIDC_TOKEN=test-oidc-token\nVERCEL_TOKEN=\nCURSOR_API_KEY=test-cursor-key\n",
   );
 });
 
@@ -77,6 +78,7 @@ test("exports only OIDC when the job does not run Cursor", async (t) => {
     `#!/usr/bin/env node
 import { writeFileSync } from 'node:fs'
 writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_KEY=test-cursor-key\\n')
+if (process.argv.includes('--token') || process.argv.includes('--scope')) process.exit(2)
 `,
   );
   await chmod(vercel, 0o755);
@@ -88,7 +90,7 @@ writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_K
       PATH: `${bin}:${process.env.PATH}`,
       GITHUB_ENV: githubEnv,
       VERCEL_TOKEN: "test-access-token",
-      VERCEL_TEAM_ID: "test-team",
+      VERCEL_ORG_ID: "team_test",
       VERCEL_PROJECT_ID: "test-project",
     },
   });
@@ -98,6 +100,6 @@ writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_K
   assert.doesNotMatch(result.stdout, /test-cursor-key/);
   assert.equal(
     await readFile(githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\n",
+    "VERCEL_OIDC_TOKEN=test-oidc-token\nVERCEL_TOKEN=\n",
   );
 });

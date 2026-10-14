@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   // OpenCode over AI Gateway: the direct Gemini harness requires a separate
@@ -36,7 +37,7 @@ const config: ExperimentConfig = {
     // setting through this gateway path, so the model runs at its default.
   },
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // The pass@1 smoke sweep reached roughly 16 minutes on its slowest valid
   // attempt, so leave the same headroom as the current Gemini Flash pair.
@@ -45,7 +46,7 @@ const config: ExperimentConfig = {
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    await installNext(sandbox);
   },
 };
 

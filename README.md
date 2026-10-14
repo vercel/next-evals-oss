@@ -275,11 +275,12 @@ pass@4 board. Follow-up questions in that Slack thread use the same report
 context; questions about published data use Eve's read-only repository tool.
 
 The Next.js caller grants `id-token: write` and passes its existing release-eval
-Vercel project identifiers plus the project's CLI OIDC policy ID. Every job
-exchanges its GitHub Actions identity for a short-lived `VERCEL_TOKEN`, then uses
-that token to pull a short-lived `VERCEL_OIDC_TOKEN` from the linked project. The
-CLI policy should be restricted to the Next.js caller workflow, this reusable
-workflow, and the release-eval project. The project OIDC token authenticates
+Vercel project identifiers. Every job uses Vercel's official authentication
+action to exchange its GitHub Actions identity for short-lived CLI access, then
+pulls a short-lived `VERCEL_OIDC_TOKEN` from the release-eval project. The CLI
+policy should be restricted to the `vercel/next.js` repository and its caller
+workflow. The temporary CLI credential is cleared before the eval runner starts.
+The project OIDC token authenticates
 Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
 and the release agent's OIDC-protected intake route. Cursor matrix jobs also
 export the existing `CURSOR_API_KEY`; other model and reporting jobs do not.

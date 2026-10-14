@@ -23,38 +23,31 @@ on:
         description: GitHub Actions URL for the Next.js release
         required: true
         type: string
-      vercelTeamId:
-        description: Vercel team ID used for GitHub OIDC authentication
+      vercelOrgId:
+        description: Canonical Vercel team ID used for GitHub OIDC authentication
         required: true
         type: string
       vercelProjectId:
         description: Vercel project ID that stores the release-eval credentials
         required: true
         type: string
-      vercelOidcPolicyId:
-        description: Vercel CLI OIDC policy for this GitHub Actions workflow
-        required: true
-        type: string
       releaseAgentUrl:
         description: Production URL for the Eve release-evals agent
-        required: true
-        type: string
-      automationRef:
-        description: Immutable next-evals-oss commit containing this workflow and its scripts
         required: true
         type: string
 concurrency:
   group: next-release-evals
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
   prepare:
     name: Validate release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       next-version: ${{ steps.release.outputs.next-version }}
       release-kind: ${{ steps.release.outputs.release-kind }}
@@ -67,8 +60,8 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: vercel/next-evals-oss
-          ref: ${{ inputs.automationRef }}
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -83,13 +76,12 @@ jobs:
       - name: Check required credentials
         shell: bash
         env:
-          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
+          VERCEL_ORG_ID: ${{ inputs.vercelOrgId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
-          VERCEL_OIDC_POLICY_ID: ${{ inputs.vercelOidcPolicyId }}
           RELEASE_AGENT_URL: ${{ inputs.releaseAgentUrl }}
         run: |
           missing=()
-          for name in VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_OIDC_POLICY_ID RELEASE_AGENT_URL; do
+          for name in VERCEL_ORG_ID VERCEL_PROJECT_ID RELEASE_AGENT_URL; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( ${#missing[@]} > 0 )); then
@@ -125,13 +117,10 @@ jobs:
       - name: Authenticate Vercel CLI access
         uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
         with:
-          audience: https://github.com/vercel
-          policy: ${{ inputs.vercelOidcPolicyId }}
-          team: ${{ inputs.vercelTeamId }}
+          team: ${{ inputs.vercelOrgId }}
 
       - name: Check the release project's credentials
         env:
-          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           REQUIRE_CURSOR_API_KEY: "1"
         run: node scripts/ci-auth.mjs
@@ -151,6 +140,9 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -158,8 +150,8 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: vercel/next-evals-oss
-          ref: ${{ inputs.automationRef }}
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -188,13 +180,10 @@ jobs:
       - name: Authenticate Vercel CLI access
         uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
         with:
-          audience: https://github.com/vercel
-          policy: ${{ inputs.vercelOidcPolicyId }}
-          team: ${{ inputs.vercelTeamId }}
+          team: ${{ inputs.vercelOrgId }}
 
       - name: Pull short-lived Vercel OIDC token
         env:
-          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           REQUIRE_CURSOR_API_KEY: ${{ startsWith(matrix.experiment, 'cursor-') && '1' || '0' }}
         run: node scripts/ci-auth.mjs
@@ -280,8 +269,8 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: vercel/next-evals-oss
-          ref: ${{ inputs.automationRef }}
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -381,13 +370,10 @@ jobs:
       - name: Authenticate Vercel CLI access
         uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
         with:
-          audience: https://github.com/vercel
-          policy: ${{ inputs.vercelOidcPolicyId }}
-          team: ${{ inputs.vercelTeamId }}
+          team: ${{ inputs.vercelOrgId }}
 
       - name: Pull the release project's short-lived credentials
         env:
-          VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
         run: node scripts/ci-auth.mjs
 
