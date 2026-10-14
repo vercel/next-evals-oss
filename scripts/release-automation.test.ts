@@ -187,7 +187,8 @@ test('agent notification points at the standalone measurement PR', () => {
       sourceRunUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
       evaluatedAt: '2026-10-13T12:00:00.000Z',
     },
-    workflowUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
+    workflowUrl:
+      'https://github.com/vercel/next-evals-oss/actions/runs/12345',
     measurementUrl: 'https://github.com/vercel/next-evals-oss/pull/456',
     report,
   });
@@ -220,6 +221,17 @@ test('agent notification points at the standalone measurement PR', () => {
     'validation',
     'workflowUrl',
   ]);
+
+  assert.throws(
+    () =>
+      buildReleaseNotification({
+        target: notification.target,
+        workflowUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
+        measurementUrl: notification.measurementUrl,
+        report,
+      }),
+    /vercel\/next-evals-oss/,
+  );
 });
 
 async function makeResult(

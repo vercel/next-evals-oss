@@ -37,7 +37,8 @@ token or webhook URL in GitHub.
    `message.channels` trigger events, with `app_mentions:read`, `chat:write`, and
    `channels:history` bot scopes.
 4. Run `pnpm deploy` and save the production URL as the
-   `VERCEL_NEXT_EVALS_AGENT_URL` Actions variable in `vercel/next.js`.
+   `VERCEL_NEXT_EVALS_AGENT_URL` Actions variable in
+   `vercel/next-evals-oss`.
 
 The bot is limited to channel `C0C7VCBP4CA`. Automated summaries start a thread;
 teammates can continue in that thread or mention the bot in the channel.
