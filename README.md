@@ -260,17 +260,19 @@ reproducible failure from an unstable first attempt.
 
 The workflow runs and aggregates release measurements in a temporary workspace
 outside the repository. Matrix jobs validate their raw output in place, then
-retain only score summaries and compact failure confirmations for aggregation.
-Raw transcripts, generated applications, evaluator output, and command output
-never cross the job boundary. Before retaining generated measurement data, the
+pass score summaries, compact failure confirmations, and the full validated run
+output to the aggregation job. Before passing or committing generated data, the
 workflow rejects it if it contains the exact value of a credential available to
-that job.
+that job. The temporary transport artifacts expire after one day.
 
 Each completed run opens a draft pull request under
 `measurements/releases/<version>/<run-id>/`. The pull request contains the
-aggregate measurement, release provenance, and failure confirmations. It never
-writes to the publishable `results/` tree or `agent-results.json`, so merging it
-records the measurement without publishing anything to `nextjs.org/evals`.
+durable aggregate measurement, release provenance, failure confirmations, and
+the complete sanitized output from the scored and confirmation attempts. This
+includes transcripts, evaluator output, and command output for inspecting the
+agent's reasoning. It never writes to the publishable `results/` tree or
+`agent-results.json`, so merging it records the measurement without publishing
+anything to `nextjs.org/evals`.
 
 After the draft pull request is opened, the workflow sends a compact validated
 report to the [Eve release agent](apps/release-agent). Eve writes one concise message to

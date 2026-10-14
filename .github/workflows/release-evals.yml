@@ -247,8 +247,10 @@ jobs:
           EXPERIMENT: ${{ matrix.experiment }}
           EVALUATED_AT: ${{ needs.prepare.outputs.evaluated-at }}
           RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
+          DIAGNOSTIC_RESULTS_DIR: ${{ runner.temp }}/release-diagnostic-runs
         run: |
           experiment_results="$RELEASE_EVAL_WORKSPACE/results/$EXPERIMENT"
+          diagnostic_results="$DIAGNOSTIC_RESULTS_DIR/$EXPERIMENT"
           if [[ ! -d "$experiment_results" ]]; then
             echo "The runner produced no new result files for $EXPERIMENT" >&2
             exit 1
@@ -256,16 +258,23 @@ jobs:
 
           pnpm tsx scripts/release-automation.ts validate-results
 
-          # The raw result tree contains transcripts, generated applications,
-          # and command output. Only score summaries cross the job boundary.
+          # Score summaries cross the job boundary separately for aggregation.
+          # Full scored and confirmation output is also retained for the
+          # human-reviewed measurement PR.
           cd "$RELEASE_EVAL_WORKSPACE/results"
           find "$EXPERIMENT" -type f -name summary.json -print0 \
             | tar --null -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" --files-from=-
           tar -tzf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" | head -1
 
-          node "$GITHUB_WORKSPACE/scripts/assert-no-secrets.mjs" \
-            "$RUNNER_TEMP/$EXPERIMENT.tar.gz" \
+          retained_paths=(
+            "$RUNNER_TEMP/$EXPERIMENT.tar.gz"
             "$RUNNER_TEMP/release-diagnostic-summaries/$EXPERIMENT.json"
+            "$experiment_results"
+          )
+          if [[ -d "$diagnostic_results" ]]; then
+            retained_paths+=("$diagnostic_results")
+          fi
+          node "$GITHUB_WORKSPACE/scripts/assert-no-secrets.mjs" "${retained_paths[@]}"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -278,6 +287,16 @@ jobs:
         with:
           name: release-diagnostic-summary-${{ matrix.experiment }}
           path: ${{ runner.temp }}/release-diagnostic-summaries/${{ matrix.experiment }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Retain full output for human diagnosis
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-full-output-${{ matrix.experiment }}
+          path: |
+            ${{ runner.temp }}/release-eval-workspace/results/${{ matrix.experiment }}
+            ${{ runner.temp }}/release-diagnostic-runs/${{ matrix.experiment }}
           if-no-files-found: error
           retention-days: 1
 
@@ -322,6 +341,12 @@ jobs:
         with:
           pattern: release-diagnostic-summary-*
           path: ${{ runner.temp }}/release-diagnostic-parts
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-full-output-*
+          path: ${{ runner.temp }}/release-full-output
           merge-multiple: true
 
       - name: Prepare an isolated release workspace
@@ -416,10 +441,23 @@ jobs:
           MEASUREMENT_REPOSITORY: ${{ github.workspace }}/measurement-repository
         run: |
           destination="measurements/releases/$NEXT_VERSION/$RUN_ID"
-          mkdir -p "$MEASUREMENT_REPOSITORY/$destination"
+          mkdir -p \
+            "$MEASUREMENT_REPOSITORY/$destination/results" \
+            "$MEASUREMENT_REPOSITORY/$destination/confirmations"
           cp "$RUNNER_TEMP/release-measurement.json" "$MEASUREMENT_REPOSITORY/$destination/measurement.json"
           cp "$RUNNER_TEMP/evaluation-target.json" "$MEASUREMENT_REPOSITORY/$destination/target.json"
           cp "$RUNNER_TEMP/release-diagnostics.json" "$MEASUREMENT_REPOSITORY/$destination/diagnostics.json"
+          cp -R \
+            "$RUNNER_TEMP/release-full-output/release-eval-workspace/results/." \
+            "$MEASUREMENT_REPOSITORY/$destination/results/"
+          if [[ -d "$RUNNER_TEMP/release-full-output/release-diagnostic-runs" ]]; then
+            cp -R \
+              "$RUNNER_TEMP/release-full-output/release-diagnostic-runs/." \
+              "$MEASUREMENT_REPOSITORY/$destination/confirmations/"
+          fi
+
+          node "$GITHUB_WORKSPACE/scripts/assert-no-secrets.mjs" \
+            "$MEASUREMENT_REPOSITORY/$destination"
 
           cd "$MEASUREMENT_REPOSITORY"
           branch="automation/measure-next-$NEXT_VERSION-$RUN_ID"
@@ -449,6 +487,7 @@ jobs:
           RELEASE_KIND: ${{ needs.prepare.outputs.release-kind }}
           BRANCH: ${{ steps.measurement.outputs.branch }}
           DESTINATION: ${{ steps.measurement.outputs.destination }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         working-directory: ${{ github.workspace }}/measurement-repository
         run: |
           existing="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')"
@@ -464,8 +503,9 @@ jobs:
           - Tag: `$NEXT_REF`
           - Commit: `$NEXT_SHA`
           - Release workflow: $SOURCE_RUN_URL
+          - Measurement workflow: $WORKFLOW_URL
 
-          This PR contains only validated aggregate scores, release provenance, and compact failure confirmations. Raw transcripts, generated applications, and command output are excluded. Merging it records the measurement without changing `results/` or `agent-results.json`, so it cannot publish to nextjs.org/evals.
+          This PR contains the validated aggregate scores and the complete sanitized output from the scored and confirmation attempts. The data is isolated under `$DESTINATION`; it does not change `results/` or `agent-results.json`, so merging this PR cannot publish it to nextjs.org/evals.
           EOF
           url="$(gh pr create --draft --base main --head "$BRANCH" --title "Record Next.js v$NEXT_VERSION pass@1 measurement" --body-file "$RUNNER_TEMP/measurement-pr-body.md")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
