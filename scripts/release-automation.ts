@@ -144,11 +144,13 @@ export function buildReleaseNotification(options: {
   report: ReleaseReport;
 }): ReleaseNotification {
   if (
-    !/^https:\/\/github\.com\/vercel\/next\.js\/actions\/runs\/\d+$/.test(
+    !/^https:\/\/github\.com\/vercel\/next-evals-oss\/actions\/runs\/\d+$/.test(
       options.workflowUrl,
     )
   ) {
-    throw new Error('workflowUrl must point to a vercel/next.js Actions run');
+    throw new Error(
+      'workflowUrl must point to a vercel/next-evals-oss Actions run',
+    );
   }
   if (
     !/^https:\/\/github\.com\/vercel\/next-evals-oss\/pull\/\d+$/.test(

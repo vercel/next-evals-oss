@@ -234,12 +234,13 @@ refreshing, and record the rest in `ACCEPTED_STALE`.
 
 [`release-evals.yml`](.github/workflows/release-evals.yml) runs entirely in this
 repository. An hourly check discovers stable releases and backports published
-after the monitor baseline in [`release-monitor.json`](release-monitor.json); a
-daily check measures the current npm canary. Manual dispatch accepts one exact
-published stable or canary version. Discovery resolves the matching public tag,
-commit SHA, successful `vercel/next.js` build-and-deploy run, and source branch
-before any model job starts. Existing measurement pull requests are skipped
-unless a maintainer explicitly requests a forced manual rerun.
+after the monitor baseline in [`release-monitor.json`](release-monitor.json).
+Manual dispatch accepts one exact published stable or canary version, so canary
+measurements run only when a maintainer explicitly requests one. Discovery
+resolves the matching public tag, commit SHA, successful `vercel/next.js`
+build-and-deploy run, and source branch before any model job starts. Existing
+verified automation-authored measurement pull requests are skipped unless a
+maintainer explicitly requests a forced manual rerun.
 
 The workflow runs every tier-1 model both with and without AGENTS.md against a
 fixed eval suite. Existing Next.js fixtures install the exact published package,

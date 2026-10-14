@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   classifyReleaseRuns,
+  isVerifiedMeasurementPull,
   selectScheduledVersions,
 } from './release-discovery.js';
 
@@ -11,7 +12,6 @@ const sha = 'a'.repeat(40);
 test('scheduled stable discovery includes backports and proceeds oldest first', () => {
   assert.deepEqual(
     selectScheduledVersions({
-      mode: 'stable',
       publishedAt: {
         '16.2.3': '2026-10-13T10:00:00.000Z',
         '15.5.9': '2026-10-14T10:00:00.000Z',
@@ -19,21 +19,8 @@ test('scheduled stable discovery includes backports and proceeds oldest first', 
         '16.3.0-canary.1': '2026-10-14T09:00:00.000Z',
       },
       stablePublishedAfter: '2026-10-14T00:00:00.000Z',
-      canaryVersion: '',
     }),
     ['15.5.9', '16.2.4'],
-  );
-});
-
-test('scheduled canary discovery uses the npm canary dist-tag', () => {
-  assert.deepEqual(
-    selectScheduledVersions({
-      mode: 'canary',
-      publishedAt: {},
-      stablePublishedAfter: '2026-10-14T00:00:00.000Z',
-      canaryVersion: '16.3.0-canary.12',
-    }),
-    ['16.3.0-canary.12'],
   );
 });
 
@@ -73,6 +60,50 @@ test('release provenance distinguishes releases, backports, and canaries', () =>
       runs: [canaryTagRun],
     }),
     { kind: 'canary', sourceRunUrl: tagRun.html_url },
+  );
+});
+
+test('only bot-authored measurement pull requests suppress a release', () => {
+  const pull = {
+    title: 'Record Next.js v16.2.4 pass@1 measurement',
+    user: { login: 'github-actions[bot]' },
+    base: { ref: 'main' },
+    head: {
+      ref: 'automation/measure-next-16.2.4-12345',
+      repo: { full_name: 'vercel/next-evals-oss' },
+    },
+  };
+
+  assert.equal(isVerifiedMeasurementPull(pull, '16.2.4'), true);
+  assert.equal(
+    isVerifiedMeasurementPull(
+      { ...pull, user: { login: 'someone-else' } },
+      '16.2.4',
+    ),
+    false,
+  );
+  assert.equal(
+    isVerifiedMeasurementPull(
+      {
+        ...pull,
+        head: { ...pull.head, ref: 'lookalike-branch' },
+      },
+      '16.2.4',
+    ),
+    false,
+  );
+  assert.equal(
+    isVerifiedMeasurementPull(
+      {
+        ...pull,
+        head: {
+          ...pull.head,
+          repo: { full_name: 'someone-else/next-evals-oss' },
+        },
+      },
+      '16.2.4',
+    ),
+    false,
   );
 });
 

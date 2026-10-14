@@ -10,7 +10,7 @@ const repository = 'vercel/next-evals-oss';
 const nextRepository = 'vercel/next.js';
 const releaseWorkflow = 'build_and_deploy.yml';
 
-type DiscoveryMode = 'manual' | 'stable' | 'canary';
+type DiscoveryMode = 'manual' | 'stable';
 
 interface MonitorConfig {
   stablePublishedAfter: string;
@@ -44,8 +44,21 @@ interface BranchAtCommit {
 
 interface SearchResult {
   items: Array<{
+    number: number;
+    pull_request?: object;
     title: string;
+    user: { login: string } | null;
   }>;
+}
+
+interface PullRequestDetails {
+  base: { ref: string };
+  head: {
+    ref: string;
+    repo: { full_name: string } | null;
+  };
+  title: string;
+  user: { login: string } | null;
 }
 
 interface GithubClient {
@@ -53,18 +66,9 @@ interface GithubClient {
 }
 
 export function selectScheduledVersions(options: {
-  mode: Exclude<DiscoveryMode, 'manual'>;
   publishedAt: Record<string, string>;
   stablePublishedAfter: string;
-  canaryVersion: string;
 }): string[] {
-  if (options.mode === 'canary') {
-    if (!canaryVersionPattern.test(options.canaryVersion)) {
-      throw new Error('The npm canary dist-tag is not an exact canary version');
-    }
-    return [options.canaryVersion];
-  }
-
   const threshold = Date.parse(options.stablePublishedAfter);
   if (!Number.isFinite(threshold)) {
     throw new Error('stablePublishedAfter must be an ISO timestamp');
@@ -77,6 +81,22 @@ export function selectScheduledVersions(options: {
     )
     .sort(([, left], [, right]) => Date.parse(left) - Date.parse(right))
     .map(([version]) => version);
+}
+
+export function isVerifiedMeasurementPull(
+  pull: PullRequestDetails,
+  version: string,
+): boolean {
+  const branchPrefix = `automation/measure-next-${version}-`;
+  const runId = pull.head.ref.slice(branchPrefix.length);
+  return (
+    pull.title === `Record Next.js v${version} pass@1 measurement` &&
+    pull.user?.login === 'github-actions[bot]' &&
+    pull.base.ref === 'main' &&
+    pull.head.repo?.full_name === repository &&
+    pull.head.ref.startsWith(branchPrefix) &&
+    /^\d+$/.test(runId)
+  );
 }
 
 export function classifyReleaseRuns(options: {
@@ -206,9 +226,19 @@ async function hasMeasurement(
   const { items } = await github.get<SearchResult>(
     `/search/issues?q=${query}&per_page=10`,
   );
-  return items.some(
-    (pull) => pull.title === `Record Next.js v${version} pass@1 measurement`,
+  const candidates = items.filter(
+    (pull) =>
+      pull.pull_request &&
+      pull.title === `Record Next.js v${version} pass@1 measurement` &&
+      pull.user?.login === 'github-actions[bot]',
   );
+  for (const candidate of candidates) {
+    const pull = await github.get<PullRequestDetails>(
+      `/repos/${repository}/pulls/${candidate.number}`,
+    );
+    if (isVerifiedMeasurementPull(pull, version)) return true;
+  }
+  return false;
 }
 
 async function resolveTarget(
@@ -246,8 +276,8 @@ async function writeOutput(name: string, value: string): Promise<void> {
 
 async function main(): Promise<void> {
   const mode = requiredEnv('DISCOVERY_MODE') as DiscoveryMode;
-  if (!['manual', 'stable', 'canary'].includes(mode)) {
-    throw new Error('DISCOVERY_MODE must be manual, stable, or canary');
+  if (!['manual', 'stable'].includes(mode)) {
+    throw new Error('DISCOVERY_MODE must be manual or stable');
   }
 
   const publishedAt = npmJson<Record<string, string>>([
@@ -271,15 +301,9 @@ async function main(): Promise<void> {
     const config = JSON.parse(
       await readFile('release-monitor.json', 'utf8'),
     ) as MonitorConfig;
-    const canaryVersion =
-      mode === 'canary'
-        ? npmJson<string>(['view', 'next', 'dist-tags.canary', '--json'])
-        : '';
     candidates = selectScheduledVersions({
-      mode,
       publishedAt,
       stablePublishedAfter: config.stablePublishedAfter,
-      canaryVersion,
     });
   }
 

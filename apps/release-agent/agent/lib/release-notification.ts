@@ -60,7 +60,9 @@ export const releaseNotificationSchema = z.object({
   }),
   workflowUrl: z
     .url()
-    .regex(/^https:\/\/github\.com\/vercel\/next\.js\/actions\/runs\/\d+$/),
+    .regex(
+      /^https:\/\/github\.com\/vercel\/next-evals-oss\/actions\/runs\/\d+$/,
+    ),
   measurementUrl: z
     .url()
     .regex(/^https:\/\/github\.com\/vercel\/next-evals-oss\/pull\/\d+$/),

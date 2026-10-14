@@ -6,11 +6,21 @@ const workflowPath = new URL(
   '../.github/workflows/release-evals.yml',
   import.meta.url,
 );
+const notificationSchemaPath = new URL(
+  '../apps/release-agent/agent/lib/release-notification.ts',
+  import.meta.url,
+);
 
 test('release automation is standalone and restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /schedule:/);
+  assert.match(workflow, /cron: "17 \* \* \* \*"/);
+  assert.doesNotMatch(workflow, /cron: "43 7 \* \* \*"/);
+  assert.match(
+    workflow,
+    /github\.event_name == 'workflow_dispatch' && 'manual' \|\| 'stable'/,
+  );
   assert.match(
     workflow,
     /github\.ref == 'refs\/heads\/main'/,
@@ -30,4 +40,16 @@ test('repository write access starts only after sanitization', async () => {
   assert.match(publish, /contents: write/);
   assert.match(publish, /pull-requests: write/);
   assert.match(publish, /assert-no-secrets\.mjs/);
+});
+
+test('the release agent accepts standalone workflow URLs', async () => {
+  const schema = await readFile(notificationSchemaPath, 'utf8');
+  assert.match(
+    schema,
+    /github\\\.com\\\/vercel\\\/next-evals-oss\\\/actions\\\/runs/,
+  );
+  assert.doesNotMatch(
+    schema,
+    /workflowUrl:[\s\S]*github\\\.com\\\/vercel\\\/next\\\.js\\\/actions\\\/runs/,
+  );
 });
