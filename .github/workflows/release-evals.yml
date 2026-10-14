@@ -496,17 +496,15 @@ jobs:
             exit 0
           fi
 
-          cat > "$RUNNER_TEMP/measurement-pr-body.md" <<EOF
-          Records the standalone pass@1 measurement for `next@$NEXT_VERSION` at `$DESTINATION`.
-
-          - Release path: `$RELEASE_KIND`
-          - Tag: `$NEXT_REF`
-          - Commit: `$NEXT_SHA`
-          - Release workflow: $SOURCE_RUN_URL
-          - Measurement workflow: $WORKFLOW_URL
-
-          This PR contains the validated aggregate scores and the complete sanitized output from the scored and confirmation attempts. The data is isolated under `$DESTINATION`; it does not change `results/` or `agent-results.json`, so merging this PR cannot publish it to nextjs.org/evals.
-          EOF
+          {
+            printf 'Records the standalone pass@1 measurement for `next@%s` at `%s`.\n\n' "$NEXT_VERSION" "$DESTINATION"
+            printf -- '- Release path: `%s`\n' "$RELEASE_KIND"
+            printf -- '- Tag: `%s`\n' "$NEXT_REF"
+            printf -- '- Commit: `%s`\n' "$NEXT_SHA"
+            printf -- '- Release workflow: %s\n' "$SOURCE_RUN_URL"
+            printf -- '- Measurement workflow: %s\n\n' "$WORKFLOW_URL"
+            printf 'This PR contains the validated aggregate scores and the complete sanitized output from the scored and confirmation attempts. The data is isolated under `%s`; it does not change `results/` or `agent-results.json`, so merging this PR cannot publish it to nextjs.org/evals.\n' "$DESTINATION"
+          } > "$RUNNER_TEMP/measurement-pr-body.md"
           url="$(gh pr create --draft --base main --head "$BRANCH" --title "Record Next.js v$NEXT_VERSION pass@1 measurement" --body-file "$RUNNER_TEMP/measurement-pr-body.md")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
