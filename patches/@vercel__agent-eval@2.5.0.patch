@@ -1,0 +1,31 @@
+diff --git a/dist/lib/runner.js b/dist/lib/runner.js
+index 5f1f2e2cb0478d10199813e8f7d9b91370c9bf49..24265b20bed7daa915769990dcb626de38d88de7 100644
+--- a/dist/lib/runner.js
++++ b/dist/lib/runner.js
+@@ -219,18 +219,21 @@ export async function runExperiment(options) {
+         };
+     };
+     // Retry wrapper: if an attempt fails suspiciously fast (< 5s), it's likely an infra issue (429, etc.)
+-    // Real evals take minutes, so a sub-5s failure is always anomalous.
++    // Real evals take minutes, so a sub-5s failure is always anomalous. Vercel
++    // Sandbox transport failures can also surface as a late, exact `fetch failed`
++    // error, so retry those independently of their reported duration.
+     const MAX_RETRIES = 5;
+     const INITIAL_BACKOFF_MS = 5_000;
+     const ANOMALY_THRESHOLD_S = 5;
+     const runAttemptWithRetry = async (attempt) => {
+         for (let retry = 0;; retry++) {
+             const result = await runAttempt(attempt);
+-            const isSuspiciouslyFast = !result.aborted &&
++            const isRetryableInfrastructureFailure = !result.aborted &&
+                 result.runData.result.status === 'failed' &&
+-                result.runData.result.duration < ANOMALY_THRESHOLD_S &&
+-                !result.runData.result.error?.includes('timed out');
+-            if (!isSuspiciouslyFast || retry >= MAX_RETRIES) {
++                ((result.runData.result.duration < ANOMALY_THRESHOLD_S &&
++                    !result.runData.result.error?.includes('timed out')) ||
++                    result.runData.result.error === 'fetch failed');
++            if (!isRetryableInfrastructureFailure || retry >= MAX_RETRIES) {
+                 return result;
+             }
+             const backoff = INITIAL_BACKOFF_MS * Math.pow(2, retry);

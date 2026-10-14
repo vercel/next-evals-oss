@@ -74,6 +74,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'gemini-3-pro-preview--agents-md': 'gemini-3-pro-preview-gemini-cli',
   'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
   'gemini-3.8-flash--agents-md': 'gemini-3.8-flash',
+  'gemini-4-argon--agents-md': 'gemini-4-argon',
   'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
   'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
   'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
@@ -235,6 +236,8 @@ const MODEL_NAMES: Record<string, string> = {
   // comment in experiments/gemini-3.8-flash.ts.
   'gemini-3.8-flash': 'Gemini 3.8 Flash',
   'gemini-3.8-flash--agents-md': 'Gemini 3.8 Flash + AGENTS.md',
+  'gemini-4-argon': 'Gemini 4 Argon',
+  'gemini-4-argon--agents-md': 'Gemini 4 Argon + AGENTS.md',
   'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
   'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',

@@ -20,6 +20,8 @@ export const TIER_ONE_EXPERIMENTS = [
   // Flash and Pro are separate model lines. The Pro experiments remain tier 2
   // until the direct-provider Gemini CLI credentials are available to rerun them.
   'gemini-3.8-flash',
+  // Argon is Google's current general reasoning line, distinct from Flash.
+  'gemini-4-argon',
   'kimi-k3',
   'kimi-k2.7-code', // Kimi K3 shipped 29 days after it.
   'cursor-composer-2.5',
