@@ -8,6 +8,7 @@ import { parse } from "dotenv";
 const required = [
   "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
   "ACTIONS_ID_TOKEN_REQUEST_URL",
+  "VERCEL_CLI_CLIENT_ID",
   "VERCEL_ORG_ID",
   "VERCEL_PROJECT_ID",
   "GITHUB_ENV",
@@ -46,7 +47,7 @@ try {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        client_id: "cl_HYyOPBNtFMfHhaUn9L4QPfTZz6TP47bp",
+        client_id: process.env.VERCEL_CLI_CLIENT_ID,
         subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
         requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
         team_id_or_slug: process.env.VERCEL_ORG_ID,

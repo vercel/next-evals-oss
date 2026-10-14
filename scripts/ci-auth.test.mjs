@@ -58,6 +58,7 @@ globalThis.fetch = async (url, init = {}) => {
   assert.equal(init.method, 'POST')
   const params = new URLSearchParams(init.body)
   assert.equal(params.get('grant_type'), 'urn:ietf:params:oauth:grant-type:token-exchange')
+  assert.equal(params.get('client_id'), 'test-client-id')
   assert.equal(params.get('subject_token'), 'test-github-oidc-token')
   assert.equal(params.get('team_id_or_slug'), 'team_test')
   return new Response(JSON.stringify({ access_token: 'test-access-token' }))
@@ -77,6 +78,7 @@ function runScript({ bin, githubEnv, mockFetch }, extraEnv = {}) {
       ACTIONS_ID_TOKEN_REQUEST_URL: "https://github.example.test/oidc",
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: "test-request-token",
       GITHUB_ENV: githubEnv,
+      VERCEL_CLI_CLIENT_ID: "test-client-id",
       VERCEL_ORG_ID: "team_test",
       VERCEL_PROJECT_ID: "test-project",
       ...extraEnv,
