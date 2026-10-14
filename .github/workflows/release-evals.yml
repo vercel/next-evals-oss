@@ -31,6 +31,10 @@ on:
         description: Vercel project ID that stores the release-eval credentials
         required: true
         type: string
+      vercelCliClientId:
+        description: Public OAuth client ID used for the GitHub-to-Vercel OIDC exchange
+        required: true
+        type: string
       releaseAgentUrl:
         description: Production URL for the Eve release-evals agent
         required: true
@@ -84,12 +88,13 @@ jobs:
       - name: Check required credentials
         shell: bash
         env:
+          VERCEL_CLI_CLIENT_ID: ${{ inputs.vercelCliClientId }}
           VERCEL_ORG_ID: ${{ inputs.vercelOrgId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           RELEASE_AGENT_URL: ${{ inputs.releaseAgentUrl }}
         run: |
           missing=()
-          for name in VERCEL_ORG_ID VERCEL_PROJECT_ID RELEASE_AGENT_URL; do
+          for name in VERCEL_CLI_CLIENT_ID VERCEL_ORG_ID VERCEL_PROJECT_ID RELEASE_AGENT_URL; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( ${#missing[@]} > 0 )); then
@@ -124,6 +129,7 @@ jobs:
 
       - name: Check the release project's credentials
         env:
+          VERCEL_CLI_CLIENT_ID: ${{ inputs.vercelCliClientId }}
           VERCEL_ORG_ID: ${{ inputs.vercelOrgId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           REQUIRE_CURSOR_API_KEY: "1"
@@ -183,6 +189,7 @@ jobs:
 
       - name: Pull short-lived Vercel credentials
         env:
+          VERCEL_CLI_CLIENT_ID: ${{ inputs.vercelCliClientId }}
           VERCEL_ORG_ID: ${{ inputs.vercelOrgId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           REQUIRE_CURSOR_API_KEY: ${{ startsWith(matrix.experiment, 'cursor-') && '1' || '0' }}
@@ -500,6 +507,7 @@ jobs:
 
       - name: Pull the release project's short-lived credentials
         env:
+          VERCEL_CLI_CLIENT_ID: ${{ inputs.vercelCliClientId }}
           VERCEL_ORG_ID: ${{ inputs.vercelOrgId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
         run: node scripts/ci-auth.mjs
