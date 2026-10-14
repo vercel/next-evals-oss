@@ -27,6 +27,11 @@ test("every release experiment honors pass@1 and the exact Next.js version", asy
       moduleUrl.searchParams.set("release-contract", experiment);
       const config = (await import(moduleUrl.href)).default as ExperimentConfig;
 
+      assert.match(
+        config.agent,
+        /^vercel-ai-gateway\//,
+        `${experiment} must use AI Gateway with the project OIDC token`,
+      );
       assert.equal(config.runs, 1, `${experiment} must use pass@1`);
       assert.ok(config.setup, `${experiment} must define sandbox setup`);
 

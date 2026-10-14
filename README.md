@@ -78,12 +78,12 @@ calls this out.
 
 **Agents.** Each experiment names an `agent`, and the agent decides which key it
 reads. `VERCEL_OIDC_TOKEN` authenticates `vercel-ai-gateway/*` agents. Direct
-agents still require their own credential, so the release matrix also pulls the
-existing `CURSOR_API_KEY` from its linked Vercel project.
+agents still require their own credential. The automated release matrix contains
+only AI Gateway agents, so its project OIDC token covers every model it runs.
 
 | Agent | Key |
 |-------|-----|
-| `vercel-ai-gateway/*` (most experiments) | `AI_GATEWAY_API_KEY` |
+| `vercel-ai-gateway/*` (most experiments) | `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` |
 | `claude-code` | `CLAUDE_CODE_OAUTH_TOKEN` if set, else `ANTHROPIC_API_KEY` |
 | `codex` | `OPENAI_API_KEY` |
 | `gemini` | `GEMINI_API_KEY` |
@@ -290,10 +290,10 @@ policy should be restricted to the `vercel/next.js` repository and its caller
 workflow. The temporary CLI credential is cleared before the eval runner starts.
 The project OIDC token authenticates
 Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
-and the release agent's OIDC-protected intake route. Cursor matrix jobs also
-export the existing `CURSOR_API_KEY`; other model and reporting jobs do not.
-Direct agents cannot substitute OIDC for their own credential. No long-lived
-Vercel token or model-provider secrets are copied into this repository.
+and the release agent's OIDC-protected intake route. Direct agents cannot
+substitute OIDC for their own credential and are excluded from this matrix. No
+long-lived Vercel token or model-provider secrets are copied into this
+repository.
 
 Opening the measurement pull request requires a GitHub App installed on
 `vercel/next-evals-oss` with Contents and Pull requests write permissions. The

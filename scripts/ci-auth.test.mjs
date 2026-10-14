@@ -41,7 +41,7 @@ import { writeFileSync } from 'node:fs'
 if (process.env.VERCEL_TOKEN !== 'test-access-token') process.exit(2)
 if (process.env.VERCEL_ORG_ID !== 'team_test') process.exit(3)
 if (process.argv.includes('--token') || process.argv.includes('--scope')) process.exit(4)
-writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\nCURSOR_API_KEY=test-cursor-key\\n')
+writeFileSync(process.argv[4], 'VERCEL_OIDC_TOKEN=test-oidc-token\\n')
 `,
   );
   await chmod(vercel, 0o755);
@@ -88,26 +88,12 @@ function runScript({ bin, githubEnv, mockFetch }, extraEnv = {}) {
 
 test("exchanges GitHub OIDC and exports the project credentials", async (t) => {
   const fixture = await createFixture(t);
-  const result = runScript(fixture, { REQUIRE_CURSOR_API_KEY: "1" });
+  const result = runScript(fixture);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /::add-mask::test-github-oidc-token/);
   assert.match(result.stdout, /::add-mask::test-access-token/);
   assert.match(result.stdout, /::add-mask::test-oidc-token/);
-  assert.match(result.stdout, /::add-mask::test-cursor-key/);
-  assert.equal(
-    await readFile(fixture.githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\nVERCEL_TOKEN=\nCURSOR_API_KEY=test-cursor-key\n",
-  );
-});
-
-test("exports only OIDC when the job does not run Cursor", async (t) => {
-  const fixture = await createFixture(t);
-  const result = runScript(fixture);
-
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /::add-mask::test-oidc-token/);
-  assert.doesNotMatch(result.stdout, /test-cursor-key/);
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_OIDC_TOKEN=test-oidc-token\nVERCEL_TOKEN=\n",

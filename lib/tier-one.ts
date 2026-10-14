@@ -24,7 +24,6 @@ export const TIER_ONE_EXPERIMENTS = [
   'gemini-4-argon',
   'kimi-k3',
   'kimi-k2.7-code', // Kimi K3 shipped 29 days after it.
-  'cursor-composer-2.5',
   'glm-5.2',
   'minimax-m3',
   // Grok 4.7 shipped 40 days after 4.6, outside the carve-out.
