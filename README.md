@@ -274,14 +274,17 @@ artifact and explicitly identifies the measurement as separate from the public
 pass@4 board. Follow-up questions in that Slack thread use the same report
 context; questions about published data use Eve's read-only repository tool.
 
-The Next.js caller passes credentials from its existing release and upgrade-eval
-setup. `VERCEL_NEXT_UPGRADE_EVALS_TOKEN` and the linked Vercel project identifiers
-mint a short-lived `VERCEL_OIDC_TOKEN` in every matrix job. That token authenticates
+The Next.js caller grants `id-token: write` and passes its existing release-eval
+Vercel project identifiers plus the project's CLI OIDC policy ID. Every job
+exchanges its GitHub Actions identity for a short-lived `VERCEL_TOKEN`, then uses
+that token to pull a short-lived `VERCEL_OIDC_TOKEN` from the linked project. The
+CLI policy should be restricted to the Next.js caller workflow, this reusable
+workflow, and the release-eval project. The project OIDC token authenticates
 Vercel Sandbox, AI Gateway model runners, infrastructure failure classification,
 and the release agent's OIDC-protected intake route. Cursor matrix jobs also
 export the existing `CURSOR_API_KEY`; other model and reporting jobs do not.
-Direct agents cannot substitute OIDC for their own credential. No model-provider
-secrets are copied into this repository.
+Direct agents cannot substitute OIDC for their own credential. No long-lived
+Vercel token or model-provider secrets are copied into this repository.
 
 Slack installation tokens and request verification stay in the
 `slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does

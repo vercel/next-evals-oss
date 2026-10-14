@@ -24,11 +24,15 @@ on:
         required: true
         type: string
       vercelTeamId:
-        description: Existing Vercel project team ID used to mint the short-lived OIDC token
+        description: Vercel team ID used for GitHub OIDC authentication
         required: true
         type: string
       vercelProjectId:
-        description: Existing Vercel project ID used to mint the short-lived OIDC token
+        description: Vercel project ID that stores the release-eval credentials
+        required: true
+        type: string
+      vercelOidcPolicyId:
+        description: Vercel CLI OIDC policy for this GitHub Actions workflow
         required: true
         type: string
       releaseAgentUrl:
@@ -39,17 +43,13 @@ on:
         description: Immutable next-evals-oss commit containing this workflow and its scripts
         required: true
         type: string
-    secrets:
-      VERCEL_TOKEN:
-        description: Vercel access token allowed to pull the linked project's OIDC token
-        required: true
-
 concurrency:
   group: next-release-evals
   cancel-in-progress: false
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   prepare:
@@ -83,13 +83,13 @@ jobs:
       - name: Check required credentials
         shell: bash
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
+          VERCEL_OIDC_POLICY_ID: ${{ inputs.vercelOidcPolicyId }}
           RELEASE_AGENT_URL: ${{ inputs.releaseAgentUrl }}
         run: |
           missing=()
-          for name in VERCEL_TOKEN VERCEL_TEAM_ID VERCEL_PROJECT_ID RELEASE_AGENT_URL; do
+          for name in VERCEL_TEAM_ID VERCEL_PROJECT_ID VERCEL_OIDC_POLICY_ID RELEASE_AGENT_URL; do
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( ${#missing[@]} > 0 )); then
@@ -122,9 +122,15 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@59.11.0
 
-      - name: Check the existing Vercel project credentials
+      - name: Authenticate Vercel CLI access
+        uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
+        with:
+          audience: https://github.com/vercel
+          policy: ${{ inputs.vercelOidcPolicyId }}
+          team: ${{ inputs.vercelTeamId }}
+
+      - name: Check the release project's credentials
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           REQUIRE_CURSOR_API_KEY: "1"
@@ -179,9 +185,15 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@59.11.0
 
+      - name: Authenticate Vercel CLI access
+        uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
+        with:
+          audience: https://github.com/vercel
+          policy: ${{ inputs.vercelOidcPolicyId }}
+          team: ${{ inputs.vercelTeamId }}
+
       - name: Pull short-lived Vercel OIDC token
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
           REQUIRE_CURSOR_API_KEY: ${{ startsWith(matrix.experiment, 'cursor-') && '1' || '0' }}
@@ -264,6 +276,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -365,9 +378,15 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Authenticate Vercel CLI access
+        uses: vercel/authenticate-cli-action@cec4e78ed4686ab05721608393617a31147f082b
+        with:
+          audience: https://github.com/vercel
+          policy: ${{ inputs.vercelOidcPolicyId }}
+          team: ${{ inputs.vercelTeamId }}
+
       - name: Pull the release project's short-lived credentials
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_TEAM_ID: ${{ inputs.vercelTeamId }}
           VERCEL_PROJECT_ID: ${{ inputs.vercelProjectId }}
         run: node scripts/ci-auth.mjs
