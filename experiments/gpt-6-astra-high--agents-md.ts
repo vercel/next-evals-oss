@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/codex',
@@ -8,15 +9,15 @@ const config: ExperimentConfig = {
   // AGENTS.md pointer written below.
   model: 'openai/gpt-6-astra?reasoningEffort=high',
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 1200,
   sandbox: 'vercel',
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    // Install the requested Next.js version
+    await installNext(sandbox);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({
