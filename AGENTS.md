@@ -13,7 +13,7 @@ that directory so Claude Code and other harnesses read the same copy.
 
 | Skill | Use it for |
 |-------|------------|
-| [`add-eval-model`](.agents/skills/add-eval-model/SKILL.md) | Adding, registering, running, or publishing a model on nextjs.org/evals |
+| [`add-eval-model`](.agents/skills/add-eval-model/SKILL.md) | Adding, registering, running, tiering, or publishing a model on nextjs.org/evals |
 
 ## Finish the run
 
