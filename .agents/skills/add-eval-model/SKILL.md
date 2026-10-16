@@ -1,6 +1,6 @@
 ---
 name: add-eval-model
-description: Add a model to the nextjs.org/evals board end to end — register the experiment pair, verify the model id and effort rung against the live AI Gateway, run the full pass@4 matrix, export, tier, and open the PR with results in it. Use for any "add/register/publish model X", "run the evals for X", or "update the evals site" request in this repo.
+description: Add a model to the nextjs.org/evals board end to end — register the experiment pair, verify the model id and effort rung against the live AI Gateway, run the full pass@4 matrix, choose its public-board tier and recurring-release status, export, and open the PR with results in it. Use for any "add/register/publish model X", "run the evals for X", "tier this model", or "update the evals site" request in this repo.
 ---
 
 # Adding a model to nextjs.org/evals
@@ -158,7 +158,52 @@ whole experiment. **Delete `results/<slug>/` and `results/<slug>--agents-md/` wh
 do** — results recorded under the old fingerprint are not re-derived away, they stay on
 disk, export as the model's last measurement, and fail `check-stale.mjs` as `changed`.
 
-### 4. Export, tier, and clean up
+### 4. Choose the board tier and release cadence
+
+Make two explicit decisions after the complete run exists:
+
+1. **How the model appears on the public board.**
+2. **Whether release automation runs it for every stable release and backport.**
+
+These decisions are related but not identical. `TIER_ONE_EXPERIMENTS` in
+`lib/tier-one.ts` assigns Tier 1 on the board. The release matrix starts from that
+list, then removes `RELEASE_EXCLUDED_EXPERIMENTS` before expanding each model into
+its base and `--agents-md` pair.
+
+| State | Board tier | Release matrix |
+| --- | --- | --- |
+| Current, reproducible model that we intend to keep fresh | Tier 1 | Included by default |
+| Current model worth highlighting, but intentionally unsuitable for every-release runs because of cost, credentials, harness, or low expected release sensitivity | Tier 1 | Add to `RELEASE_EXCLUDED_EXPERIMENTS` with a concrete comment |
+| One-off, preview, niche, or previously measured model that we do not intend to keep fresh | Tier 2 | Excluded |
+| Registered but not completely measured | Neither | Excluded |
+| Model id no longer served by the Gateway/provider | Remove it | Excluded |
+
+Apply the family-retention rule independently to each real product line:
+
+- The latest generally available version is Tier 1 when it has a complete current
+  run and we intend to keep it fresh.
+- Keep the immediately previous version in Tier 1 only when the new version shipped
+  less than 30 days later. Otherwise move the previous version to Tier 2.
+- Do not treat sibling lines such as Flash, Pro, or a separately positioned coding
+  model as versions of one another merely because they share a vendor.
+- If a stealth id becomes unavailable after its named successor launches, remove the
+  stealth experiment rather than preserving an irreproducible Tier 2 row.
+- Do not use Tier 2 merely as a workaround for recurring cost when the model is meant
+  to be current. Use `RELEASE_EXCLUDED_EXPERIMENTS` so the board and automation each
+  say what they mean.
+
+Blocked registrations are reminders, not publishable model additions. If a model is
+listed by AI Gateway but its only provider is unavailable to the team, keep the draft
+open and un-tiered with the exact blocker and recheck instructions. If the work is
+superseded, obsolete, or no longer worth measuring, close the draft instead of
+merging `ACCEPTED_STALE` indefinitely.
+
+The PR body must state both decisions explicitly, for example: “Tier 1 on the public
+board; excluded from recurring release measurements because …” or “Tier 2 historical
+measurement; not part of the release matrix.” Never write only “Tier 1” and leave the
+recurring-cost consequence implicit.
+
+### 5. Export, apply the tier, and clean up
 
 ```bash
 pnpm export-results
@@ -166,17 +211,20 @@ pnpm export-results
 
 Then, in the same PR:
 
-- **`TIER_1`** in `scripts/export-results.ts` — add the new slug. Per the retention
-  policy, each model family keeps the latest version, plus the previous one *only if*
-  the new one shipped less than a month after it; otherwise remove the predecessor so
-  it drops to tier 2. Put the date arithmetic in the comment.
+- **`TIER_ONE_EXPERIMENTS`** in `lib/tier-one.ts` — add the new slug only when the
+  decision above is Tier 1. Apply the family-retention rule and put the release-date
+  arithmetic or distinct-line rationale in the comment.
+- **`RELEASE_EXCLUDED_EXPERIMENTS`** in `lib/tier-one.ts` — add a Tier 1 slug only
+  when it should remain off the recurring release matrix, with a comment naming the
+  concrete reason. Tier 2 models never belong here because they are absent from the
+  Tier 1 source list already.
 - **`ACCEPTED_STALE`** in `scripts/check-stale.mjs` — remove any entries added for the
   new slugs while they had no results. They exist to keep CI green during registration
   and are not a licence to leave a pair unmeasured.
 - Commit `results/<slug>/**` and the regenerated `agent-results.json`. Never hand-edit
   `agent-results.json`.
 
-### 5. Verify, then open the PR
+### 6. Verify, then open the PR
 
 ```bash
 pnpm typecheck && pnpm test:cost && node scripts/check-stale.mjs
@@ -192,9 +240,10 @@ actually produced.
 
 The PR body should state the scores for both experiments (`n/31` at the current eval
 set — count `evals/`, do not copy a number out of this file), the mean cost per eval,
-the tiering change and its date arithmetic, and what the AGENTS.md variant won or lost.
+the public-board tier, whether recurring release automation includes it, the tiering
+change and its date arithmetic, and what the AGENTS.md variant won or lost.
 
-### 6. Publish to the site — usually nothing to do in `vercel/front`
+### 7. Publish to the site — usually nothing to do in `vercel/front`
 
 **Merging this PR to `main` is the publish.** nextjs.org/evals fetches
 `agent-results.json` from this repo's `main` on the server and `main` CI invalidates its

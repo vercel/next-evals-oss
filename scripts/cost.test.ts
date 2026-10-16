@@ -28,13 +28,34 @@ test('codex: single turn.completed, input includes cached', () => {
       reasoning_output_tokens: 20,
     },
   });
-  // uncached input = 1000 - 800; cacheRead = 800; output as reported (200 incl reasoning)
+  // Uncached input = 1000 - 800; output is the reported total, not added to reasoning.
   assert.deepEqual(extractRunTokens(raw), {
     input: 200,
     output: 50,
     cacheRead: 800,
     cacheWrite: 0,
   });
+});
+
+test('codex: cache writes are separate input tokens, not charged twice', () => {
+  const raw = jsonl({
+    type: 'turn.completed',
+    usage: {
+      input_tokens: 1292543,
+      cached_input_tokens: 1227440,
+      cache_write_input_tokens: 61673,
+      output_tokens: 20180,
+    },
+  });
+  const usage = extractRunTokens(raw)!;
+  assert.deepEqual(usage, {
+    input: 3430,
+    output: 20180,
+    cacheRead: 1227440,
+    cacheWrite: 61673,
+  });
+  assert.equal(usage.input + usage.cacheRead + usage.cacheWrite, 1292543);
+  assert.equal(priceUsage(usage, MODEL_PRICING['gpt-5.6-sol-ultra']!), 1.216661);
 });
 
 test('opencode: sums step-finish parts, reasoning billed as output', () => {
@@ -128,4 +149,22 @@ test('priceUsage: cache-heavy Claude run', () => {
   );
   // 20000*50 + 1e6*1 + 200000*12.5 = 1e6 + 1e6 + 2.5e6 = 4.5e6 tok-$ / 1e6 = $4.50
   assert.equal(cost, 4.5);
+});
+
+test('priceUsage: Grok 4.7 uses the refreshed base-context list rates', () => {
+  const pricing = MODEL_PRICING['grok-4.7']!;
+  assert.deepEqual(pricing, { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 });
+  assert.equal(
+    priceUsage({ input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 0 }, pricing),
+    8.5,
+  );
+});
+
+test('priceUsage: GPT 5.6 Sol uses the refreshed standard-service list rates', () => {
+  const pricing = MODEL_PRICING['gpt-5.6-sol-ultra']!;
+  assert.deepEqual(pricing, { input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5 });
+  assert.equal(
+    priceUsage({ input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheWrite: 1_000_000 }, pricing),
+    29.4,
+  );
 });
