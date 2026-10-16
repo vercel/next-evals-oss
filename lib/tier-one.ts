@@ -23,9 +23,6 @@ export const TIER_ONE_EXPERIMENTS = [
   'gemini-3.8-flash',
   // Argon is Google's current general reasoning line, distinct from Flash.
   'gemini-4-argon',
-  // Muse Spark Open is Meta's current open-weight coding model. It is a new
-  // line with no previously measured predecessor.
-  'muse-spark-open',
   'kimi-k3',
   'kimi-k2.7-code', // Kimi K3 shipped 29 days after it.
   'cursor-composer-2.5',
