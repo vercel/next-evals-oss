@@ -1,4 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
+import { installNext } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
@@ -8,13 +10,13 @@ const config: ExperimentConfig = {
     binaryUrl: 'https://ymdea60kblwwhidh.public.blob.vercel-storage.com/opencode-linux-x64-kimi-k2.7-code-v1',
   },
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 720,
   sandbox: 'vercel',
   setup: async (sandbox) => {
-    // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    // Install the requested Next.js version
+    await installNext(sandbox);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({

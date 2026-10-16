@@ -54,23 +54,23 @@ async function main(): Promise<void> {
   if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
   execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);
 
-  // Upstream fixtures with a local skill treatment are PR-development evals,
-  // not part of the public model and bundled-docs matrix.
+  // Upstream fixtures with a local skill treatment or `publish: false` are
+  // PR-development evals, not part of the public model and bundled-docs matrix.
   const evalConfigPath = join(repoDir, 'evals/eval.config.json');
   const evalConfig = existsSync(evalConfigPath)
     ? (JSON.parse(readFileSync(evalConfigPath, 'utf8')) as Record<
         string,
-        { skills?: string[] }
+        { skills?: string[]; publish?: boolean }
       >)
     : {};
-  const skillEvals = Object.entries(evalConfig)
-    .filter(([, config]) => config.skills?.length)
+  const nonPublicEvals = Object.entries(evalConfig)
+    .filter(([, config]) => config.publish === false || config.skills?.length)
     .map(([evalName]) => evalName);
-  for (const evalName of skillEvals) {
+  for (const evalName of nonPublicEvals) {
     rmSync(join(evalsDir, evalName), { recursive: true, force: true });
   }
-  if (skillEvals.length > 0) {
-    console.log(`Omitted skill evals: ${skillEvals.join(', ')}`);
+  if (nonPublicEvals.length > 0) {
+    console.log(`Omitted non-public evals: ${nonPublicEvals.join(', ')}`);
   }
 
   rmSync(tmpDir, { recursive: true, force: true });

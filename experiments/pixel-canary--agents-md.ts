@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
@@ -27,7 +28,7 @@ const config: ExperimentConfig = {
     },
   },
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // Match the baseline's budget: the initial matrix exceeded a 20-minute limit.
   timeout: 2400,
@@ -48,8 +49,8 @@ const config: ExperimentConfig = {
     if (settings.exitCode !== 0) throw new Error('Failed to configure OpenCode.');
 
     if (!(await isNextApp(sandbox))) return;
-    const install = await sandbox.runCommand('npm', ['install', 'next@canary']);
-    if (install.exitCode !== 0) throw new Error('Failed to install Next.js canary in the eval sandbox.');
+    const install = await installNext(sandbox);
+    if (install.exitCode !== 0) throw new Error('Failed to install the requested Next.js version in the eval sandbox.');
 
     await sandbox.writeFiles({
       'AGENTS.md': `<!-- BEGIN:nextjs-agent-rules -->
