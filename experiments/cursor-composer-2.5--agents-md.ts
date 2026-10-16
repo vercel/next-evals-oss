@@ -1,18 +1,20 @@
 import fs from 'fs';
+import { installNext } from '../lib/setup.js';
 import path from 'path';
 import type { ExperimentConfig } from '@vercel/agent-eval';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'cursor',
   model: 'composer-2.5',
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 720,
   sandbox: 'vercel',
   setup: async (sandbox) => {
-    // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    // Install the requested Next.js version
+    await installNext(sandbox);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({

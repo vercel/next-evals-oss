@@ -1,0 +1,67 @@
+import { connectSlackCredentials } from "@vercel/connect/eve";
+import {
+  defaultSlackAuth,
+  defineSlackRenderer,
+  postCompletedSlackReply,
+  slackChannel,
+} from "eve/channels/slack";
+
+import { splitReleaseEvalSlackReport } from "../lib/release-report-message";
+
+export const measurementsChannelId = "C0C7VCBP4CA";
+export const vercelWorkspaceId = "T0CAQ00TU";
+
+const releaseEvalThread = defineSlackRenderer({
+  events: {
+    async "message.completed"(event, channel, _ctx, next) {
+      if (event.finishReason === "tool-calls" || !event.message) return next();
+
+      const report = splitReleaseEvalSlackReport(event.message);
+      if (!report) return next();
+
+      await postCompletedSlackReply(channel, report.root);
+
+      try {
+        for (const reply of report.replies) {
+          await channel.thread.post(reply);
+        }
+      } catch (error) {
+        console.error("Failed to post release eval detail thread", error);
+        try {
+          await channel.thread.post(
+            "I could not post every detailed result. Ask me in this thread for the missing breakdown.",
+          );
+        } catch (fallbackError) {
+          console.error(
+            "Failed to post release eval detail fallback",
+            fallbackError,
+          );
+        }
+      }
+    },
+  },
+});
+
+export default slackChannel({
+  credentials: connectSlackCredentials("slack/next-evals-release-agent"),
+  renderers: [releaseEvalThread],
+  onAppMention(ctx, message) {
+    if (message.channelId !== measurementsChannelId || message.author?.isBot) {
+      return null;
+    }
+    return {
+      auth: defaultSlackAuth(message, ctx),
+      title: "Next.js evals question",
+    };
+  },
+  onDirectMessage() {
+    return null;
+  },
+  async onMessage(ctx, message) {
+    if (message.channelId !== measurementsChannelId || message.author?.isBot) {
+      return null;
+    }
+    if (!ctx.isBotMentioned() && !(await ctx.isSubscribed())) return null;
+    return { auth: defaultSlackAuth(message, ctx) };
+  },
+});
