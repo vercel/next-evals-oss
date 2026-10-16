@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
+import { installNext, isNextApp } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   // Mistral ships no first-party coding CLI this repo can run, so the model is
@@ -50,7 +51,7 @@ const config: ExperimentConfig = {
     // the other OpenCode rows.
   },
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // 2400s, matching every OpenCode pair that turned out to need headroom
   // (pixel-canary, minimax-m3, gemini-3.8-flash). This model has no duration
@@ -66,8 +67,7 @@ const config: ExperimentConfig = {
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    await installNext(sandbox);
   },
 };
 
