@@ -77,12 +77,14 @@ names neither the variable you forgot nor the path you meant. `pnpm preflight`
 calls this out.
 
 **Agents.** Each experiment names an `agent`, and the agent decides which key it
-reads. `VERCEL_OIDC_TOKEN` is the fallback for all of them, so the OIDC path above
-can cover this whole table on its own.
+reads. `VERCEL_OIDC_TOKEN` can authenticate `vercel-ai-gateway/*` agents, while
+direct agents still require their own credential. The automated release matrix
+contains only AI Gateway agents and deliberately uses the release project's
+separately budgeted `AI_GATEWAY_API_KEY` for every model call.
 
 | Agent | Key |
 |-------|-----|
-| `vercel-ai-gateway/*` (most experiments) | `AI_GATEWAY_API_KEY` |
+| `vercel-ai-gateway/*` (most experiments) | `AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` |
 | `claude-code` | `CLAUDE_CODE_OAUTH_TOKEN` if set, else `ANTHROPIC_API_KEY` |
 | `codex` | `OPENAI_API_KEY` |
 | `gemini` | `GEMINI_API_KEY` |
@@ -107,8 +109,9 @@ cannot actually run.
 | `pnpm playground` | Web UI for browsing results in `results/`. |
 | `pnpm sync-evals [ref]` | Re-sync fixtures from `vercel/next.js`. |
 | `pnpm export-results` | Write `agent-results.json` for nextjs.org/evals. |
-| `pnpm typecheck` | `tsc --noEmit` over `experiments/`. |
+| `pnpm typecheck` | `tsc --noEmit` over experiments, shared helpers, and TypeScript scripts. |
 | `pnpm test:cost` | Unit tests for token extraction and pricing in `scripts/cost.ts`. |
+| `pnpm test:release` | Unit tests for release targeting and the reporting gate. |
 
 Anything that runs an eval takes experiment names or globs — `pnpm eval:run
 'claude-*'`. Some experiments also honour `EVAL_FILTER` (an eval name, a glob, or a
@@ -117,6 +120,12 @@ experiment before relying on it.
 
 Results are memoized by a fingerprint of the eval content plus the experiment
 config, so a re-run only covers what actually changed. `--force` ignores the cache.
+
+Normal runs retain the experiment's configured pass@4 behavior. Release and
+backport automation sets `NEXT_RELEASE_EVAL_RUNS=1` for its separate pass@1
+measurement. Setting `NEXT_EVAL_VERSION` to an exact version such as `16.2.4`
+installs and verifies `next@16.2.4` in each existing Next.js fixture; without it,
+local runs continue to use `next@canary`.
 
 ### `pnpm export-results`
 
@@ -221,6 +230,85 @@ runs an eval — it only checks that the cache is fresh or explicitly accepted a
 stale. To adopt upstream changes: bump the SHA, re-run the experiments you are
 refreshing, and record the rest in `ACCEPTED_STALE`.
 
+### Release, backport, and canary automation
+
+[`release-evals.yml`](.github/workflows/release-evals.yml) runs entirely in this
+repository. An hourly check discovers stable releases and backports published
+after the monitor baseline in [`release-monitor.json`](release-monitor.json).
+Manual dispatch accepts one exact published stable or canary version, so canary
+measurements run only when a maintainer explicitly requests one. Discovery
+resolves the matching public tag, commit SHA, successful `vercel/next.js`
+build-and-deploy run, and source branch before any model job starts. Existing
+verified automation-authored measurement pull requests are skipped unless a
+maintainer explicitly requests a forced manual rerun.
+
+The workflow runs every tier-1 model both with and without AGENTS.md against a
+fixed eval suite. Existing Next.js fixtures install the exact published package,
+so agents read the documentation bundled in that release from
+`node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
+the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
+release, backport, and canary measurements remain comparable.
+
+Release, backport, and canary measurements always use pass@1 through the
+`NEXT_RELEASE_EVAL_RUNS=1` workflow override. Normal local runs and publishable
+benchmark runs retain their configured pass@4 behavior. This keeps the
+release-monitoring series separate from the public leaderboard.
+
+Infrastructure attempts are discarded and retried up to three times. The
+reporting gate requires one valid result for every eval and rejects missing
+transcripts, missing evaluator output, agent-runner exit 143, and known evaluator
+startup failures. Genuine assertion failures remain valid pass@1 data. Each
+genuine first-attempt model failure then receives two isolated confirmation
+attempts. Those attempts never change the pass@1 score; they only distinguish a
+reproducible failure from an unstable first attempt.
+
+The workflow runs and aggregates release measurements in a temporary workspace
+outside the repository. Matrix jobs validate their raw output in place, then
+pass score summaries, compact failure confirmations, and the full validated run
+output to the aggregation job. Before passing or committing generated data, the
+workflow rejects it if it contains the exact value of a credential available to
+that job. The temporary transport artifacts expire after one day.
+
+Each completed run opens a draft pull request under
+`measurements/releases/<version>/<run-id>/`. The pull request contains the
+durable aggregate measurement, release provenance, failure confirmations, and
+the complete sanitized output from the scored and confirmation attempts. This
+includes transcripts, evaluator output, and command output for inspecting the
+agent's reasoning. It never writes to the publishable `results/` tree or
+`agent-results.json`, so merging it records the measurement without publishing
+anything to `nextjs.org/evals`.
+
+After the draft pull request is opened, the workflow sends a compact validated
+report to the [Eve release agent](apps/release-agent). Eve writes one concise message to
+`team-agent-measurements` with the release path, pass@1 totals with and without
+AGENTS.md, and meaningful model/task failures. The summary identifies the
+measurement as separate from the public pass@4 board. Follow-up questions in
+that Slack thread use the same report context; questions about published data
+use Eve's read-only repository tool.
+
+Scheduled and manual runs are accepted only from this repository's `main`
+branch. Model jobs receive read-only repository access and `id-token: write`.
+They exchange the GitHub Actions identity for short-lived Vercel CLI access,
+then pull a short-lived `VERCEL_OIDC_TOKEN` from the release-eval project. The
+Vercel CLI policy must be restricted to `vercel/next-evals-oss` and this
+workflow on `main`. The temporary CLI credential is cleared before the eval
+runner starts.
+The project OIDC token authenticates Vercel Sandbox and the release agent's
+OIDC-protected intake route. Model-running jobs also receive the project's
+separately budgeted `AI_GATEWAY_API_KEY`; the reporting job does not. Direct
+agents are excluded from this matrix. The non-secret Vercel project identifiers
+and agent URL are repository variables. No long-lived Vercel token or
+model-provider secret is stored in GitHub.
+
+Only the final publishing job receives write-scoped `GITHUB_TOKEN` permissions
+after aggregation has produced and rechecked a sanitized measurement artifact.
+Model-running jobs cannot write to the repository, and no GitHub App private
+key is required.
+
+Slack installation tokens and request verification stay in the
+`slack/next-evals-release-agent` Vercel Connect connector. GitHub Actions does
+not hold a Slack webhook or bot token.
+
 ## Publishing to nextjs.org/evals
 
 After running evals:
@@ -287,12 +375,15 @@ reproducible.
 
 ## Scoring and cost methodology
 
-**Scoring is pass@4.** Each eval runs up to four attempts (`runs: 4`,
-`earlyExit: true`): the eval passes if any attempt passes, and remaining
-attempts abort on the first pass. A published failure means four genuine model
-failures — attempts that die on infrastructure (rate limits, sandbox faults,
-auth) are classified by the failure classifier, deleted, and rerun rather than
-counted against the model.
+**The published board remains pass@4.** Normal experiment configs use four runs
+with early exit, preserving the existing public methodology. Release and
+backport automation applies a workflow-only pass@1 override and keeps those
+measurements in isolated measurement pull requests instead of publishing them.
+This supplies the stricter repeated-release baseline used to identify saturated
+tasks without mixing pass@1 and pass@4 scores on the leaderboard.
+Infrastructure failures (rate limits, sandbox faults, missing transcripts, and
+evaluator startup failures) are invalid data: the release workflow discards and
+retries them and does not report an incomplete measurement.
 
 **Costs use provider-reported token counts.** Each run's usage (input, output,
 cache read/write) comes from the token counts the model's own API reported in
