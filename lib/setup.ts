@@ -1,4 +1,4 @@
-import type { Sandbox } from '@vercel/agent-eval'
+import type { Sandbox } from '@vercel/agent-eval';
 
 /**
  * Whether the fixture is already a Next.js app.
@@ -19,13 +19,55 @@ export async function isNextApp(sandbox: Sandbox): Promise<boolean> {
   }
 }
 
-/** Bump an existing Next.js fixture to the latest canary. No-op otherwise. */
-export async function bumpNextCanary(sandbox: Sandbox): Promise<void> {
-  if (!(await isNextApp(sandbox))) {
-    console.log('> Fixture does not depend on Next.js; leaving it untouched');
-    return;
+/**
+ * Package spec used by every experiment.
+ *
+ * Manual runs keep following canary. Release automation pins this to the exact
+ * version that was just published so the board cannot accidentally measure a
+ * newer canary under a stable release label.
+ */
+export function getNextPackageSpec(): string {
+  const version = process.env.NEXT_EVAL_VERSION?.trim();
+  if (!version) return 'next@canary';
+
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error(
+      `NEXT_EVAL_VERSION must be an exact npm version, received ${JSON.stringify(version)}`,
+    );
   }
-  await sandbox.runCommand('npm', ['install', 'next@canary']);
+
+  return `next@${version}`;
+}
+
+/** Install the requested Next.js version into an eval sandbox. */
+export async function installNext(sandbox: Sandbox) {
+  const packageSpec = getNextPackageSpec();
+  const requestedVersion = process.env.NEXT_EVAL_VERSION?.trim();
+  console.log(`> Installing ${packageSpec}`);
+  const install = await sandbox.runCommand('npm', ['install', packageSpec]);
+  if (install.exitCode !== 0) {
+    if (requestedVersion) {
+      throw new Error(`Failed to install ${packageSpec} in the eval sandbox.`);
+    }
+    return install;
+  }
+
+  if (requestedVersion) {
+    const installed = await sandbox.runCommand('node', [
+      '-p',
+      "require('./node_modules/next/package.json').version",
+    ]);
+    if (
+      installed.exitCode !== 0 ||
+      installed.stdout.trim() !== requestedVersion
+    ) {
+      throw new Error(
+        `Expected ${packageSpec}, but the eval sandbox reported ${JSON.stringify(installed.stdout.trim())}.`,
+      );
+    }
+  }
+
+  return install;
 }
 
 /**
@@ -36,7 +78,7 @@ export async function bumpNextCanary(sandbox: Sandbox): Promise<void> {
 export async function writeAgentsMd(
   sandbox: Sandbox,
   body: string,
-  extra: Record<string, string> = {}
+  extra: Record<string, string> = {},
 ): Promise<void> {
   if (!(await isNextApp(sandbox))) {
     console.log('> Fixture does not depend on Next.js; skipping AGENTS.md');

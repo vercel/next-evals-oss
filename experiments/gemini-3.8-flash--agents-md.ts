@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { installNext, isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
@@ -28,7 +29,7 @@ const config: ExperimentConfig = {
     },
   },
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // See gemini-3.8-flash.ts — 1200 loses the prefetch evals to timeouts.
   timeout: 2400,
@@ -36,8 +37,8 @@ const config: ExperimentConfig = {
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    // Bump Next.js to latest canary
-    await sandbox.runCommand('npm', ['install', 'next@canary']);
+    // Install the requested Next.js version
+    await installNext(sandbox);
 
     // Create AGENTS.md at the root
     await sandbox.writeFiles({
