@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from '@vercel/agent-eval';
-import { isNextApp } from '../lib/setup.js';
+import { releaseEvalRuns } from '../lib/release-runs.js';
+import { installNext, isNextApp } from '../lib/setup.js';
 
 const config: ExperimentConfig = {
   agent: 'vercel-ai-gateway/opencode',
@@ -35,7 +36,7 @@ const config: ExperimentConfig = {
     },
   },
   scripts: ['build'],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   // Same budget as pixel-canary, whose successful tasks took up to 20 minutes.
   timeout: 2400,
@@ -57,8 +58,7 @@ const config: ExperimentConfig = {
 
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    const install = await sandbox.runCommand('npm', ['install', 'next@canary']);
-    if (install.exitCode !== 0) throw new Error('Failed to install Next.js canary in the eval sandbox.');
+    await installNext(sandbox);
   },
 };
 
