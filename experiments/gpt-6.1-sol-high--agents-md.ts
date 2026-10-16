@@ -1,5 +1,6 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
-import { isNextApp } from "../lib/setup.js";
+import { installNext, isNextApp } from "../lib/setup.js";
+import { releaseEvalRuns } from "../lib/release-runs.js";
 
 const config: ExperimentConfig = {
   agent: "vercel-ai-gateway/codex",
@@ -7,14 +8,14 @@ const config: ExperimentConfig = {
   // See gpt-6.1-sol-high.ts; only the AGENTS.md treatment below differs.
   model: "openai/gpt-6.1-sol?reasoningEffort=high",
   scripts: ["build"],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 1200,
   sandbox: "vercel",
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    await sandbox.runCommand("npm", ["install", "next@canary"]);
+    await installNext(sandbox);
     await sandbox.writeFiles({
       "AGENTS.md": `<!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know

@@ -1,12 +1,12 @@
 import type { ExperimentConfig } from "@vercel/agent-eval";
-import { isNextApp } from "../lib/setup.js";
+import { installNext, isNextApp } from "../lib/setup.js";
+import { releaseEvalRuns } from "../lib/release-runs.js";
 
 const config: ExperimentConfig = {
   agent: "vercel-ai-gateway/claude-code",
   // The Gateway's Anthropic-compatible endpoint resolves unprefixed ids, as
   // with claude-opus-5.5. `anthropic/claude-sonnet-5.5` is in the AI Gateway
-  // catalog (/v1/models, 2026-10-07); live-API resolution still needs a
-  // credentialed `pnpm preflight` + smoke run before the matrix.
+  // catalog (/v1/models, rechecked 2026-10-16).
   model: "claude-sonnet-5.5",
   evals: process.env.EVAL_FILTER ?? "*",
   agentOptions: {
@@ -16,14 +16,14 @@ const config: ExperimentConfig = {
     effort: "high",
   },
   scripts: ["build"],
-  runs: 4,
+  runs: releaseEvalRuns(),
   earlyExit: true,
   timeout: 1200,
   sandbox: "vercel",
   setup: async (sandbox) => {
     // Framework-choice fixtures start empty; hand them nothing.
     if (!(await isNextApp(sandbox))) return;
-    await sandbox.runCommand("npm", ["install", "next@canary"]);
+    await installNext(sandbox);
   },
 };
 
