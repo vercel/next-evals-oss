@@ -124,9 +124,12 @@ export function findInvalidRunReason(options: {
 }
 
 export interface ReleaseNotification {
-  schemaVersion: 4;
+  schemaVersion: 5;
   target: ReleaseTarget;
-  workflowUrl: string;
+  execution:
+    | { kind: 'github-actions'; url: string }
+    | { kind: 'maintainer' };
+  coverage: { kind: 'full' | 'cohort' };
   measurementUrl: string;
   metric: 'pass@1';
   validation: {
@@ -139,17 +142,21 @@ export interface ReleaseNotification {
 
 export function buildReleaseNotification(options: {
   target: ReleaseTarget;
-  workflowUrl: string;
+  execution:
+    | { kind: 'github-actions'; url: string }
+    | { kind: 'maintainer' };
+  coverage: { kind: 'full' | 'cohort' };
   measurementUrl: string;
   report: ReleaseReport;
 }): ReleaseNotification {
   if (
+    options.execution.kind === 'github-actions' &&
     !/^https:\/\/github\.com\/vercel\/next-evals-oss\/actions\/runs\/\d+$/.test(
-      options.workflowUrl,
+      options.execution.url,
     )
   ) {
     throw new Error(
-      'workflowUrl must point to a vercel/next-evals-oss Actions run',
+      'execution.url must point to a vercel/next-evals-oss Actions run',
     );
   }
   if (
@@ -162,9 +169,10 @@ export function buildReleaseNotification(options: {
     );
   }
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     target: options.target,
-    workflowUrl: options.workflowUrl,
+    execution: options.execution,
+    coverage: options.coverage,
     measurementUrl: options.measurementUrl,
     metric: 'pass@1',
     validation: {
@@ -678,7 +686,12 @@ async function main(): Promise<void> {
     ) as ReleaseDiagnosticsData;
     const notification = buildReleaseNotification({
       target,
-      workflowUrl: process.env.WORKFLOW_URL ?? '',
+      execution: process.env.WORKFLOW_URL
+        ? { kind: 'github-actions', url: process.env.WORKFLOW_URL }
+        : { kind: 'maintainer' },
+      coverage: {
+        kind: process.env.MEASUREMENT_SCOPE === 'cohort' ? 'cohort' : 'full',
+      },
       measurementUrl: process.env.MEASUREMENT_URL ?? '',
       report: buildReleaseReport(data, diagnostics),
     });

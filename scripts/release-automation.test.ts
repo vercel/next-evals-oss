@@ -187,13 +187,16 @@ test('agent notification points at the standalone measurement PR', () => {
       sourceRunUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
       evaluatedAt: '2026-10-13T12:00:00.000Z',
     },
-    workflowUrl:
-      'https://github.com/vercel/next-evals-oss/actions/runs/12345',
+    execution: {
+      kind: 'github-actions',
+      url: 'https://github.com/vercel/next-evals-oss/actions/runs/12345',
+    },
+    coverage: { kind: 'full' },
     measurementUrl: 'https://github.com/vercel/next-evals-oss/pull/456',
     report,
   });
 
-  assert.equal(notification.schemaVersion, 4);
+  assert.equal(notification.schemaVersion, 5);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
   assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
@@ -213,20 +216,25 @@ test('agent notification points at the standalone measurement PR', () => {
   ]);
   assert.equal(notification.report.failures[0].reproducible, false);
   assert.deepEqual(Object.keys(notification).sort(), [
+    'coverage',
+    'execution',
     'measurementUrl',
     'metric',
     'report',
     'schemaVersion',
     'target',
     'validation',
-    'workflowUrl',
   ]);
 
   assert.throws(
     () =>
       buildReleaseNotification({
         target: notification.target,
-        workflowUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
+        execution: {
+          kind: 'github-actions',
+          url: 'https://github.com/vercel/next.js/actions/runs/12345',
+        },
+        coverage: { kind: 'full' },
         measurementUrl: notification.measurementUrl,
         report,
       }),

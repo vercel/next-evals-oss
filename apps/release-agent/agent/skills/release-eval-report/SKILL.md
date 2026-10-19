@@ -28,8 +28,9 @@ Match the established reports in `#next-bots`: a short framing paragraph,
 followed by a few named findings written in compact prose.
 
 - Use only `Next.js <version>` as the title.
-- In the opening paragraph, identify release, backport, or canary, matrix size, and the
-  Base and AGENTS.md totals.
+- In the opening paragraph, identify release, backport, or canary, matrix size,
+  and the Base and AGENTS.md totals. If `coverage.kind` is `cohort`, call it a
+  preliminary cohort and name the measured agents.
 - Organize the findings around the questions the team is answering:
   `Saturation`, `Harder tasks`, `Potential eval problems`, and `Comparison`.
 - `Saturation` should quantify tasks above 90% in both variants, identify the
@@ -47,6 +48,8 @@ followed by a few named findings written in compact prose.
 - Do not include execution links, pull requests, artifacts, metric methodology,
   or automation commentary.
 - Do not use tables. Keep the root under 2,500 characters.
+- For a cohort report, qualify saturation and harder-task findings with
+  `within this cohort`. Never generalize cohort findings to unmeasured agents.
 
 Use this shape:
 
