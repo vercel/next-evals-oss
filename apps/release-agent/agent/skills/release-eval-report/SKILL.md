@@ -28,8 +28,12 @@ Match the established reports in `#next-bots`: a short framing paragraph,
 followed by a few named findings written in compact prose.
 
 - Use only `Next.js <version>` as the title.
-- In the opening paragraph, identify release, backport, or canary, matrix size, and the
-  Base and AGENTS.md totals.
+- In the opening paragraph, identify release, backport, or canary, matrix size,
+  and the Base and AGENTS.md totals. If `coverage.kind` is `cohort`, call it a
+  preliminary cohort and name the measured agents.
+- If `coverage.unavailableAgents` is present, name those agents after the
+  opening paragraph and say they were excluded from the score with the supplied
+  reason. Never turn an unavailable agent into a 0% result.
 - Organize the findings around the questions the team is answering:
   `Saturation`, `Harder tasks`, `Potential eval problems`, and `Comparison`.
 - `Saturation` should quantify tasks above 90% in both variants, identify the
@@ -47,6 +51,8 @@ followed by a few named findings written in compact prose.
 - Do not include execution links, pull requests, artifacts, metric methodology,
   or automation commentary.
 - Do not use tables. Keep the root under 2,500 characters.
+- For a cohort report, qualify saturation and harder-task findings with
+  `within this cohort`. Never generalize cohort findings to unmeasured agents.
 
 Use this shape:
 
@@ -88,11 +94,16 @@ and explicitly identify version changes.
 
 Title the reply `Failure verification and comparison`.
 
+- Repeat any unavailable agents before the failure list so readers do not
+  mistake an incomplete cohort for the requested matrix.
 - List every scored failure grouped by task.
 - A failure is confirmed only when `reproducible` is true, meaning the scored
   attempt and both non-scoring confirmations failed.
 - Mark a failure unstable when at least one confirmation passed. It stays a
   failure in the score, but do not present it as a reliable regression signal.
+- Mark a failure unverified when `confirmationUnavailable` is nonzero. It stays
+  a failure in the score, but do not call it confirmed or unstable and keep it
+  out of root-message regression claims.
 - State that infrastructure retries were excluded only when one or more scored
   results needed an infrastructure retry.
 - When comparison data is available, list every changed task, every changed

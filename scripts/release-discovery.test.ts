@@ -45,7 +45,7 @@ test('release provenance distinguishes releases, backports, and canaries', () =>
       version: '16.2.4',
       sha,
       runs: [tagRun],
-      branchesAtSha: ['releases/lts/active'],
+      sourceBranches: ['releases/lts/active'],
     }),
     { kind: 'backport', sourceRunUrl: tagRun.html_url },
   );

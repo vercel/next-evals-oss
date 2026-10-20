@@ -31,7 +31,7 @@ interface Summary {
 
 export interface ConfirmationAttempt {
   attempt: number;
-  outcome: 'passed' | 'failed';
+  outcome: 'passed' | 'failed' | 'unavailable';
   infrastructureRetries: number;
   failureReason?: string;
 }
@@ -145,7 +145,12 @@ async function classifyWithRetry(
   experiment: string,
 ): Promise<Classification> {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolveDelay) =>
+        setTimeout(resolveDelay, Math.min(1_000 * 2 ** (attempt - 1), 8_000)),
+      );
+    }
     try {
       const classification = await classifyFailure(
         evalDir,
@@ -213,11 +218,17 @@ async function runValidConfirmation(options: {
       timestamp,
       options.fixture.name,
     );
-    const classification = await classifyWithRetry(
-      evalDir,
-      options.fixture.name,
-      options.experiment,
-    );
+    let classification: Classification;
+    try {
+      classification = await classifyWithRetry(
+        evalDir,
+        options.fixture.name,
+        options.experiment,
+      );
+    } catch {
+      infrastructureRetries++;
+      continue;
+    }
     if (classification.failureType === 'model') {
       return {
         attempt: options.attempt,
@@ -229,9 +240,12 @@ async function runValidConfirmation(options: {
     infrastructureRetries++;
   }
 
-  throw new Error(
-    `${options.experiment}/${options.fixture.name}: no valid confirmation attempt remained after infrastructure retries`,
-  );
+  return {
+    attempt: options.attempt,
+    outcome: 'unavailable',
+    infrastructureRetries,
+    failureReason: 'No valid confirmation remained after infrastructure retries',
+  };
 }
 
 async function mapWithConcurrency<T, U>(
@@ -296,16 +310,31 @@ export async function diagnoseExperiment(options: {
         }
         const confirmations: ConfirmationAttempt[] = [];
         for (let attempt = 1; attempt <= confirmationAttempts; attempt++) {
-          confirmations.push(
-            await runValidConfirmation({
-              config: singleModelConfig,
-              fixture,
-              apiKey,
-              experiment: options.experiment,
-              attempt,
-              resultsRoot: options.resultsRoot,
-            }),
-          );
+          const confirmation = await runValidConfirmation({
+            config: singleModelConfig,
+            fixture,
+            apiKey,
+            experiment: options.experiment,
+            attempt,
+            resultsRoot: options.resultsRoot,
+          });
+          confirmations.push(confirmation);
+          if (confirmation.outcome === 'unavailable') {
+            for (
+              let skipped = attempt + 1;
+              skipped <= confirmationAttempts;
+              skipped++
+            ) {
+              confirmations.push({
+                attempt: skipped,
+                outcome: 'unavailable',
+                infrastructureRetries: 0,
+                failureReason:
+                  'Skipped after a previous confirmation exhausted infrastructure retries',
+              });
+            }
+            break;
+          }
         }
         return {
           evalName: failure.evalName,

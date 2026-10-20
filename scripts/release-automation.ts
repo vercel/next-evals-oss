@@ -123,10 +123,21 @@ export function findInvalidRunReason(options: {
   return undefined;
 }
 
+export interface ReleaseCoverage {
+  kind: 'full' | 'cohort';
+  unavailableAgents?: Array<{
+    model: string;
+    reason: string;
+  }>;
+}
+
 export interface ReleaseNotification {
-  schemaVersion: 4;
+  schemaVersion: 5;
   target: ReleaseTarget;
-  workflowUrl: string;
+  execution:
+    | { kind: 'github-actions'; url: string }
+    | { kind: 'maintainer' };
+  coverage: ReleaseCoverage;
   measurementUrl: string;
   metric: 'pass@1';
   validation: {
@@ -139,17 +150,21 @@ export interface ReleaseNotification {
 
 export function buildReleaseNotification(options: {
   target: ReleaseTarget;
-  workflowUrl: string;
+  execution:
+    | { kind: 'github-actions'; url: string }
+    | { kind: 'maintainer' };
+  coverage: ReleaseCoverage;
   measurementUrl: string;
   report: ReleaseReport;
 }): ReleaseNotification {
   if (
+    options.execution.kind === 'github-actions' &&
     !/^https:\/\/github\.com\/vercel\/next-evals-oss\/actions\/runs\/\d+$/.test(
-      options.workflowUrl,
+      options.execution.url,
     )
   ) {
     throw new Error(
-      'workflowUrl must point to a vercel/next-evals-oss Actions run',
+      'execution.url must point to a vercel/next-evals-oss Actions run',
     );
   }
   if (
@@ -162,9 +177,10 @@ export function buildReleaseNotification(options: {
     );
   }
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     target: options.target,
-    workflowUrl: options.workflowUrl,
+    execution: options.execution,
+    coverage: options.coverage,
     measurementUrl: options.measurementUrl,
     metric: 'pass@1',
     validation: {
@@ -213,7 +229,7 @@ interface ReleaseDiagnosticsData {
       evalName: string;
       scoredFailureReason: string;
       confirmations: Array<{
-        outcome: 'passed' | 'failed';
+        outcome: 'passed' | 'failed' | 'unavailable';
         infrastructureRetries: number;
       }>;
     }>;
@@ -251,6 +267,7 @@ export interface ReleaseReport {
     reproducible: boolean;
     confirmationPasses: number;
     confirmationFailures: number;
+    confirmationUnavailable: number;
     infrastructureRetries: number;
     scoredFailureReason: string;
   }>;
@@ -351,14 +368,23 @@ export function buildReleaseReport(
         const confirmationPasses = task.confirmations.filter(
           (attempt) => attempt.outcome === 'passed',
         ).length;
+        const confirmationFailures = task.confirmations.filter(
+          (attempt) => attempt.outcome === 'failed',
+        ).length;
+        const confirmationUnavailable = task.confirmations.filter(
+          (attempt) => attempt.outcome === 'unavailable',
+        ).length;
         return {
           experiment: baseExperiment,
           model,
           evalName: task.evalName,
           agentsMd,
-          reproducible: confirmationPasses === 0,
+          reproducible:
+            confirmationFailures === task.confirmations.length &&
+            confirmationUnavailable === 0,
           confirmationPasses,
-          confirmationFailures: task.confirmations.length - confirmationPasses,
+          confirmationFailures,
+          confirmationUnavailable,
           infrastructureRetries: task.confirmations.reduce(
             (total, attempt) => total + attempt.infrastructureRetries,
             0,
@@ -678,7 +704,12 @@ async function main(): Promise<void> {
     ) as ReleaseDiagnosticsData;
     const notification = buildReleaseNotification({
       target,
-      workflowUrl: process.env.WORKFLOW_URL ?? '',
+      execution: process.env.WORKFLOW_URL
+        ? { kind: 'github-actions', url: process.env.WORKFLOW_URL }
+        : { kind: 'maintainer' },
+      coverage: {
+        kind: process.env.MEASUREMENT_SCOPE === 'cohort' ? 'cohort' : 'full',
+      },
       measurementUrl: process.env.MEASUREMENT_URL ?? '',
       report: buildReleaseReport(data, diagnostics),
     });
