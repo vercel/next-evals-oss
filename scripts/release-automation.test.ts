@@ -169,8 +169,14 @@ test('agent notification points at the standalone measurement PR', () => {
               evalName: 'task-b',
               scoredFailureReason: 'assertion failed',
               confirmations: [
-                { outcome: 'failed', infrastructureRetries: 1 },
-                { outcome: 'passed', infrastructureRetries: 0 },
+                {
+                  outcome: 'failed',
+                  infrastructureRetries: 1,
+                },
+                {
+                  outcome: 'passed',
+                  infrastructureRetries: 0,
+                },
               ],
             },
           ],
@@ -215,6 +221,10 @@ test('agent notification points at the standalone measurement PR', () => {
     },
   ]);
   assert.equal(notification.report.failures[0].reproducible, false);
+  assert.equal(
+    notification.report.failures[0].confirmationUnavailable,
+    0,
+  );
   assert.deepEqual(Object.keys(notification).sort(), [
     'coverage',
     'execution',

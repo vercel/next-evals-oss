@@ -221,7 +221,7 @@ interface ReleaseDiagnosticsData {
       evalName: string;
       scoredFailureReason: string;
       confirmations: Array<{
-        outcome: 'passed' | 'failed';
+        outcome: 'passed' | 'failed' | 'unavailable';
         infrastructureRetries: number;
       }>;
     }>;
@@ -259,6 +259,7 @@ export interface ReleaseReport {
     reproducible: boolean;
     confirmationPasses: number;
     confirmationFailures: number;
+    confirmationUnavailable: number;
     infrastructureRetries: number;
     scoredFailureReason: string;
   }>;
@@ -359,14 +360,23 @@ export function buildReleaseReport(
         const confirmationPasses = task.confirmations.filter(
           (attempt) => attempt.outcome === 'passed',
         ).length;
+        const confirmationFailures = task.confirmations.filter(
+          (attempt) => attempt.outcome === 'failed',
+        ).length;
+        const confirmationUnavailable = task.confirmations.filter(
+          (attempt) => attempt.outcome === 'unavailable',
+        ).length;
         return {
           experiment: baseExperiment,
           model,
           evalName: task.evalName,
           agentsMd,
-          reproducible: confirmationPasses === 0,
+          reproducible:
+            confirmationFailures === task.confirmations.length &&
+            confirmationUnavailable === 0,
           confirmationPasses,
-          confirmationFailures: task.confirmations.length - confirmationPasses,
+          confirmationFailures,
+          confirmationUnavailable,
           infrastructureRetries: task.confirmations.reduce(
             (total, attempt) => total + attempt.infrastructureRetries,
             0,
