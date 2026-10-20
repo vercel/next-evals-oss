@@ -31,6 +31,9 @@ followed by a few named findings written in compact prose.
 - In the opening paragraph, identify release, backport, or canary, matrix size,
   and the Base and AGENTS.md totals. If `coverage.kind` is `cohort`, call it a
   preliminary cohort and name the measured agents.
+- If `coverage.unavailableAgents` is present, name those agents after the
+  opening paragraph and say they were excluded from the score with the supplied
+  reason. Never turn an unavailable agent into a 0% result.
 - Organize the findings around the questions the team is answering:
   `Saturation`, `Harder tasks`, `Potential eval problems`, and `Comparison`.
 - `Saturation` should quantify tasks above 90% in both variants, identify the
@@ -91,6 +94,8 @@ and explicitly identify version changes.
 
 Title the reply `Failure verification and comparison`.
 
+- Repeat any unavailable agents before the failure list so readers do not
+  mistake an incomplete cohort for the requested matrix.
 - List every scored failure grouped by task.
 - A failure is confirmed only when `reproducible` is true, meaning the scored
   attempt and both non-scoring confirmations failed.

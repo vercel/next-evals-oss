@@ -197,7 +197,15 @@ test('agent notification points at the standalone measurement PR', () => {
       kind: 'github-actions',
       url: 'https://github.com/vercel/next-evals-oss/actions/runs/12345',
     },
-    coverage: { kind: 'full' },
+    coverage: {
+      kind: 'cohort',
+      unavailableAgents: [
+        {
+          model: 'Unavailable Model',
+          reason: 'The provider did not return a valid attempt.',
+        },
+      ],
+    },
     measurementUrl: 'https://github.com/vercel/next-evals-oss/pull/456',
     report,
   });
@@ -205,6 +213,7 @@ test('agent notification points at the standalone measurement PR', () => {
   assert.equal(notification.schemaVersion, 5);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
+  assert.equal(notification.coverage.unavailableAgents?.length, 1);
   assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
   assert.equal(notification.report.scores.withoutAgentsMd.passed, 1);
   assert.equal(notification.report.scores.withAgentsMd.passed, 2);

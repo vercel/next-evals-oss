@@ -70,7 +70,17 @@ export const releaseNotificationSchema = z.object({
     }),
     z.object({ kind: z.literal("maintainer") }),
   ]),
-  coverage: z.object({ kind: z.enum(["full", "cohort"]) }),
+  coverage: z.object({
+    kind: z.enum(["full", "cohort"]),
+    unavailableAgents: z
+      .array(
+        z.object({
+          model: z.string().min(1),
+          reason: z.string().min(1),
+        }),
+      )
+      .optional(),
+  }),
   measurementUrl: z
     .url()
     .regex(/^https:\/\/github\.com\/vercel\/next-evals-oss\/pull\/\d+$/),

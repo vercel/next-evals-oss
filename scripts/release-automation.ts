@@ -123,13 +123,21 @@ export function findInvalidRunReason(options: {
   return undefined;
 }
 
+export interface ReleaseCoverage {
+  kind: 'full' | 'cohort';
+  unavailableAgents?: Array<{
+    model: string;
+    reason: string;
+  }>;
+}
+
 export interface ReleaseNotification {
   schemaVersion: 5;
   target: ReleaseTarget;
   execution:
     | { kind: 'github-actions'; url: string }
     | { kind: 'maintainer' };
-  coverage: { kind: 'full' | 'cohort' };
+  coverage: ReleaseCoverage;
   measurementUrl: string;
   metric: 'pass@1';
   validation: {
@@ -145,7 +153,7 @@ export function buildReleaseNotification(options: {
   execution:
     | { kind: 'github-actions'; url: string }
     | { kind: 'maintainer' };
-  coverage: { kind: 'full' | 'cohort' };
+  coverage: ReleaseCoverage;
   measurementUrl: string;
   report: ReleaseReport;
 }): ReleaseNotification {
