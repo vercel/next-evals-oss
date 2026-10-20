@@ -1,0 +1,123 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 9ms
+   ✓ Page is an async server component with parallel data fetching 1ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 5ms
+     → expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  16:46:26
+   Duration  255ms (transform 53ms, setup 21ms, collect 29ms, tests 9ms, environment 0ms, prepare 73ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+type ApiResult = { data: unknown } | { error: string }
+
+type DashboardResults = {
+  analytics: ApiResult | null
+  notifications: ApiResult | null
+  settings: ApiResult | null
+}
+
+const initialResults: DashboardResults = {
+  analytics: null,
+  notifications: null,
+  settings: null,
+}
+
+async function fetchJson(url: string, signal: AbortSignal): Promise<ApiResult> {
+  try {
+    const response = await fetch(url, { signal })
+
+    if (!response.ok) {
+      return { error: `Request failed (${response.status})` }
+    }
+
+    return { data: await response.json() }
+  } catch {
+    return { error: 'Unable to load this data.' }
+  }
+}
+
+function DataPanel({
+  title,
+  result,
+}: {
+  title: string
+  result: ApiResult | null
+}) {
+  return (
+    <section aria-labelledby={`${title.toLowerCase()}-heading`}>
+      <h3 id={`${title.toLowerCase()}-heading`}>{title}</h3>
+      {result === null ? (
+        <p role=\"status\">Loading {title.toLowerCase()}…</p>
+      ) : 'error' in result ? (
+        <p role=\"alert\">{result.error}</p>
+      ) : (
+        <pre>{JSON.stringify(result.data, null, 2)}</pre>
+      )}
+    </section>
+  )
+}
+
+export default function Dashboard() {
+  const [results, setResults] = useState(initialResults)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let active = true
+
+    Promise.all([
+      fetchJson('/api/analytics', controller.signal),
+      fetchJson('/api/notifications', controller.signal),
+      fetchJson('/api/settings', controller.signal),
+    ]).then(([analytics, notifications, settings]) => {
+      if (active) {
+        setResults({ analytics, notifications, settings })
+      }
+    })
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [])
+
+  return (
+    <div>
+      <h2>Dashboard</h2>
+      <DataPanel title=\"Analytics\" result={results.analytics} />
+      <DataPanel title=\"Notifications\" result={results.notifications} />
+      <DataPanel title=\"Settings\" result={results.settings} />
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:68:32
+     66| 
+     67|   // Should NOT have 'use client' directive
+     68|   expect(dashboardContent).not.toMatch(/['"]use client['"];?/)
+       |                                ^
+     69| })
+     70| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

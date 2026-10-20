@@ -1,0 +1,83 @@
+{
+  "status": "failed",
+  "duration": 142.855,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "2.1.304 (Claude Code)"
+  },
+  "usage": {
+    "inputTokens": 20,
+    "outputTokens": 10542,
+    "cacheReadTokens": 220017,
+    "cacheWriteTokens": 15857,
+    "totalTokens": 246436
+  },
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 1,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 6,
+      "file_edit": 0,
+      "shell": 5,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 11,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [
+      "/workspace/src/store.js",
+      "/workspace/src/views.js",
+      "/workspace/src/app.js",
+      "/workspace/server.js",
+      "/workspace/test/app.test.js",
+      "/workspace/README.md"
+    ],
+    "shellCommands": [
+      {
+        "command": "ls -la && git show --stat HEAD && cat package.json 2>/dev/null; node --version; head -c 600 package-lock.json",
+        "success": true
+      },
+      {
+        "command": "cat .gitignore; ls __agent_eval__; ls node_modules | head -50",
+        "success": true
+      },
+      {
+        "command": "python3 - <<'EOF'\np='src/app.js'\ns=open(p).read()\ns=s.replace(\"const book = store.get(decodeURIComponent(match[1]));\",\"const book = store.get(decodeId(match[1]));\")\ns=s.replace(\"const id = decodeURIComponent(match[1]);\\n      const book = await store.finish(id);\",\"const id = decodeId(match[1]);\\n      const book = id && (await store.finish(id));\")\ns=s.replace(\"function validate(book) {\",\"\"\"function decodeId(raw) {\n  try {\n    return decodeURIComponent(raw);\n  } catch {\n    return null;\n  }\n}\n\nfunction validate(book) {\"\"\")\nopen(p,'w').write(s)\nEOF\ngrep -n decodeId src/app.js",
+        "success": true
+      },
+      {
+        "command": "python3 - <<'EOF'\nimport json\np=json.load(open('package.json'))\np['scripts']={'start':'node server.js','test':'vitest run', **{k:v for k,v in p['scripts'].items() if k=='build'}}\njson.dump(p,open('package.json','w'),indent=2); open('package.json','a').write('\\n')\nEOF\nprintf 'data/\\n' >> .gitignore\ncat package.json .gitignore; npx vitest run 2>&1 | tail -25",
+        "success": true
+      },
+      {
+        "command": "cd /tmp && rm -rf smoke && mkdir smoke && (PORT=3999 DATA_FILE=/tmp/smoke/books.json node /workspace/server.js & echo $! > /tmp/smoke/pid); sleep 0.7\ncurl -s -o /dev/null -w '%{http_code} %{redirect_url}\\n' -d 'title=Middlemarch&author=George Eliot&notes=Slow start, worth it' http://127.0.0.1:3999/books\ncat /tmp/smoke/books.json; id=$(node -e 'console.log(require(\"/tmp/smoke/books.json\").books[0].id)')\ncurl -s http://127.0.0.1:3999/books/$id | sed -n '/<h2>/,$p'\nkill $(cat /tmp/smoke/pid)",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 20,
+      "outputTokens": 10542,
+      "cacheReadTokens": 220017,
+      "cacheWriteTokens": 15857,
+      "totalTokens": 246436
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

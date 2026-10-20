@@ -1,0 +1,151 @@
+{
+  "status": "passed",
+  "duration": 170.258,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.163.0"
+  },
+  "usage": {
+    "inputTokens": 60,
+    "outputTokens": 8715,
+    "cacheReadTokens": 642386,
+    "cacheWriteTokens": 44190,
+    "reasoningTokens": 3664,
+    "totalTokens": 695351
+  },
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 19,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 19,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g '\"'!node_modules'\"' -g '\"'!dist'\"' -g '\"'!build'\"' && rg --files | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && cat app/page.tsx && cat app/layout.tsx && cat AGENTS.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg -n \"updateTag|revalidateTag|Server Action|use server|cacheTag|cache tags\" node_modules/next/dist/docs | head -100'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find node_modules/next/dist/docs -maxdepth 3 -type f | head -70'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/updateTag.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md && cat node_modules/next/dist/docs/01-app/01-getting-started/09-revalidating.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat next.config.ts && cat tsconfig.json && git status --short && rg --files -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!'\"\\\\.next'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md | head -130 && cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/cacheTag.md | head -135'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n \\\"file system|filesystem|database|use cache|cacheTag|cacheComponents\\\" node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md | head -90 && rg --files -g '.gitignore' -g '\"'!node_modules'\"' && node -v\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat .gitignore && sed -n '245,320p' node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md && sed -n '130,160p' node_modules/next/dist/docs/01-app/02-guides/server-actions.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/page.tsx app/actions.ts app/posts.ts next.config.ts .gitignore && git status --short && npx tsc --noEmit'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom urllib.request import urlopen\nfrom html.parser import HTMLParser\n\nclass FormParser(HTMLParser):\n    def handle_starttag(self, tag, attrs):\n        if tag == 'form' or (tag == 'input' and any(k == 'type' and v == 'hidden' for k, v in attrs)):\n            print(tag, dict(attrs))\n\nhtml = urlopen('http://localhost:3100').read().decode()\nprint('Initial empty list:', 'No posts yet.' in html)\nFormParser().feed(html)\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom urllib.request import urlopen, Request\nfrom urllib.parse import urlencode\nfrom html.parser import HTMLParser\nfrom uuid import uuid4\n\nclass ActionField(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.name = None\n    def handle_starttag(self, tag, attrs):\n        if tag == 'input':\n            name = dict(attrs).get('name', '')\n            if name.startswith('\"'$ACTION_ID_'\"'):\n                self.name = name\n\nbase = 'http://localhost:3100/'\nbefore = urlopen(base).read().decode()\nparser = ActionField()\nparser.feed(before)\nassert parser.name\nunique_title = 'Fresh post ' + uuid4().hex[:8]\nbody = urlencode({parser.name: '', 'title': unique_title, 'content': 'Created through the Server Action'}).encode()\nresponse = urlopen(Request(base, body, method='POST', headers={'Content-Type': 'application/x-www-form-urlencoded'}))\nafter_action = response.read().decode()\nnext_load = urlopen(base).read().decode()\nprint('Action status:', response.status)\nprint('Fresh in action response:', unique_title in after_action)\nprint('Fresh on next page load:', unique_title in next_load)\nassert unique_title in after_action and unique_title in next_load\nPY\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"find .data -maxdepth 2 -type f -print -exec cat {} \\\\;\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom urllib.request import urlopen, Request\nfrom html.parser import HTMLParser\nfrom uuid import uuid4\n\nclass ActionField(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.name = None\n    def handle_starttag(self, tag, attrs):\n        if tag == 'input':\n            name = dict(attrs).get('name', '')\n            if name.startswith('\"'$ACTION_ID_'\"'):\n                self.name = name\n\nbase = 'http://localhost:3100/'\nparser = ActionField()\nparser.feed(urlopen(base).read().decode())\nboundary = 'test' + uuid4().hex\ntitle = 'Fresh post ' + uuid4().hex[:8]\nfields = {parser.name: '', 'title': title, 'content': 'Created through the Server Action'}\nbody = b''.join(f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{key}\\\"\\\\r\\\\n\\\\r\\\\n{value}\\\\r\\\\n'.encode() for key,value in fields.items()) + f'--{boundary}--\\\\r\\\\n'.encode()\nrequest = Request(base, body, method='POST', headers={'Content-Type': f'multipart/form-data; boundary={boundary}'})\nresponse = urlopen(request)\nafter_action = response.read().decode()\nnext_load = urlopen(base).read().decode()\nprint('Action status:', response.status, 'Final URL:', response.url)\nprint('Fresh in action response:', title in after_action)\nprint('Fresh on next page load:', title in next_load)\nprint('Response prefix:', after_action[:160])\nassert title in after_action and title in next_load\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rm .data/posts.json && rmdir .data && git diff --check && git diff -- tsconfig.json && git status --short && nl -ba app/actions.ts && nl -ba app/posts.ts && nl -ba app/page.tsx && nl -ba next.config.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit && git diff --check && git status --short && git diff --stat && git diff -- tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 60,
+      "outputTokens": 8715,
+      "cacheReadTokens": 642386,
+      "cacheWriteTokens": 44190,
+      "reasoningTokens": 3664,
+      "totalTokens": 695351
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

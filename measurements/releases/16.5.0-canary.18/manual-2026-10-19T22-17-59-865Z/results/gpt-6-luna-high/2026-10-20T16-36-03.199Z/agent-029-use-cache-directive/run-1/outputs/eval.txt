@@ -1,0 +1,308 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 10ms
+   × Catalog is cached, tagged, and revalidated by the sync action 9ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  16:39:56
+   Duration  322ms (transform 70ms, setup 29ms, collect 37ms, tests 10ms, environment 0ms, prepare 83ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Products | Northstar Admin',
+  description: 'Manage the Northstar Goods product catalog.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { getCachedProducts } from '@/lib/products'
+
+function Icon({ name, size = 18 }: { name: string; size?: number }) {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true as const,
+  }
+
+  if (name === 'grid') return <svg {...common}><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\" /><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\" /><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\" /><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\" /></svg>
+  if (name === 'box') return <svg {...common}><path d=\"m12 3 9 5-9 5-9-5 9-5Z\" /><path d=\"m3 8 9 5 9-5M3 8v9l9 5 9-5V8M12 13v9\" /></svg>
+  if (name === 'orders') return <svg {...common}><path d=\"M8 4h12v17H8z\" /><path d=\"M4 7v14h12M11 9h6M11 13h6M11 17h4\" /></svg>
+  if (name === 'customers') return <svg {...common}><circle cx=\"9\" cy=\"8\" r=\"3.5\" /><path d=\"M2.5 20a6.5 6.5 0 0 1 13 0M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14a5.5 5.5 0 0 1 3.5 5\" /></svg>
+  if (name === 'chart') return <svg {...common}><path d=\"M4 19V5M4 19h17\" /><path d=\"m7 15 4-4 3 2 5-6\" /></svg>
+  if (name === 'settings') return <svg {...common}><circle cx=\"12\" cy=\"12\" r=\"3\" /><path d=\"m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.6a8 8 0 0 1-1.7 1l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.7-1l-1.7.6-1.4-2.4L7.3 15a8 8 0 0 1 0-2l-1.4-1.1 1.4-2.4 1.7.6a8 8 0 0 1 1.7-1l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.7 1l1.7-.6 1.4 2.4L19.3 13a8 8 0 0 1 .1 2Z\" transform=\"translate(-1 -1)\" /></svg>
+  if (name === 'search') return <svg {...common}><circle cx=\"10.8\" cy=\"10.8\" r=\"6.8\" /><path d=\"m16 16 4.5 4.5\" /></svg>
+  if (name === 'chevron') return <svg {...common}><path d=\"m9 18 6-6-6-6\" /></svg>
+  if (name === 'refresh') return <svg {...common}><path d=\"M20 7v5h-5\" /><path d=\"M19 12a7 7 0 1 1-2-5l3 5\" /></svg>
+  if (name === 'plus') return <svg {...common}><path d=\"M12 5v14M5 12h14\" /></svg>
+  if (name === 'filter') return <svg {...common}><path d=\"M4 7h16M7 12h10m-7 5h4\" /><circle cx=\"8\" cy=\"7\" r=\"1.5\" fill=\"currentColor\" /><circle cx=\"15\" cy=\"12\" r=\"1.5\" fill=\"currentColor\" /></svg>
+  if (name === 'more') return <svg {...common}><circle cx=\"5\" cy=\"12\" r=\"1\" fill=\"currentColor\" /><circle cx=\"12\" cy=\"12\" r=\"1\" fill=\"currentColor\" /><circle cx=\"19\" cy=\"12\" r=\"1\" fill=\"currentColor\" /></svg>
+  return null
+}
+
+const navigation = [
+  { label: 'Overview', icon: 'grid' },
+  { label: 'Products', icon: 'box', active: true },
+  { label: 'Orders', icon: 'orders', count: '12' },
+  { label: 'Customers', icon: 'customers' },
+  { label: 'Analytics', icon: 'chart' },
+]
+
+const statusLabel: Record<string, string> = {
+  active: 'Active',
+  draft: 'Draft',
+  archived: 'Archived',
+}
+
+export default async function Page() {
+  async function syncCatalogAction() {
+    'use server'
+
+    // Stale-while-revalidate keeps catalog pages responsive while the shared
+    // product cache refreshes in the background on its next read.
+    revalidateTag('products', 'max')
+  }
+
+  const products = await getCachedProducts()
+  const activeProducts = products.filter((product) => product.status === 'active').length
+  const lowStock = products.filter((product) => product.inventory < 20).length
+
+  return (
+    <main className=\"admin-shell\">
+      <aside className=\"sidebar\">
+        <a className=\"brand\" href=\"#\" aria-label=\"Northstar home\">
+          <span className=\"brand-mark\"><span /></span>
+          <span className=\"brand-name\">northstar<span>.</span></span>
+        </a>
+
+        <div className=\"workspace-switcher\">
+          <div className=\"workspace-avatar\">N</div>
+          <div className=\"workspace-copy\">
+            <span className=\"eyebrow\">Workspace</span>
+            <strong>Northstar Goods</strong>
+          </div>
+          <span className=\"workspace-caret\">⌄</span>
+        </div>
+
+        <span className=\"nav-heading\">Workspace</span>
+        <nav className=\"main-nav\" aria-label=\"Main navigation\">
+          {navigation.map((item) => (
+            <a className={`nav-link${item.active ? ' active' : ''}`} href=\"#\" key={item.label} aria-current={item.active ? 'page' : undefined}>
+              <Icon name={item.icon} size={17} />
+              <span>{item.label}</span>
+              {item.count && <span className=\"nav-count\">{item.count}</span>}
+            </a>
+          ))}
+        </nav>
+
+        <div className=\"sidebar-bottom\">
+          <a className=\"nav-link\" href=\"#\"><Icon name=\"settings\" size={17} /><span>Settings</span></a>
+          <div className=\"user-card\">
+            <div className=\"user-avatar\">AM</div>
+            <div className=\"user-copy\"><strong>Alex Morgan</strong><span>Admin</span></div>
+            <Icon name=\"more\" size={17} />
+          </div>
+        </div>
+      </aside>
+
+      <section className=\"main-panel\">
+        <header className=\"topbar\">
+          <div className=\"breadcrumbs\"><span>Workspace</span><Icon name=\"chevron\" size={14} /><strong>Products</strong></div>
+          <div className=\"topbar-right\">
+            <div className=\"sync-indicator\"><span className=\"live-dot\" />All systems operational</div>
+            <button className=\"icon-button\" type=\"button\" aria-label=\"Search\"><Icon name=\"search\" size={18} /></button>
+            <div className=\"top-avatar\">AM</div>
+          </div>
+        </header>
+
+        <div className=\"page-content\">
+          <div className=\"page-heading-row\">
+            <div>
+              <div className=\"overline\">CATALOG MANAGEMENT</div>
+              <h1>Products</h1>
+              <p className=\"page-subtitle\">Manage your catalog, inventory, and product availability.</p>
+            </div>
+            <div className=\"heading-actions\">
+              <form action={syncCatalogAction}>
+                <button className=\"button button-secondary\" type=\"submit\"><Icon name=\"refresh\" size={16} />Sync latest catalog</button>
+              </form>
+              <button className=\"button button-primary\" type=\"button\"><Icon name=\"plus\" size={17} />Add product</button>
+            </div>
+          </div>
+
+          <div className=\"metric-grid\">
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Total products</span><span className=\"metric-icon violet\"><Icon name=\"box\" size={17} /></span></div>
+              <div className=\"metric-value\">{products.length}</div>
+              <div className=\"metric-note\"><span className=\"trend-up\">↗ 8.2%</span><span>vs. last month</span></div>
+            </article>
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Active listings</span><span className=\"metric-icon green\"><span className=\"active-ring\" /></span></div>
+              <div className=\"metric-value\">{activeProducts}</div>
+              <div className=\"metric-note\"><span className=\"trend-up\">↗ 4.6%</span><span>vs. last month</span></div>
+            </article>
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Low stock</span><span className=\"metric-icon amber\">!</span></div>
+              <div className=\"metric-value\">{lowStock}</div>
+              <div className=\"metric-note\"><span className=\"trend-alert\">Needs attention</span><span>under 20 units</span></div>
+            </article>
+            <article className=\"metric-card catalog-source-card\">
+              <div className=\"metric-top\"><span>Catalog source</span><span className=\"source-mark\">↗</span></div>
+              <div className=\"source-main\"><span className=\"source-logo\">P</span><div><strong>ProductHub PIM</strong><span>Connected</span></div></div>
+              <div className=\"metric-note\"><span>Last sync</span><strong>Today, 9:42 AM</strong></div>
+            </article>
+          </div>
+
+          <section className=\"catalog-card\" aria-labelledby=\"catalog-heading\">
+            <div className=\"catalog-header\">
+              <div>
+                <div className=\"catalog-title-row\"><h2 id=\"catalog-heading\">All products</h2><span className=\"result-count\">{products.length}</span></div>
+                <p>View and manage your product listings.</p>
+              </div>
+              <div className=\"catalog-tools\">
+                <label className=\"search-field\"><Icon name=\"search\" size={17} /><input aria-label=\"Search products\" placeholder=\"Search products...\" /></label>
+                <button className=\"button button-tool\" type=\"button\"><Icon name=\"filter\" size={16} />Filters<span className=\"filter-count\">2</span></button>
+              </div>
+            </div>
+
+            <div className=\"table-scroll\">
+              <table>
+                <thead>
+                  <tr>
+                    <th className=\"check-cell\"><input type=\"checkbox\" aria-label=\"Select all products\" /></th>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Price</th>
+                    <th>Inventory</th>
+                    <th>Status</th>
+                    <th>Last updated</th>
+                    <th><span className=\"sr-only\">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product) => (
+                    <tr key={product.id}>
+                      <td className=\"check-cell\"><input type=\"checkbox\" aria-label={`Select ${product.name}`} /></td>
+                      <td>
+                        <div className=\"product-cell\">
+                          <div className={`product-thumb ${product.imageTone}`}><span>{product.initials}</span></div>
+                          <div className=\"product-copy\"><strong>{product.name}</strong><span>{product.category}</span></div>
+                        </div>
+                      </td>
+                      <td><span className=\"sku\">{product.sku}</span></td>
+                      <td><span className=\"price\">${product.price.toFixed(2)}</span></td>
+                      <td><div className=\"inventory-cell\"><span className={product.inventory < 20 ? 'stock-number stock-low' : 'stock-number'}>{product.inventory}</span><span>in stock</span></div></td>
+                      <td><span className={`status-pill ${product.status}`}><span />{statusLabel[product.status]}</span></td>
+                      <td><span className=\"updated-date\">{product.updated}</span></td>
+                      <td><button className=\"row-action\" type=\"button\" aria-label={`More actions for ${product.name}`}><Icon name=\"more\" size={18} /></button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <footer className=\"table-footer\">
+              <span>Showing <strong>1–{products.length}</strong> of <strong>{products.length}</strong> products</span>
+              <div className=\"pagination\"><button type=\"button\" disabled>Previous</button><span className=\"current-page\">1</span><button type=\"button\" disabled>Next</button></div>
+            </footer>
+          </section>
+          <p className=\"cache-note\"><span className=\"cache-note-dot\" />Catalog updates are processed in the background. Recent changes may take a moment to appear.</p>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Studio Headphones', category: 'Audio', sku: 'NS-AU-2048', price: 189, inventory: 142, status: 'active', updated: 'Oct 18, 2026', initials: 'SH', imageTone: 'tone-lilac' },
+    { id: 2, name: 'Everyday Backpack', category: 'Accessories', sku: 'NS-AC-1032', price: 84, inventory: 8, status: 'active', updated: 'Oct 17, 2026', initials: 'EB', imageTone: 'tone-sand' },
+    { id: 3, name: 'Ceramic Desk Lamp', category: 'Home & Living', sku: 'NS-HM-7714', price: 129, inventory: 56, status: 'active', updated: 'Oct 17, 2026', initials: 'DL', imageTone: 'tone-blue' },
+    { id: 4, name: 'Linen Overshirt', category: 'Apparel', sku: 'NS-AP-0358', price: 96, inventory: 0, status: 'draft', updated: 'Oct 16, 2026', initials: 'LO', imageTone: 'tone-rose' },
+    { id: 5, name: 'Insulated Bottle', category: 'Outdoors', sku: 'NS-OT-6201', price: 42, inventory: 318, status: 'active', updated: 'Oct 15, 2026', initials: 'IB', imageTone: 'tone-mint' },
+    { id: 6, name: 'Minimalist Wallet', category: 'Accessories', sku: 'NS-AC-4119', price: 58, inventory: 24, status: 'active', updated: 'Oct 14, 2026', initials: 'MW', imageTone: 'tone-slate' },
+  ]
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db'
+
+// Shared across catalog views so one successful refresh updates every consumer.
+export const getCachedProducts = unstable_cache(
+  async () => getAllProducts(),
+  ['catalog-products'],
+  {
+    tags: ['products'],
+    revalidate: 60 * 60,
+  },
+)
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

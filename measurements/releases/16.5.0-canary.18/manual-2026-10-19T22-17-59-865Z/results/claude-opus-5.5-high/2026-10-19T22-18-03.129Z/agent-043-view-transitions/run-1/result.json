@@ -1,0 +1,100 @@
+{
+  "status": "passed",
+  "duration": 261.018,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "2.1.304 (Claude Code)"
+  },
+  "usage": {
+    "inputTokens": 22,
+    "outputTokens": 8028,
+    "cacheReadTokens": 311271,
+    "cacheWriteTokens": 28579,
+    "totalTokens": 347900
+  },
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 1,
+      "file_write": 3,
+      "file_edit": 2,
+      "shell": 9,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [
+      "/workspace/node_modules/next/dist/docs/01-app/02-guides/view-transitions.md"
+    ],
+    "filesModified": [
+      "/workspace/app/PageTransition.tsx",
+      "/workspace/app/ProductGrid.tsx",
+      "/workspace/app/page.tsx",
+      "/workspace/app/product/[slug]/page.tsx",
+      "/workspace/app/globals.css"
+    ],
+    "shellCommands": [
+      {
+        "command": "git diff && find . -path ./node_modules -prune -o -type f -not -path './.git/*' -not -name package-lock.json -print && cat package.json",
+        "success": true
+      },
+      {
+        "command": "for f in next.config.ts tsconfig.json lib/products.ts app/*.tsx app/globals.css 'app/product/[slug]/page.tsx'; do echo \"=== $f\"; cat \"$f\"; done; ls node_modules | head -50; cat node_modules/next/package.json | grep '\"version\"'; cat node_modules/react/package.json | grep '\"version\"'",
+        "success": true
+      },
+      {
+        "command": "cd node_modules/next; ls dist/docs 2>/dev/null | head; grep -rl \"ViewTransition\" dist/docs 2>/dev/null | head -20; grep -o \"export.\\{0,80\\}ViewTransition[^,;]*\" dist/compiled/react/cjs/react.development.js | head; grep -n \"ViewTransition\" dist/compiled/react/cjs/react.development.js | head",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next; grep -n -i -B3 -A30 \"transitionTypes\\|viewTransition\" dist/docs/01-app/03-api-reference/02-components/link.md | head -120; grep -rn -i \"viewTransition\" dist/docs/01-app/02-guides/upgrading/version-16.md | head",
+        "success": true
+      },
+      {
+        "command": "cd /workspace; grep '\"version\"' node_modules/@types/react/package.json; grep -ln \"ViewTransition\" node_modules/@types/react/*.d.ts; grep -n \"ViewTransition\\b\\|function addTransitionType\\|interface ViewTransitionProps\" node_modules/@types/react/index.d.ts | head; grep -rn \"transitionTypes\" node_modules/next/dist/client/app-dir/link.d.ts | head -3",
+        "success": true
+      },
+      {
+        "command": "python3 - <<'EOF'\np='app/product/[slug]/page.tsx'\ns=open(p).read()\ns=s.replace(\"import { Suspense } from 'react'\\n\",\"import { Suspense, ViewTransition } from 'react'\\n\")\ns=s.replace(\"import { notFound } from 'next/navigation'\\n\",\"import { notFound } from 'next/navigation'\\nimport { PageTransition } from '../../PageTransition'\\n\")\nold=s[s.index(\"  return (\\n    <div>\\n      <Link\"):]\nnew='''  return (\n    <PageTransition>\n      <div>\n        <Link href=\"/\" transitionTypes={['nav-back']} className=\"back-link\">\n          ← Back to products\n        </Link>\n        <div className=\"product-detail\">\n          <ViewTransition\n            name={`product-image-${product.slug}`}\n            share=\"morph\"\n            default=\"none\"\n          >\n            <div\n              className=\"product-hero\"\n              style={{ backgroundColor: product.color }}\n            />\n          </ViewTransition>\n          <Suspense\n            fallback={\n              <ViewTransition exit=\"slide-down\" default=\"none\">\n                <DetailsSkeleton />\n              </ViewTransition>\n            }\n          >\n            <ViewTransition enter=\"slide-up\" default=\"none\">\n              <ProductDetails slug={slug} />\n            </ViewTransition>\n          </Suspense>\n        </div>\n      </div>\n    </PageTransition>\n  )\n}\n'''\ns=s.replace(old,new)\nopen(p,'w').write(s)\nEOF\ngit diff 'app/product/[slug]/page.tsx'",
+        "success": true
+      },
+      {
+        "command": "cat >> app/globals.css <<'EOF'\n\n/* View transitions */\n\n:root {\n  --duration-exit: 150ms;\n  --duration-enter: 210ms;\n  --duration-move: 400ms;\n}\n\n/* Let clicks pass through to the live page while a transition runs */\n::view-transition {\n  pointer-events: none;\n}\n\n/* Shared element: grid thumbnail <-> detail hero */\n::view-transition-group(.morph) {\n  animation-duration: var(--duration-move);\n}\n\n::view-transition-image-pair(.morph) {\n  animation-name: via-blur;\n}\n\n/* Thumbnail (4:3) and hero (1:1) differ in aspect ratio; fill the group\n   instead of letting the snapshots overflow it */\n::view-transition-old(.morph),\n::view-transition-new(.morph) {\n  height: 100%;\n  object-fit: cover;\n}\n\n@keyframes via-blur {\n  30% {\n    filter: blur(3px);\n  }\n}\n\n/* Suspense reveal: skeleton leaves quickly, content arrives gently */\n::view-transition-old(.slide-down) {\n  animation:\n    var(--duration-exit) ease-out both fade reverse,\n    var(--duration-exit) ease-out both slide-y reverse;\n}\n\n::view-transition-new(.slide-up) {\n  animation:\n    var(--duration-enter) ease-in var(--duration-exit) both fade,\n    var(--duration-move) ease-in both slide-y;\n}\n\n/* Directional page navigation */\n::view-transition-old(.nav-forward) {\n  --slide-offset: -60px;\n  animation:\n    var(--duration-exit) ease-in both fade reverse,\n    var(--duration-move) ease-in-out both slide-x reverse;\n}\n\n::view-transition-new(.nav-forward) {\n  --slide-offset: 60px;\n  animation:\n    var(--duration-enter) ease-out var(--duration-exit) both fade,\n    var(--duration-move) ease-in-out both slide-x;\n}\n\n::view-transition-old(.nav-back) {\n  --slide-offset: 60px;\n  animation:\n    var(--duration-exit) ease-in both fade reverse,\n    var(--duration-move) ease-in-out both slide-x reverse;\n}\n\n::view-transition-new(.nav-back) {\n  --slide-offset: -60px;\n  animation:\n    var(--duration-enter) ease-out var(--duration-exit) both fade,\n    var(--duration-move) ease-in-out both slide-x;\n}\n\n@keyframes fade {\n  from {\n    filter: blur(3px);\n    opacity: 0;\n  }\n  to {\n    filter: blur(0);\n    opacity: 1;\n  }\n}\n\n@keyframes slide-y {\n  from {\n    transform: translateY(10px);\n  }\n  to {\n    transform: translateY(0);\n  }\n}\n\n@keyframes slide-x {\n  from {\n    translate: var(--slide-offset);\n  }\n  to {\n    translate: 0;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  ::view-transition-old(*),\n  ::view-transition-new(*),\n  ::view-transition-group(*),\n  ::view-transition-image-pair(*) {\n    animation-duration: 0s !important;\n    animation-delay: 0s !important;\n  }\n\n  .skeleton-image,\n  .skeleton-text {\n    animation: none;\n  }\n}\nEOF\nnpx tsc --noEmit -p . && npm run build 2>&1 | tail -25",
+        "success": true
+      },
+      {
+        "command": "which chromium chromium-browser google-chrome 2>/dev/null; ls ~/.cache/ms-playwright 2>/dev/null; git status --short",
+        "success": true
+      },
+      {
+        "command": "rm -rf .next tsconfig.tsbuildinfo next-env.d.ts && git checkout tsconfig.json && git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 22,
+      "outputTokens": 8028,
+      "cacheReadTokens": 311271,
+      "cacheWriteTokens": 28579,
+      "totalTokens": 347900
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
