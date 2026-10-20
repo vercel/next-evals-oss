@@ -1,0 +1,102 @@
+{
+  "status": "passed",
+  "duration": 346.542,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "2.1.304 (Claude Code)"
+  },
+  "usage": {
+    "inputTokens": 24,
+    "outputTokens": 6406,
+    "cacheReadTokens": 440604,
+    "cacheWriteTokens": 49957,
+    "totalTokens": 496991
+  },
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 6,
+    "toolCalls": {
+      "file_read": 1,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 11,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [
+      "/home/vercel-sandbox/.claude/projects/-workspace/860524ca-f5c0-4dd3-8a32-4e52b526b2c7/tool-results/bz8tb03zh.txt"
+    ],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "git diff package.json; cat package.json; find . -path ./node_modules -prune -o -type f -not -path './.git/*' -print | head -50; ls node_modules/next/dist/docs/",
+        "success": true
+      },
+      {
+        "command": "for f in next.config.ts lib/products.ts app/layout.tsx app/page.tsx \"app/products/[slug]/page.tsx\" tsconfig.json; do echo \"=== $f\"; cat \"$f\"; done; head -50 __agent_eval__/run.mjs",
+        "success": true
+      },
+      {
+        "command": "cd node_modules/next/dist/docs; grep -ril \"cacheComponents\" . | head -40; ls 01-app/*",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app; cat 03-api-reference/05-config/01-next-config-js/cacheComponents.md 02-guides/migrating-to-cache-components.md",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app; cat 02-guides/optimizing-the-static-shell.md; cat 03-api-reference/03-file-conventions/02-route-segment-config/ensureStatic.md 03-api-reference/03-file-conventions/02-route-segment-config/instant.md | head -150",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app; grep -n \"\" 02-guides/incremental-static-regeneration-cache-components.md | sed -n '1,400p' | grep -iv \"^\\s*$\" | head -250",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app; sed -n '1,80p' 03-api-reference/01-directives/use-cache.md; grep -n \"notFound\\|redirect\" 03-api-reference/01-directives/use-cache.md | head",
+        "success": true
+      },
+      {
+        "command": "cd /workspace && cat > next.config.ts <<'EOF'\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n  partialPrefetching: true,\n}\n\nexport default nextConfig\nEOF\ncat > lib/products.ts <<'EOF'\nimport { cacheLife } from 'next/cache'\n\nconst products = {\n  lamp: { slug: 'lamp', name: 'Brass lamp', usd: 120 },\n  vase: { slug: 'vase', name: 'Stone vase', usd: 80 },\n}\n\n// Cached per (slug, currency): both arguments are part of the cache key.\nexport async function getProduct(slug: string, currency: string) {\n  'use cache'\n  cacheLife('hours')\n  await new Promise((resolve) => setTimeout(resolve, 120))\n  const product = products[slug as keyof typeof products]\n  if (!product) return null\n  const rate = currency === 'EUR' ? 0.92 : 1\n  return { ...product, price: `${currency} ${(product.usd * rate).toFixed(2)}` }\n}\n\nexport async function getRelatedProducts(slug: string) {\n  await new Promise((resolve) => setTimeout(resolve, 420))\n  return Object.values(products).filter((product) => product.slug !== slug)\n}\nEOF\ncat > \"app/products/[slug]/page.tsx\" <<'EOF'\nimport { Suspense } from 'react'\nimport { notFound } from 'next/navigation'\nimport { getProduct, getRelatedProducts } from '@/lib/products'\n\ntype Params = Promise<{ slug: string }>\ntype SearchParams = Promise<{ currency?: string }>\n\nexport default function ProductPage({\n  params,\n  searchParams,\n}: {\n  params: Params\n  searchParams: SearchParams\n}) {\n  return (\n    <main>\n      <p>Signal Shop collection</p>\n      <Suspense\n        fallback={\n          <>\n            <h1>Loading product…</h1>\n            <p>Loading price…</p>\n          </>\n        }\n      >\n        <ProductDetails params={params} searchParams={searchParams} />\n      </Suspense>\n      <section>\n        <h2>Related products</h2>\n        <Suspense fallback={<p>Loading related products…</p>}>\n          <RelatedProducts params={params} />\n        </Suspense>\n      </section>\n    </main>\n  )\n}\n\nasync function ProductDetails({\n  params,\n  searchParams,\n}: {\n  params: Params\n  searchParams: SearchParams\n}) {\n  const { slug } = await params\n  const { currency = 'USD' } = await searchParams\n  const product = await getProduct(slug, currency)\n  if (!product) notFound()\n\n  return (\n    <>\n      <h1>{product.name}</h1>\n      <p>{product.price}</p>\n    </>\n  )\n}\n\nasync function RelatedProducts({ params }: { params: Params }) {\n  const { slug } = await params\n  const related = await getRelatedProducts(slug)\n\n  return related.map((item) => <p key={item.slug}>{item.name}</p>)\n}\nEOF\nnpm run build 2>&1 | tail -40",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 > /tmp/next.log 2>&1 &) ; sleep 4\nfor u in \"/products/lamp?currency=EUR\" \"/products/lamp\" \"/products/vase?currency=EUR\" \"/products/nope\"; do echo \"== $u\"; curl -s -o /tmp/out.html -w \"%{http_code} %{time_starttransfer}s first byte, %{time_total}s total\\n\" \"http://localhost:3123$u\"; grep -oE \"(Signal Shop collection|Loading[^<]*|Brass lamp|Stone vase|(USD|EUR) [0-9.]+|could not be found)\" /tmp/out.html | sort | uniq -c; done\npkill -f \"next start\"; true",
+        "success": false
+      },
+      {
+        "command": "cd /workspace; (npx next start -p 3123 > /tmp/next.log 2>&1 &) ; sleep 4\nfor u in \"/products/lamp?currency=EUR\" \"/products/lamp\" \"/products/vase?currency=EUR\" \"/products/nope\"; do echo \"== $u\"; curl -s -o /tmp/out.html -w \"status %{http_code}, first byte %{time_starttransfer}s, total %{time_total}s\\n\" \"http://localhost:3123$u\"; for s in '>Signal Shop collection<' '>Loading product…<' '>Loading related products…<' '>Brass lamp<' '>Stone vase<' '>EUR 110.40<' '>USD 120.00<' '>EUR 73.60<' 'This page could not be found' 'noindex'; do printf \"  %-32s %s\\n\" \"$s\" \"$(grep -c -- \"$s\" /tmp/out.html)\"; done; done\necho \"== repeat (cached details)\"; curl -s -o /dev/null -w \"total %{time_total}s\\n\" \"http://localhost:3123/products/lamp?currency=EUR\"\npkill -f \"next start\" >/dev/null 2>&1; cat /tmp/next.log | tail -5",
+        "success": false
+      },
+      {
+        "command": "cd /workspace; (npx next start -p 3123 > /tmp/next.log 2>&1 &) ; sleep 4\ncurl -s \"http://localhost:3123/products/nope\" | sed 's/<script[^>]*>[^<]*<\\/script>//g' | grep -oE '<(h1|h2|p|template|meta)[^>]*>[^<]*' | head -30\npkill -f \"next start\" >/dev/null 2>&1; true",
+        "success": false
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 24,
+      "outputTokens": 6406,
+      "cacheReadTokens": 440604,
+      "cacheWriteTokens": 49957,
+      "totalTokens": 496991
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

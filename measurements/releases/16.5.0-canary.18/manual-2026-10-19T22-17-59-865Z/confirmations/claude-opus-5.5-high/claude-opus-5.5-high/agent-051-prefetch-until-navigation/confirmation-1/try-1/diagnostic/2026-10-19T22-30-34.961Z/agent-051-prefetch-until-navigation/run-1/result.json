@@ -1,0 +1,114 @@
+{
+  "status": "failed",
+  "duration": 345.241,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "2.1.304 (Claude Code)"
+  },
+  "usage": {
+    "inputTokens": 32,
+    "outputTokens": 5568,
+    "cacheReadTokens": 657638,
+    "cacheWriteTokens": 50019,
+    "totalTokens": 713257
+  },
+  "model": "claude-opus-5.5",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 2,
+    "toolCalls": {
+      "file_read": 1,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 14,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [
+      "/home/vercel-sandbox/.claude/projects/-workspace/e0b718d5-39ec-4aeb-84b2-e0dbc53108e1/tool-results/bx9m2dj2f.txt"
+    ],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "git diff && cat package.json && find . -path ./node_modules -prune -o -path ./.git -prune -o -type f -print | head -100",
+        "success": true
+      },
+      {
+        "command": "for f in next.config.ts tsconfig.json lib/data.ts app/layout.tsx app/page.tsx \"app/projects/[slug]/page.tsx\" .gitignore; do echo \"=== $f\"; cat \"$f\"; done; ls node_modules/next/package.json && grep '\"version\"' node_modules/next/package.json",
+        "success": true
+      },
+      {
+        "command": "cd node_modules/next; ls; ls dist/docs 2>/dev/null | head; grep -rl \"unstable_instant\\|unstable_prefetch\" dist --include=*.js -l | head -20",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next; cat AGENTS.md; grep -rli \"unstable_instant\\|prefetch\" dist/docs | head -40",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app/02-guides; cat instant-navigation.md adopting-partial-prefetching.md",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app; cat 02-guides/optimizing-prefetching.md",
+        "success": true
+      },
+      {
+        "command": "cd /workspace/node_modules/next/dist/docs/01-app/03-api-reference; cat 04-functions/navigation.md | head -120; grep -n \"partialPrefetching\" -r 05-config/01-next-config-js/partialPrefetching.md | head; grep -n \"navigation\" /workspace/node_modules/next/cache.d.ts /workspace/node_modules/next/dist/server/web/exports/*.d.ts 2>/dev/null | head",
+        "success": true
+      },
+      {
+        "command": "cd /workspace && cat > next.config.ts <<'EOF'\nimport type { NextConfig } from 'next'\n\nconst nextConfig: NextConfig = {\n  cacheComponents: true,\n  partialPrefetching: true,\n}\n\nexport default nextConfig\nEOF\ncat > \"app/projects/[slug]/page.tsx\" <<'EOF'\nimport { Suspense } from 'react'\nimport { navigation } from 'next/cache'\nimport { getProjectDetails, getProjectTitle } from '@/lib/data'\n\ntype Params = PageProps<'/projects/[slug]'>['params']\n\nexport default function ProjectPage({ params }: PageProps<'/projects/[slug]'>) {\n  return (\n    <main>\n      <Suspense fallback={<h1>Loading project...</h1>}>\n        <ProjectTitle params={params} />\n      </Suspense>\n      <Suspense fallback={<p>Loading details...</p>}>\n        <ProjectDetails params={params} />\n      </Suspense>\n    </main>\n  )\n}\n\nasync function ProjectTitle({ params }: { params: Params }) {\n  const { slug } = await params\n  const title = await getProjectTitle(slug)\n  return <h1>{title}</h1>\n}\n\nasync function ProjectDetails({ params }: { params: Params }) {\n  // Keep the details out of per-link prefetches; they load on navigation.\n  await navigation()\n  const { slug } = await params\n  const details = await getProjectDetails(slug)\n\n  return (\n    <>\n      <p>{details.description}</p>\n      <h2>Recent activity</h2>\n      <ul>\n        {details.activity.map((item) => (\n          <li key={item}>{item}</li>\n        ))}\n      </ul>\n    </>\n  )\n}\nEOF\nsed -i 's|<Link href={`/projects/${project.slug}`}>{project.name}</Link>|<Link href={`/projects/${project.slug}`} prefetch>\\n              {project.name}\\n            </Link>|' app/page.tsx\ncat app/page.tsx; npx next build 2>&1 | tail -30",
+        "success": true
+      },
+      {
+        "command": "git checkout tsconfig.json && git status --short; grep -o \"NEXT_ROUTER_PREFETCH_HEADER[^;]*;\" -r node_modules/next/dist/client/components/app-router-headers.js | head; grep -n \"export const\" node_modules/next/dist/esm/client/components/app-router-headers.js | head -30",
+        "success": true
+      },
+      {
+        "command": "(npx next start -p 3123 > /tmp/next.log 2>&1 &) ; sleep 5\ncurl -s localhost:3123/projects/acme -H 'rsc: 1' -H 'next-router-prefetch: 2' -o /tmp/prefetch.txt -w '%{http_code}\\n'\ncurl -s localhost:3123/projects/acme -H 'rsc: 1' -o /tmp/nav.txt -w '%{http_code}\\n'\nfor f in /tmp/prefetch.txt /tmp/nav.txt; do echo \"== $f\"; for s in \"Acme Storefront\" \"Loading details\" \"Commerce storefront\"; do printf '%s: ' \"$s\"; grep -c \"$s\" $f; done; done",
+        "success": false
+      },
+      {
+        "command": "curl -sI localhost:3123/projects/acme -H 'rsc: 1' | head; cat /tmp/next.log",
+        "success": true
+      },
+      {
+        "command": "curl -sL localhost:3123/projects/acme -H 'rsc: 1' -H 'next-router-prefetch: 2' -o /tmp/prefetch.txt -w '%{http_code} %{url_effective}\\n'\ncurl -sL localhost:3123/projects/acme -H 'rsc: 1' -o /tmp/nav.txt -w '%{http_code} %{url_effective}\\n'\nfor f in /tmp/prefetch.txt /tmp/nav.txt; do echo \"== $f\"; for s in \"Acme Storefront\" \"Loading details\" \"Commerce storefront\"; do printf '%s: ' \"$s\"; grep -c \"$s\" $f; done; done",
+        "success": true
+      },
+      {
+        "command": "pkill -f \"next start -p 3123\"; rm -rf .next next-env.d.ts; git status --short; git diff -- app next.config.ts",
+        "success": false
+      },
+      {
+        "command": "rm -rf .next next-env.d.ts; git status --short",
+        "success": true
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 32,
+      "outputTokens": 5568,
+      "cacheReadTokens": 657638,
+      "cacheWriteTokens": 50019,
+      "totalTokens": 713257
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

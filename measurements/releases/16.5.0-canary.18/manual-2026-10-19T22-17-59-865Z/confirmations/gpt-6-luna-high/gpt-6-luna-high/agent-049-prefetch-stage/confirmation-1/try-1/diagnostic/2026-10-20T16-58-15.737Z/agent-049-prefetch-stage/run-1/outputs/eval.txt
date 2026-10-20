@@ -1,0 +1,177 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 3 failed) 31460ms
+   ✓ enables Partial Prefetching globally or for the product route 2ms
+   × opts the featured product link into per-link prefetching 7ms
+     → expected 'import type { Metadata } from \'next\…' to match /<Link\b[^>]*\bprefetch(?:\s*=\s*\{tru…/
+   × uses the prefetch cache stage 1ms
+     → expected null not to be null
+   ✓ keeps stable product content in the reusable shell  12338ms
+   × includes related products only in the selected prefetch 19110ms
+     → [judge:environment] FAIL — The related-products section must be available before navigation from the featured-product Link without joining the default product App Shell.
+
+Render related products through an async component that awaits unstable_prefetch() before calling the cached getRelatedProducts() function. The unstable_prefetch() call must be outside every use cache scope, while the existing cached data function stays below it.
+
+Reject solutions that replace the stage with connection() or unstable_navigation(), make the related-products data uncached, or defer it until after navigation. Accept equivalent component and file organization.
+  reason: Fail: app/product/page.tsx imports `prefetch as prefetchRelatedProducts` and awaits `prefetchRelatedProducts()`, so it never calls the required `unstable_prefetch()`. RelatedProducts is async and lib/data.ts keeps getRelatedProducts() under `use cache`, but the required prefetch stage is absent.
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Start at  17:00:40
+   Duration  31.90s (transform 103ms, setup 39ms, collect 52ms, tests 31.46s, environment 0ms, prepare 152ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > opts the featured product link into per-link prefetching
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /<Link\b[^>]*\bprefetch(?:\s*=\s*\{tru…/
+
+[32m- Expected:[39m 
+/<Link\b[^>]*\bprefetch(?:\s*=\s*\{true\})?(?:\s|>)/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Featured product',
+  description: 'Shop our featured product',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import Link from 'next/link'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Featured product</h1>
+      <Link href=\"/product\" prefetch=\"prefetch\">
+        View Premium Widget
+      </Link>
+    </main>
+  )
+}
+
+---FILE---
+import { prefetch as prefetchRelatedProducts } from 'next/cache'
+import { Suspense } from 'react'
+import { getRelatedProducts } from '@/lib/data'
+
+export const prefetch = 'partial'
+
+async function RelatedProducts() {
+  await prefetchRelatedProducts()
+  const relatedProducts = await getRelatedProducts()
+
+  return (
+    <section>
+      <h2>Related products</h2>
+      <ul>
+        {relatedProducts.map((product) => (
+          <li key={product}>{product}</li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+export default function ProductPage() {
+  return (
+    <main>
+      <h1>Premium Widget</h1>
+      <p>A durable widget for everyday projects.</p>
+      <Suspense fallback={null}>
+        <RelatedProducts />
+      </Suspense>
+    </main>
+  )
+}
+
+---FILE---
+import { cacheLife } from 'next/cache'
+
+export async function getRelatedProducts() {
+  'use cache'
+  cacheLife('hours')
+  return ['Compact Widget', 'Widget Carry Case']
+}
+
+---FILE---
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+---FILE---
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    
+    
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:60:18
+     58| 
+     59| test('opts the featured product link into per-link prefetching', () =>…
+     60|   expect(source).toMatch(/<Link\b[^>]*\bprefetch(?:\s*=\s*\{true\})?(?…
+       |                  ^
+     61| })
+     62| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > uses the prefetch cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:67:30
+     65|     /\bunstable_prefetch(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     66|   )
+     67|   expect(prefetchImport).not.toBeNull()
+       |                              ^
+     68| 
+     69|   const localName = prefetchImport?.[1] ?? 'unstable_prefetch'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > includes related products only in the selected prefetch
+Error: [judge:environment] FAIL — The related-products section must be available before navigation from the featured-product Link without joining the default product App Shell.
+
+Render related products through an async component that awaits unstable_prefetch() before calling the cached getRelatedProducts() function. The unstable_prefetch() call must be outside every use cache scope, while the existing cached data function stays below it.
+
+Reject solutions that replace the stage with connection() or unstable_navigation(), make the related-products data uncached, or defer it until after navigation. Accept equivalent component and file organization.
+  reason: Fail: app/product/page.tsx imports `prefetch as prefetchRelatedProducts` and awaits `prefetchRelatedProducts()`, so it never calls the required `unstable_prefetch()`. RelatedProducts is async and lib/data.ts keeps getRelatedProducts() under `use cache`, but the required prefetch stage is absent.
+ ❯ EVAL.ts:80:3
+     78| 
+     79| test('includes related products only in the selected prefetch', async …
+     80|   await expect(environment).toSatisfyCriterion(
+       |   ^
+     81|     `The related-products section must be available before navigation …
+     82| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
