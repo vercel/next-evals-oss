@@ -95,6 +95,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'grok-4.7': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
+  // Flat rate, no long-context tier: MiniMax's 2026-10-19 launch post and the
+  // AI Gateway catalog `minimax/minimax-m3.1-flash` agree on 0.15/0.6/0.015 as
+  // of 2026-10-23. Caching is implicit, so there is no write rate.
+  'minimax-m3.1-flash': { input: 0.15, output: 0.6, cacheRead: 0.015, cacheWrite: 0 },
 };
 
 /** USD for one run at the given list price. */
