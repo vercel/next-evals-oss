@@ -85,6 +85,9 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
   'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },
   'kimi-k3': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
+  // AI Gateway catalog `moonshotai/kimi-k3.1-pro`, 2026-10-24: 2/10, cache
+  // read 0.2, cache write 2. Matches Moonshot's launch pricing as reported.
+  'kimi-k3.1-pro': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2 },
   'glm-5.1-opencode': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
   // Cut from 1.4/4.4/0.26 (zai's own rate); gateway and models.dev vercel
   // entry agree as of 2026-08-26.
@@ -95,6 +98,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'grok-4.7': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
   'minimax-m2.7': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0.375 },
   'minimax-m3': { input: 0.3, output: 1.2, cacheRead: 0.06, cacheWrite: 0 },
+  // Flat rate, no long-context tier: MiniMax's 2026-10-19 launch post and the
+  // AI Gateway catalog `minimax/minimax-m3.1-flash` agree on 0.15/0.6/0.015 as
+  // of 2026-10-23. Caching is implicit, so there is no write rate.
+  'minimax-m3.1-flash': { input: 0.15, output: 0.6, cacheRead: 0.015, cacheWrite: 0 },
 };
 
 /** USD for one run at the given list price. */
