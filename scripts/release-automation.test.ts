@@ -8,6 +8,7 @@ import {
   buildReleaseNotification,
   buildReleaseReport,
   findInvalidRunReason,
+  loadReleaseCoverage,
   prepareReleaseWorkspace,
   validateReleaseResults,
   validateReleaseTarget,
@@ -102,6 +103,48 @@ test('release results are prepared outside the publishable repository tree', asy
       evals,
     }),
   );
+});
+
+test('cohort coverage reports unavailable agents from the availability file', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'next-evals-availability-'));
+  tempDirs.push(root);
+  const availabilityPath = join(root, 'availability.json');
+  await writeFile(
+    availabilityPath,
+    JSON.stringify({
+      schemaVersion: 1,
+      excludedExperiments: [
+        {
+          model: 'Unavailable Model',
+          experiments: ['unavailable', 'unavailable--agents-md'],
+          reason: 'The provider did not return a valid attempt.',
+        },
+      ],
+    }),
+  );
+
+  assert.deepEqual(
+    await loadReleaseCoverage({
+      scope: 'cohort',
+      availabilityPath,
+    }),
+    {
+      kind: 'cohort',
+      unavailableAgents: [
+        {
+          model: 'Unavailable Model',
+          reason: 'The provider did not return a valid attempt.',
+        },
+      ],
+    },
+  );
+  await assert.rejects(
+    () => loadReleaseCoverage({ scope: 'cohort' }),
+    /RELEASE_AVAILABILITY_PATH/,
+  );
+  assert.deepEqual(await loadReleaseCoverage({ scope: 'full' }), {
+    kind: 'full',
+  });
 });
 
 test('the reporting gate distinguishes assertion failures from infrastructure failures', () => {
@@ -258,6 +301,82 @@ test('agent notification points at the standalone measurement PR', () => {
         report,
       }),
     /vercel\/next-evals-oss/,
+  );
+});
+
+test('a failure is reproducible only after exactly two failed confirmations', () => {
+  const report = buildReleaseReport(
+    {
+      metadata: {
+        measurement: {
+          metric: 'pass@1',
+          scoredAttempts: 1,
+          infrastructureFailuresExcluded: true,
+        },
+        experiments: [
+          {
+            name: 'model',
+            modelName: 'Model',
+            agentHarness: 'Harness',
+          },
+        ],
+      },
+      results: { model: [] },
+    },
+    {
+      metric: 'pass@1',
+      confirmationAttemptsPerFailure: 2,
+      experiments: [
+        {
+          experiment: 'model',
+          tasks: [
+            {
+              evalName: 'zero-confirmations',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [],
+            },
+            {
+              evalName: 'one-confirmation',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 0 },
+              ],
+            },
+            {
+              evalName: 'two-confirmations',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 0 },
+                { outcome: 'failed', infrastructureRetries: 0 },
+              ],
+            },
+            {
+              evalName: 'unavailable-confirmation',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 0 },
+                { outcome: 'unavailable', infrastructureRetries: 3 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(
+    Object.fromEntries(
+      report.failures.map((failure) => [
+        failure.evalName,
+        failure.reproducible,
+      ]),
+    ),
+    {
+      'one-confirmation': false,
+      'two-confirmations': true,
+      'unavailable-confirmation': false,
+      'zero-confirmations': false,
+    },
   );
 });
 

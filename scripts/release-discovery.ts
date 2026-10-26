@@ -123,28 +123,46 @@ export function classifyReleaseRuns(options: {
     return { kind: 'canary', sourceRunUrl: tagRun.html_url };
   }
 
-  const sourceBranches = [
+  const exactSourceBranches = [
     ...new Set(
-      [
-        ...successfulRuns.map((run) => run.head_branch),
-        ...(options.sourceBranches ?? []),
-      ].filter(
+      successfulRuns.map((run) => run.head_branch).filter(
         (branch) => branch === 'canary' || /^next-\d+-\d+$/.test(branch),
       ),
     ),
   ];
-  const ltsBranches = [
+  const exactLtsBranches = [
     ...new Set(
-      [
-        ...successfulRuns.map((run) => run.head_branch),
-        ...(options.sourceBranches ?? []),
-      ].filter(
+      successfulRuns.map((run) => run.head_branch).filter(
         (branch) =>
           branch === 'releases/lts/active' ||
           branch === 'releases/lts/maintenance',
       ),
     ),
   ];
+  const inferredBranches = options.sourceBranches ?? [];
+  const sourceBranches =
+    exactSourceBranches.length > 0 || exactLtsBranches.length > 0
+      ? exactSourceBranches
+      : [
+          ...new Set(
+            inferredBranches.filter(
+              (branch) =>
+                branch === 'canary' || /^next-\d+-\d+$/.test(branch),
+            ),
+          ),
+        ];
+  const ltsBranches =
+    exactSourceBranches.length > 0 || exactLtsBranches.length > 0
+      ? exactLtsBranches
+      : [
+          ...new Set(
+            inferredBranches.filter(
+              (branch) =>
+                branch === 'releases/lts/active' ||
+                branch === 'releases/lts/maintenance',
+            ),
+          ),
+        ];
 
   const sourceBranch =
     sourceBranches.length === 1
@@ -245,7 +263,7 @@ async function hasMeasurement(
   return false;
 }
 
-async function sourceBranchesForRelease(
+export async function sourceBranchesForRelease(
   github: GithubClient,
   version: string,
   sha: string,
