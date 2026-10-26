@@ -8,7 +8,6 @@ import {
   buildReleaseNotification,
   buildReleaseReport,
   findInvalidRunReason,
-  loadReleaseCoverage,
   prepareReleaseWorkspace,
   validateReleaseResults,
   validateReleaseTarget,
@@ -105,48 +104,6 @@ test('release results are prepared outside the publishable repository tree', asy
   );
 });
 
-test('cohort coverage reports unavailable agents from the availability file', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'next-evals-availability-'));
-  tempDirs.push(root);
-  const availabilityPath = join(root, 'availability.json');
-  await writeFile(
-    availabilityPath,
-    JSON.stringify({
-      schemaVersion: 1,
-      excludedExperiments: [
-        {
-          model: 'Unavailable Model',
-          experiments: ['unavailable', 'unavailable--agents-md'],
-          reason: 'The provider did not return a valid attempt.',
-        },
-      ],
-    }),
-  );
-
-  assert.deepEqual(
-    await loadReleaseCoverage({
-      scope: 'cohort',
-      availabilityPath,
-    }),
-    {
-      kind: 'cohort',
-      unavailableAgents: [
-        {
-          model: 'Unavailable Model',
-          reason: 'The provider did not return a valid attempt.',
-        },
-      ],
-    },
-  );
-  await assert.rejects(
-    () => loadReleaseCoverage({ scope: 'cohort' }),
-    /RELEASE_AVAILABILITY_PATH/,
-  );
-  assert.deepEqual(await loadReleaseCoverage({ scope: 'full' }), {
-    kind: 'full',
-  });
-});
-
 test('the reporting gate distinguishes assertion failures from infrastructure failures', () => {
   assert.equal(
     findInvalidRunReason({
@@ -236,19 +193,8 @@ test('agent notification points at the standalone measurement PR', () => {
       sourceRunUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
       evaluatedAt: '2026-10-13T12:00:00.000Z',
     },
-    execution: {
-      kind: 'github-actions',
-      url: 'https://github.com/vercel/next-evals-oss/actions/runs/12345',
-    },
-    coverage: {
-      kind: 'cohort',
-      unavailableAgents: [
-        {
-          model: 'Unavailable Model',
-          reason: 'The provider did not return a valid attempt.',
-        },
-      ],
-    },
+    workflowUrl:
+      'https://github.com/vercel/next-evals-oss/actions/runs/12345',
     measurementUrl: 'https://github.com/vercel/next-evals-oss/pull/456',
     report,
   });
@@ -256,7 +202,6 @@ test('agent notification points at the standalone measurement PR', () => {
   assert.equal(notification.schemaVersion, 5);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
-  assert.equal(notification.coverage.unavailableAgents?.length, 1);
   assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
   assert.equal(notification.report.scores.withoutAgentsMd.passed, 1);
   assert.equal(notification.report.scores.withAgentsMd.passed, 2);
@@ -278,25 +223,20 @@ test('agent notification points at the standalone measurement PR', () => {
     0,
   );
   assert.deepEqual(Object.keys(notification).sort(), [
-    'coverage',
-    'execution',
     'measurementUrl',
     'metric',
     'report',
     'schemaVersion',
     'target',
     'validation',
+    'workflowUrl',
   ]);
 
   assert.throws(
     () =>
       buildReleaseNotification({
         target: notification.target,
-        execution: {
-          kind: 'github-actions',
-          url: 'https://github.com/vercel/next.js/actions/runs/12345',
-        },
-        coverage: { kind: 'full' },
+        workflowUrl: 'https://github.com/vercel/next.js/actions/runs/12345',
         measurementUrl: notification.measurementUrl,
         report,
       }),

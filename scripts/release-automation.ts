@@ -123,95 +123,10 @@ export function findInvalidRunReason(options: {
   return undefined;
 }
 
-export interface ReleaseCoverage {
-  kind: 'full' | 'cohort';
-  unavailableAgents?: Array<{
-    model: string;
-    reason: string;
-  }>;
-}
-
-interface ReleaseAvailabilityData {
-  schemaVersion: 1;
-  excludedExperiments: Array<{
-    model: string;
-    experiments: string[];
-    reason: string;
-  }>;
-}
-
-export async function loadReleaseCoverage(options: {
-  scope?: string;
-  availabilityPath?: string;
-}): Promise<ReleaseCoverage> {
-  if (options.scope !== 'cohort') return { kind: 'full' };
-  if (!options.availabilityPath) {
-    throw new Error(
-      'RELEASE_AVAILABILITY_PATH is required for cohort measurements',
-    );
-  }
-
-  let availability: unknown;
-  try {
-    availability = JSON.parse(
-      await readFile(options.availabilityPath, 'utf8'),
-    ) as unknown;
-  } catch (error) {
-    throw new Error(
-      `Could not read cohort availability from ${options.availabilityPath}`,
-      { cause: error },
-    );
-  }
-
-  if (
-    typeof availability !== 'object' ||
-    availability === null ||
-    (availability as Partial<ReleaseAvailabilityData>).schemaVersion !== 1 ||
-    !Array.isArray(
-      (availability as Partial<ReleaseAvailabilityData>).excludedExperiments,
-    )
-  ) {
-    throw new Error('Cohort availability must use schemaVersion 1');
-  }
-
-  const excludedExperiments = (
-    availability as ReleaseAvailabilityData
-  ).excludedExperiments;
-  for (const entry of excludedExperiments) {
-    if (
-      typeof entry !== 'object' ||
-      entry === null ||
-      typeof entry.model !== 'string' ||
-      entry.model.trim() === '' ||
-      typeof entry.reason !== 'string' ||
-      entry.reason.trim() === '' ||
-      !Array.isArray(entry.experiments) ||
-      entry.experiments.length === 0 ||
-      entry.experiments.some(
-        (experiment) =>
-          typeof experiment !== 'string' || experiment.trim() === '',
-      )
-    ) {
-      throw new Error('Cohort availability contains an invalid exclusion');
-    }
-  }
-
-  return {
-    kind: 'cohort',
-    unavailableAgents: excludedExperiments.map(({ model, reason }) => ({
-      model,
-      reason,
-    })),
-  };
-}
-
 export interface ReleaseNotification {
   schemaVersion: 5;
   target: ReleaseTarget;
-  execution:
-    | { kind: 'github-actions'; url: string }
-    | { kind: 'maintainer' };
-  coverage: ReleaseCoverage;
+  workflowUrl: string;
   measurementUrl: string;
   metric: 'pass@1';
   validation: {
@@ -224,21 +139,17 @@ export interface ReleaseNotification {
 
 export function buildReleaseNotification(options: {
   target: ReleaseTarget;
-  execution:
-    | { kind: 'github-actions'; url: string }
-    | { kind: 'maintainer' };
-  coverage: ReleaseCoverage;
+  workflowUrl: string;
   measurementUrl: string;
   report: ReleaseReport;
 }): ReleaseNotification {
   if (
-    options.execution.kind === 'github-actions' &&
     !/^https:\/\/github\.com\/vercel\/next-evals-oss\/actions\/runs\/\d+$/.test(
-      options.execution.url,
+      options.workflowUrl,
     )
   ) {
     throw new Error(
-      'execution.url must point to a vercel/next-evals-oss Actions run',
+      'workflowUrl must point to a vercel/next-evals-oss Actions run',
     );
   }
   if (
@@ -253,8 +164,7 @@ export function buildReleaseNotification(options: {
   return {
     schemaVersion: 5,
     target: options.target,
-    execution: options.execution,
-    coverage: options.coverage,
+    workflowUrl: options.workflowUrl,
     measurementUrl: options.measurementUrl,
     metric: 'pass@1',
     validation: {
@@ -781,13 +691,7 @@ async function main(): Promise<void> {
     ) as ReleaseDiagnosticsData;
     const notification = buildReleaseNotification({
       target,
-      execution: process.env.WORKFLOW_URL
-        ? { kind: 'github-actions', url: process.env.WORKFLOW_URL }
-        : { kind: 'maintainer' },
-      coverage: await loadReleaseCoverage({
-        scope: process.env.MEASUREMENT_SCOPE,
-        availabilityPath: process.env.RELEASE_AVAILABILITY_PATH,
-      }),
+      workflowUrl: process.env.WORKFLOW_URL ?? '',
       measurementUrl: process.env.MEASUREMENT_URL ?? '',
       report: buildReleaseReport(data, diagnostics),
     });
