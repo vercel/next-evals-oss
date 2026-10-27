@@ -53,3 +53,20 @@ test('the release agent accepts standalone workflow URLs', async () => {
     /workflowUrl:[\s\S]*github\\\.com\\\/vercel\\\/next\\\.js\\\/actions\\\/runs/,
   );
 });
+
+test('release jobs use short-lived scoped credentials without a stored token', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const intake = await readFile(
+    new URL(
+      '../apps/release-agent/agent/channels/release-intake.ts',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  assert.doesNotMatch(workflow, /Install Vercel CLI/);
+  assert.match(workflow, /RELEASE_WORKFLOW_OIDC_TOKEN/);
+  assert.doesNotMatch(workflow, /\$VERCEL_OIDC_TOKEN/);
+  assert.match(intake, /https:\/\/token\.actions\.githubusercontent\.com/);
+  assert.match(intake, /repo:vercel\/next-evals-oss:ref:refs\/heads\/main/);
+});

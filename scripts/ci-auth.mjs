@@ -21,8 +21,13 @@ if (!oidcResponse.ok) {
   throw new Error(`GitHub OIDC request failed with status ${oidcResponse.status}`);
 }
 const { value: githubOidcToken } = await oidcResponse.json();
-if (!githubOidcToken || /[\r\n]/.test(githubOidcToken)) {
-  throw new Error("GitHub did not provide a single-line OIDC token");
+if (
+  !githubOidcToken ||
+  !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(
+    githubOidcToken,
+  )
+) {
+  throw new Error("GitHub did not provide a valid OIDC JWT");
 }
 console.log(`::add-mask::${githubOidcToken}`);
 
@@ -49,40 +54,28 @@ if (!accessToken || /[\r\n]/.test(accessToken)) {
 }
 console.log(`::add-mask::${accessToken}`);
 
-// `vercel env pull` first reads the current user and team. Project-scoped OIDC
-// credentials intentionally cannot read those account-wide resources, so call
-// the same project environment endpoint directly instead of broadening the
-// policy to every project in the team.
-const environmentUrl = new URL(
-  `/v3/env/pull/${encodeURIComponent(process.env.VERCEL_PROJECT_ID)}/development`,
-  "https://api.vercel.com",
-);
-environmentUrl.searchParams.set("source", "vercel-cli:env:pull");
-environmentUrl.searchParams.set("teamId", process.env.VERCEL_ORG_ID);
-const environmentResponse = await fetch(environmentUrl, {
-  headers: { authorization: `Bearer ${accessToken}` },
-});
-if (!environmentResponse.ok) {
-  throw new Error(
-    `Vercel environment request failed with status ${environmentResponse.status}`,
-  );
-}
-const { env: credentials } = await environmentResponse.json();
-if (!credentials || typeof credentials !== "object") {
-  throw new Error("Vercel did not provide project environment variables");
-}
-
-const oidcToken = credentials.VERCEL_OIDC_TOKEN?.replace(/\s/g, "");
-if (
-  !oidcToken ||
-  !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(oidcToken)
-) {
-  throw new Error("Vercel did not provide a valid OIDC JWT");
-}
-console.log(`::add-mask::${oidcToken}`);
-
 let gatewayCredential = "";
 if (process.env.REQUIRE_AI_GATEWAY_API_KEY === "1") {
+  // The model matrix uses a separately budgeted key. Read only this project's
+  // Development environment with the short-lived project access token.
+  const environmentUrl = new URL(
+    `/v3/env/pull/${encodeURIComponent(process.env.VERCEL_PROJECT_ID)}/development`,
+    "https://api.vercel.com",
+  );
+  environmentUrl.searchParams.set("source", "vercel-cli:env:pull");
+  environmentUrl.searchParams.set("teamId", process.env.VERCEL_ORG_ID);
+  const environmentResponse = await fetch(environmentUrl, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!environmentResponse.ok) {
+    throw new Error(
+      `Vercel environment request failed with status ${environmentResponse.status}`,
+    );
+  }
+  const { env: credentials } = await environmentResponse.json();
+  if (!credentials || typeof credentials !== "object") {
+    throw new Error("Vercel did not provide project environment variables");
+  }
   const gatewayApiKey = credentials.AI_GATEWAY_API_KEY?.trim();
   if (!gatewayApiKey || /[\r\n]/.test(gatewayApiKey)) {
     throw new Error(
@@ -93,10 +86,10 @@ if (process.env.REQUIRE_AI_GATEWAY_API_KEY === "1") {
   gatewayCredential = `AI_GATEWAY_API_KEY=${gatewayApiKey}\n`;
 }
 
-// The exchange credential stays in this process. Clear any inherited value for
-// later steps, which receive only the short-lived project OIDC token and the
-// separately budgeted Gateway key when needed.
+// Sandbox accepts the short-lived access token with the linked team and project
+// IDs. The GitHub OIDC token authenticates the workflow's call to Eve. Neither
+// credential is persisted in GitHub.
 appendFileSync(
   process.env.GITHUB_ENV,
-  `VERCEL_OIDC_TOKEN=${oidcToken}\n${gatewayCredential}VERCEL_TOKEN=\n`,
+  `VERCEL_TOKEN=${accessToken}\nVERCEL_TEAM_ID=${process.env.VERCEL_ORG_ID}\nVERCEL_PROJECT_ID=${process.env.VERCEL_PROJECT_ID}\nRELEASE_WORKFLOW_OIDC_TOKEN=${githubOidcToken}\n${gatewayCredential}`,
 );
