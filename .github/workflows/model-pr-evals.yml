@@ -1,0 +1,535 @@
+name: Evaluate a model registration PR
+
+run-name: Measure models from ${{ inputs.prNumber && format('PR #{0}', inputs.prNumber) || 'the RoboEve queue' }}
+
+on:
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+    inputs:
+      prNumber:
+        description: Optional RoboEve model-registration pull request number
+        required: false
+        type: string
+
+concurrency:
+  group: model-pr-evals
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  prepare:
+    name: Validate model registration
+    if: github.repository == 'vercel/next-evals-oss' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      has-candidate: ${{ steps.registration.outputs.has-candidate }}
+      approval-needed: ${{ steps.registration.outputs.approval-needed }}
+      should-run: ${{ steps.registration.outputs.should-run }}
+      pr-number: ${{ steps.registration.outputs.pr-number }}
+      head-ref: ${{ steps.registration.outputs.head-ref }}
+      head-sha: ${{ steps.registration.outputs.head-sha }}
+      pairs: ${{ steps.registration.outputs.pairs }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Read eligible pull requests
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PR_NUMBER: ${{ inputs.prNumber }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { owner, repo } = context.repo;
+            const requested = Number(process.env.PR_NUMBER || 0);
+            const pulls = requested
+              ? [(await github.rest.pulls.get({ owner, repo, pull_number: requested })).data]
+              : (await github.paginate(github.rest.pulls.list, {
+                  owner,
+                  repo,
+                  state: 'open',
+                  sort: 'created',
+                  direction: 'asc',
+                  per_page: 100,
+                })).filter((pull) =>
+                  pull.user?.login === 'roboeve[bot]' &&
+                  pull.head.repo?.full_name === `${owner}/${repo}` &&
+                  pull.head.ref.startsWith('v/register-')
+                );
+            const candidates = [];
+            for (const pull of pulls) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: pull.number,
+                per_page: 100,
+              });
+              // Credentials are granted only after two maintainers approve the
+              // exact head SHA, so collect each reviewer's latest decision for
+              // that commit.
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner,
+                repo,
+                pull_number: pull.number,
+                per_page: 100,
+              });
+              const latestReviewByUser = new Map();
+              for (const review of reviews) {
+                if (review.commit_id !== pull.head.sha) continue;
+                if (review.user?.type !== 'User') continue;
+                if (review.state === 'COMMENTED' || review.state === 'PENDING') continue;
+                const previous = latestReviewByUser.get(review.user.login);
+                if (!previous || review.id > previous.id) {
+                  latestReviewByUser.set(review.user.login, review);
+                }
+              }
+              const approvals = [];
+              for (const review of latestReviewByUser.values()) {
+                if (review.state !== 'APPROVED') continue;
+                const { permission } = await github.rest.repos
+                  .getCollaboratorPermissionLevel({ owner, repo, username: review.user.login })
+                  .then((response) => response.data, () => ({ permission: 'none' }));
+                approvals.push({ login: review.user.login, permission });
+              }
+              const headCommit = (
+                await github.rest.repos.getCommit({ owner, repo, ref: pull.head.sha })
+              ).data;
+              const measuredByAutomation =
+                headCommit.committer?.login === 'github-actions[bot]' &&
+                headCommit.commit.message.split('\n', 1)[0] === 'Record model evaluation results';
+              candidates.push({
+                pullRequest: pull,
+                files,
+                approvals,
+                measuredByAutomation,
+              });
+            }
+            fs.writeFileSync(
+              `${process.env.RUNNER_TEMP}/model-pr-candidates.json`,
+              JSON.stringify(candidates),
+            );
+
+      - name: Select the new model pairs
+        id: registration
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+          MODEL_PR_CANDIDATES_JSON: ${{ runner.temp }}/model-pr-candidates.json
+        run: pnpm tsx scripts/model-pr.ts discover
+
+  notify:
+    name: Open the model eval Slack thread
+    needs: prepare
+    if: needs.prepare.outputs.has-candidate == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      checks: write
+      id-token: write
+    outputs:
+      check-run-id: ${{ steps.thread.outputs.check-run-id }}
+      session-id: ${{ steps.thread.outputs.session-id }}
+    steps:
+      - name: Reuse or open the model PR thread
+        id: thread
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          APPROVAL_NEEDED: ${{ needs.prepare.outputs.approval-needed }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
+          RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const checkName = 'Model eval Slack thread';
+            const headSha = process.env.HEAD_SHA;
+            const existing = await github.rest.checks.listForRef({
+              owner,
+              repo,
+              ref: headSha,
+              check_name: checkName,
+              filter: 'latest',
+              per_page: 100,
+            });
+            const check = existing.data.check_runs.find((run) =>
+              run.external_id?.startsWith('eve-session:')
+            );
+            if (check) {
+              core.setOutput('check-run-id', String(check.id));
+              core.setOutput('session-id', check.external_id.slice('eve-session:'.length));
+              return;
+            }
+
+            const agentUrl = process.env.RELEASE_AGENT_URL?.replace(/\/$/, '');
+            if (!agentUrl) throw new Error('VERCEL_NEXT_EVALS_AGENT_URL is required');
+            const prNumber = Number(process.env.PR_NUMBER);
+            const workflowUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const oidcToken = await core.getIDToken('https://github.com/vercel');
+            core.setSecret(oidcToken);
+            const response = await fetch(`${agentUrl}/model-evals`, {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${oidcToken}`,
+                'content-type': 'application/json',
+                'x-vercel-trusted-oidc-idp-token': oidcToken,
+              },
+              body: JSON.stringify({
+                event: process.env.APPROVAL_NEEDED === 'true'
+                  ? 'approval_required'
+                  : 'run_started',
+                prNumber,
+                prUrl: `${context.serverUrl}/${owner}/${repo}/pull/${prNumber}`,
+                headSha,
+                pairs: JSON.parse(process.env.PAIRS_JSON),
+                workflowUrl,
+              }),
+            });
+            if (!response.ok) {
+              throw new Error(`Eve rejected the model notification with status ${response.status}`);
+            }
+            const result = await response.json();
+            if (typeof result.sessionId !== 'string' || result.sessionId.length > 256) {
+              throw new Error('Eve did not return a valid session ID');
+            }
+
+            const created = await github.rest.checks.create({
+              owner,
+              repo,
+              name: checkName,
+              head_sha: headSha,
+              status: 'completed',
+              conclusion: 'neutral',
+              external_id: `eve-session:${result.sessionId}`,
+              details_url: workflowUrl,
+              output: {
+                title: process.env.APPROVAL_NEEDED === 'true'
+                  ? 'Waiting for exact-SHA approval'
+                  : 'Model evals started',
+                summary: 'Operational updates for this exact PR head are kept in one Slack thread.',
+              },
+            });
+            core.setOutput('check-run-id', String(created.data.id));
+            core.setOutput('session-id', result.sessionId);
+
+  evaluate:
+    name: ${{ matrix.pair.base }}
+    needs: [prepare, notify]
+    if: needs.prepare.outputs.should-run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        pair: ${{ fromJSON(needs.prepare.outputs.pairs) }}
+    steps:
+      # Credentialed jobs run only this repository's main code. The pull
+      # request contributes nothing but its new experiment files, copied in
+      # below from a credential-free sparse checkout.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Fetch the registration PR's experiment files
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.prepare.outputs.head-sha }}
+          path: registration-pr
+          sparse-checkout: experiments
+          persist-credentials: false
+
+      - name: Overlay only the new experiment files
+        env:
+          EXPERIMENTS_JSON: ${{ toJSON(matrix.pair.experiments) }}
+        run: |
+          mapfile -t experiments < <(node -e 'for (const value of JSON.parse(process.env.EXPERIMENTS_JSON)) console.log(value)')
+          for experiment in "${experiments[@]}"; do
+            cp "registration-pr/experiments/$experiment.ts" "experiments/$experiment.ts"
+          done
+          rm -rf registration-pr
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Sync the fixed eval suite
+        run: pnpm sync-evals "$(cat eval-suite-ref.txt)"
+
+      - name: Pull short-lived Vercel credentials
+        env:
+          REQUIRE_AI_GATEWAY_API_KEY: "1"
+          VERCEL_CLI_CLIENT_ID: ${{ vars.VERCEL_CLI_CLIENT_ID }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_NEXT_UPGRADE_EVALS_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_NEXT_UPGRADE_EVALS_PROJECT_ID }}
+        run: node scripts/ci-auth.mjs
+
+      - name: Preflight the new model pair
+        env:
+          EXPERIMENTS_JSON: ${{ toJSON(matrix.pair.experiments) }}
+        run: |
+          mapfile -t experiments < <(node -e 'for (const value of JSON.parse(process.env.EXPERIMENTS_JSON)) console.log(value)')
+          pnpm preflight "${experiments[@]}"
+
+      - name: Run the complete pass@4 matrices
+        env:
+          EXPERIMENTS_JSON: ${{ toJSON(matrix.pair.experiments) }}
+        run: |
+          mapfile -t experiments < <(node -e 'for (const value of JSON.parse(process.env.EXPERIMENTS_JSON)) console.log(value)')
+          for experiment in "${experiments[@]}"; do
+            complete=false
+            for attempt in 1 2 3 4; do
+              set +e
+              pnpm eval:run "$experiment"
+              set -e
+              if pnpm tsx scripts/model-pr.ts validate-results "$experiment"; then
+                complete=true
+                break
+              fi
+              if (( attempt < 4 )); then
+                echo "Infrastructure recovery pass $attempt/3 for $experiment"
+              fi
+            done
+            if [[ "$complete" != true ]]; then
+              echo "The result matrix for $experiment is incomplete" >&2
+              exit 1
+            fi
+          done
+
+      - name: Package sanitized result output
+        env:
+          EXPERIMENTS_JSON: ${{ toJSON(matrix.pair.experiments) }}
+          STAGE: ${{ runner.temp }}/model-results
+        run: |
+          mapfile -t experiments < <(node -e 'for (const value of JSON.parse(process.env.EXPERIMENTS_JSON)) console.log(value)')
+          mkdir -p "$STAGE/results"
+          for experiment in "${experiments[@]}"; do
+            node scripts/assert-no-secrets.mjs "results/$experiment"
+            cp -R "results/$experiment" "$STAGE/results/$experiment"
+          done
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-results-${{ matrix.pair.base }}
+          path: ${{ runner.temp }}/model-results
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+  export:
+    name: Export the public dataset
+    needs: [prepare, evaluate]
+    if: needs.prepare.outputs.should-run == 'true' && needs.evaluate.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      # This job runs the pull request's own export and cost scripts, so it
+      # receives no Vercel credential and no repository write access.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.prepare.outputs.head-sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: model-results-*
+          path: ${{ runner.temp }}/model-results
+          merge-multiple: true
+
+      - name: Add the measured results
+        run: cp -R "$RUNNER_TEMP/model-results/." .
+
+      - name: Sync the fixed eval suite
+        run: pnpm sync-evals "$(cat eval-suite-ref.txt)"
+
+      - name: Export and validate the public dataset
+        env:
+          PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
+        run: |
+          pnpm export-results
+          mapfile -t experiments < <(node -e 'for (const pair of JSON.parse(process.env.PAIRS_JSON)) for (const value of pair.experiments) console.log(value)')
+          node scripts/assert-no-secrets.mjs agent-results.json "${experiments[@]/#/results/}"
+          pnpm typecheck
+          pnpm test:cost
+          node scripts/check-stale.mjs
+          pnpm export-results --check
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: model-export
+          path: agent-results.json
+          if-no-files-found: error
+          retention-days: 1
+
+  update:
+    name: Add results to the model PR
+    needs: [prepare, export]
+    if: needs.prepare.outputs.should-run == 'true' && needs.export.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      # The only job that can push runs no pull request code: it checks the
+      # sanitized artifacts with main's script and commits them.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: model-results-*
+          path: ${{ runner.temp }}/model-results
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: model-export
+          path: ${{ runner.temp }}/model-export
+
+      - name: Check out the registration PR
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.prepare.outputs.head-ref }}
+          token: ${{ github.token }}
+          path: registration-pr
+          persist-credentials: true
+
+      - name: Commit results to the registration PR
+        env:
+          EXPECTED_SHA: ${{ needs.prepare.outputs.head-sha }}
+          HEAD_REF: ${{ needs.prepare.outputs.head-ref }}
+          PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
+          REGISTRATION: ${{ github.workspace }}/registration-pr
+        run: |
+          mapfile -t experiments < <(node -e 'for (const pair of JSON.parse(process.env.PAIRS_JSON)) for (const value of pair.experiments) console.log(value)')
+
+          actual="$(git -C "$REGISTRATION" rev-parse HEAD)"
+          if [[ "$actual" != "$EXPECTED_SHA" ]]; then
+            echo "PR head changed while its model evals were running" >&2
+            echo "expected: $EXPECTED_SHA" >&2
+            echo "actual:   $actual" >&2
+            exit 1
+          fi
+
+          cp -R "$RUNNER_TEMP/model-results/." "$REGISTRATION/"
+          cp "$RUNNER_TEMP/model-export/agent-results.json" "$REGISTRATION/agent-results.json"
+          node scripts/assert-no-secrets.mjs \
+            "$REGISTRATION/agent-results.json" \
+            "${experiments[@]/#/$REGISTRATION/results/}"
+
+          cd "$REGISTRATION"
+          git add agent-results.json "${experiments[@]/#/results/}"
+          if git diff --cached --quiet; then
+            echo "The registration PR already contains these results"
+            exit 0
+          fi
+          git diff --cached --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Record model evaluation results"
+          git push origin "HEAD:$HEAD_REF"
+
+  report:
+    name: Reply with the model eval outcome
+    needs: [prepare, notify, evaluate, export, update]
+    if: always() && needs.prepare.outputs.should-run == 'true' && needs.notify.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      checks: write
+      id-token: write
+    steps:
+      - name: Post the outcome in the existing Slack thread
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          CHECK_RUN_ID: ${{ needs.notify.outputs.check-run-id }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
+          RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
+          SESSION_ID: ${{ needs.notify.outputs.session-id }}
+          UPDATE_RESULT: ${{ needs.update.result }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const agentUrl = process.env.RELEASE_AGENT_URL?.replace(/\/$/, '');
+            if (!agentUrl) throw new Error('VERCEL_NEXT_EVALS_AGENT_URL is required');
+            const succeeded = process.env.UPDATE_RESULT === 'success';
+            const prNumber = Number(process.env.PR_NUMBER);
+            const workflowUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const oidcToken = await core.getIDToken('https://github.com/vercel');
+            core.setSecret(oidcToken);
+            const response = await fetch(`${agentUrl}/model-evals`, {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${oidcToken}`,
+                'content-type': 'application/json',
+                'x-vercel-trusted-oidc-idp-token': oidcToken,
+              },
+              body: JSON.stringify({
+                event: succeeded ? 'run_succeeded' : 'run_failed',
+                sessionId: process.env.SESSION_ID,
+                prNumber,
+                prUrl: `${context.serverUrl}/${owner}/${repo}/pull/${prNumber}`,
+                headSha: process.env.HEAD_SHA,
+                pairs: JSON.parse(process.env.PAIRS_JSON),
+                workflowUrl,
+              }),
+            });
+            if (!response.ok) {
+              throw new Error(`Eve rejected the model outcome with status ${response.status}`);
+            }
+
+            await github.rest.checks.update({
+              owner,
+              repo,
+              check_run_id: Number(process.env.CHECK_RUN_ID),
+              status: 'completed',
+              conclusion: succeeded ? 'success' : 'failure',
+              details_url: workflowUrl,
+              output: {
+                title: succeeded ? 'Model evals finished' : 'Model evals failed',
+                summary: succeeded
+                  ? 'Validated results were added to the registration PR. Review and merge it manually.'
+                  : 'The workflow failed. The existing Slack thread links to this run.',
+              },
+            });

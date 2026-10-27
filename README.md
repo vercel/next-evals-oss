@@ -189,6 +189,37 @@ Editing an existing experiment config changes its fingerprint, which makes its
 cached results stale. That is the intended signal, but it means config churn costs
 real re-runs.
 
+RoboEve model-registration pull requests run through the hourly
+[`model-pr-evals.yml`](.github/workflows/model-pr-evals.yml). The workflow accepts
+only same-repository branches created by `roboeve[bot]` under `v/register-*` whose
+exact head commit two distinct maintainers with write or admin access have
+approved in pull request reviews. Git author and committer identities are
+editable metadata, so they are not used for authorization. The experiment files
+are code the credentialed job executes, so those reviews are the gate: approve
+the pull request once the two new experiment files look right, and any later push
+drops both approvals until two maintainers review the new head. The workflow then
+runs the oldest unmeasured eligible pull request's new base and AGENTS.md pairs
+sequentially against the pinned eval suite. A manual dispatch can select an
+eligible pull request by number but cannot skip the approval. It records normal
+pass@4 results against `next@canary`, regenerates
+`agent-results.json`, and pushes the sanitized output back to the draft pull
+request. A matrix counts as complete only when every eval has a fresh result
+that passes the release gate's validity rules: a classified model failure or a
+pass, a transcript and evaluator output for every run, and no batch marked
+invalid. A rejected result is deleted and measured again on the next recovery
+pass; after the last pass the run fails instead of publishing it.
+
+Every job that holds a credential runs this repository's `main` code. The model
+jobs check out `main`, copy in only the pull request's new experiment files, and
+hold short-lived Vercel credentials with read-only repository access. The pull
+request's own export and cost scripts run in a separate job with no Vercel or
+model credential and no write access. The only job allowed to push receives the
+sanitized artifacts, rechecks them for credentials with `main`'s script, and
+commits them without installing or running anything from the pull request. The
+pull request still requires human review of the model configuration, complete
+results, tier, and recurring-release decision before merge. The Vercel CLI OIDC
+policy must allow this workflow on `main` as well as the release workflow.
+
 ### Reasoning effort
 
 Models that expose a reasoning-effort ladder get published at a **reasonable
