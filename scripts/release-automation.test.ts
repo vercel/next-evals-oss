@@ -169,8 +169,14 @@ test('agent notification points at the standalone measurement PR', () => {
               evalName: 'task-b',
               scoredFailureReason: 'assertion failed',
               confirmations: [
-                { outcome: 'failed', infrastructureRetries: 1 },
-                { outcome: 'passed', infrastructureRetries: 0 },
+                {
+                  outcome: 'failed',
+                  infrastructureRetries: 1,
+                },
+                {
+                  outcome: 'passed',
+                  infrastructureRetries: 0,
+                },
               ],
             },
           ],
@@ -193,7 +199,7 @@ test('agent notification points at the standalone measurement PR', () => {
     report,
   });
 
-  assert.equal(notification.schemaVersion, 4);
+  assert.equal(notification.schemaVersion, 5);
   assert.equal(notification.metric, 'pass@1');
   assert.equal(notification.target.kind, 'backport');
   assert.equal(notification.validation.modelFailureConfirmationAttempts, 2);
@@ -212,6 +218,10 @@ test('agent notification points at the standalone measurement PR', () => {
     },
   ]);
   assert.equal(notification.report.failures[0].reproducible, false);
+  assert.equal(
+    notification.report.failures[0].confirmationUnavailable,
+    0,
+  );
   assert.deepEqual(Object.keys(notification).sort(), [
     'measurementUrl',
     'metric',
@@ -231,6 +241,82 @@ test('agent notification points at the standalone measurement PR', () => {
         report,
       }),
     /vercel\/next-evals-oss/,
+  );
+});
+
+test('a failure is reproducible only after exactly two failed confirmations', () => {
+  const report = buildReleaseReport(
+    {
+      metadata: {
+        measurement: {
+          metric: 'pass@1',
+          scoredAttempts: 1,
+          infrastructureFailuresExcluded: true,
+        },
+        experiments: [
+          {
+            name: 'model',
+            modelName: 'Model',
+            agentHarness: 'Harness',
+          },
+        ],
+      },
+      results: { model: [] },
+    },
+    {
+      metric: 'pass@1',
+      confirmationAttemptsPerFailure: 2,
+      experiments: [
+        {
+          experiment: 'model',
+          tasks: [
+            {
+              evalName: 'zero-confirmations',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [],
+            },
+            {
+              evalName: 'one-confirmation',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 0 },
+              ],
+            },
+            {
+              evalName: 'two-confirmations',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 0 },
+                { outcome: 'failed', infrastructureRetries: 0 },
+              ],
+            },
+            {
+              evalName: 'unavailable-confirmation',
+              scoredFailureReason: 'assertion failed',
+              confirmations: [
+                { outcome: 'failed', infrastructureRetries: 0 },
+                { outcome: 'unavailable', infrastructureRetries: 3 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(
+    Object.fromEntries(
+      report.failures.map((failure) => [
+        failure.evalName,
+        failure.reproducible,
+      ]),
+    ),
+    {
+      'one-confirmation': false,
+      'two-confirmations': true,
+      'unavailable-confirmation': false,
+      'zero-confirmations': false,
+    },
   );
 });
 

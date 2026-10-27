@@ -38,8 +38,12 @@ interface GitTag {
   };
 }
 
-interface BranchAtCommit {
-  name: string;
+interface GitCommit {
+  parents: Array<{ sha: string }>;
+}
+
+interface CommitComparison {
+  status: 'ahead' | 'behind' | 'diverged' | 'identical';
 }
 
 interface SearchResult {
@@ -103,7 +107,7 @@ export function classifyReleaseRuns(options: {
   version: string;
   sha: string;
   runs: WorkflowRun[];
-  branchesAtSha?: string[];
+  sourceBranches?: string[];
 }): Pick<ReleaseTarget, 'kind' | 'sourceRunUrl'> | undefined {
   const ref = `v${options.version}`;
   const successfulRuns = options.runs.filter(
@@ -119,28 +123,46 @@ export function classifyReleaseRuns(options: {
     return { kind: 'canary', sourceRunUrl: tagRun.html_url };
   }
 
-  const sourceBranches = [
+  const exactSourceBranches = [
     ...new Set(
-      [
-        ...successfulRuns.map((run) => run.head_branch),
-        ...(options.branchesAtSha ?? []),
-      ].filter(
+      successfulRuns.map((run) => run.head_branch).filter(
         (branch) => branch === 'canary' || /^next-\d+-\d+$/.test(branch),
       ),
     ),
   ];
-  const ltsBranches = [
+  const exactLtsBranches = [
     ...new Set(
-      [
-        ...successfulRuns.map((run) => run.head_branch),
-        ...(options.branchesAtSha ?? []),
-      ].filter(
+      successfulRuns.map((run) => run.head_branch).filter(
         (branch) =>
           branch === 'releases/lts/active' ||
           branch === 'releases/lts/maintenance',
       ),
     ),
   ];
+  const inferredBranches = options.sourceBranches ?? [];
+  const sourceBranches =
+    exactSourceBranches.length > 0 || exactLtsBranches.length > 0
+      ? exactSourceBranches
+      : [
+          ...new Set(
+            inferredBranches.filter(
+              (branch) =>
+                branch === 'canary' || /^next-\d+-\d+$/.test(branch),
+            ),
+          ),
+        ];
+  const ltsBranches =
+    exactSourceBranches.length > 0 || exactLtsBranches.length > 0
+      ? exactLtsBranches
+      : [
+          ...new Set(
+            inferredBranches.filter(
+              (branch) =>
+                branch === 'releases/lts/active' ||
+                branch === 'releases/lts/maintenance',
+            ),
+          ),
+        ];
 
   const sourceBranch =
     sourceBranches.length === 1
@@ -241,6 +263,46 @@ async function hasMeasurement(
   return false;
 }
 
+export async function sourceBranchesForRelease(
+  github: GithubClient,
+  version: string,
+  sha: string,
+): Promise<string[]> {
+  const [major, minor] = version.split('.');
+  const candidates = [
+    'canary',
+    `next-${major}-${minor}`,
+    'releases/lts/active',
+    'releases/lts/maintenance',
+  ];
+  const commit = await github.get<GitCommit>(
+    `/repos/${nextRepository}/commits/${sha}`,
+  );
+  if (commit.parents.length !== 1 || !shaPattern.test(commit.parents[0].sha)) {
+    throw new Error(`${sha} must be a single-parent release commit`);
+  }
+
+  const parent = commit.parents[0].sha;
+  const matches = await Promise.all(
+    candidates.map(async (branch) => {
+      try {
+        const comparison = await github.get<CommitComparison>(
+          `/repos/${nextRepository}/compare/${parent}...${encodeURIComponent(branch)}`,
+        );
+        return comparison.status === 'ahead' || comparison.status === 'identical'
+          ? branch
+          : undefined;
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('status 404')) {
+          return undefined;
+        }
+        throw error;
+      }
+    }),
+  );
+  return matches.filter((branch): branch is string => branch !== undefined);
+}
+
 async function resolveTarget(
   github: GithubClient,
   version: string,
@@ -257,14 +319,14 @@ async function resolveTarget(
   }>(
     `/repos/${nextRepository}/actions/workflows/${releaseWorkflow}/runs?${query}`,
   );
-  const branchesAtSha = await github.get<BranchAtCommit[]>(
-    `/repos/${nextRepository}/commits/${sha}/branches-where-head`,
-  );
+  const sourceBranches = stableVersionPattern.test(version)
+    ? await sourceBranchesForRelease(github, version, sha)
+    : [];
   const provenance = classifyReleaseRuns({
     version,
     sha,
     runs,
-    branchesAtSha: branchesAtSha.map((branch) => branch.name),
+    sourceBranches,
   });
   if (!provenance) return undefined;
   return { version, ref, sha, ...provenance };

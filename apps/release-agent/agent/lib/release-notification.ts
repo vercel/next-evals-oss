@@ -36,6 +36,7 @@ const reportSchema = z.object({
       reproducible: z.boolean(),
       confirmationPasses: z.number().int().min(0).max(2),
       confirmationFailures: z.number().int().min(0).max(2),
+      confirmationUnavailable: z.number().int().min(0).max(2),
       infrastructureRetries: z.number().int().nonnegative(),
       scoredFailureReason: z.string().min(1),
     }),
@@ -47,7 +48,7 @@ const reportSchema = z.object({
 });
 
 export const releaseNotificationSchema = z.object({
-  schemaVersion: z.literal(4),
+  schemaVersion: z.literal(5),
   target: z.object({
     kind: z.enum(["release", "backport", "canary"]),
     version: z.string().regex(/^\d+\.\d+\.\d+(?:-canary\.\d+)?$/),

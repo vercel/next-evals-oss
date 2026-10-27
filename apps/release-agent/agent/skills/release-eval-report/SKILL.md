@@ -93,6 +93,9 @@ Title the reply `Failure verification and comparison`.
   attempt and both non-scoring confirmations failed.
 - Mark a failure unstable when at least one confirmation passed. It stays a
   failure in the score, but do not present it as a reliable regression signal.
+- Mark a failure unverified when `confirmationUnavailable` is nonzero. It stays
+  a failure in the score, but do not call it confirmed or unstable and keep it
+  out of root-message regression claims.
 - State that infrastructure retries were excluded only when one or more scored
   results needed an infrastructure retry.
 - When comparison data is available, list every changed task, every changed
