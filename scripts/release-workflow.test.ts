@@ -28,6 +28,9 @@ test('release automation is standalone and restricted to merged main', async () 
   assert.doesNotMatch(workflow, /workflow_call:/);
   assert.doesNotMatch(workflow, /create-github-app-token/);
   assert.doesNotMatch(workflow, /RELEASE_GITHUB_APP_PRIVATE_KEY/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04/);
+  assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/);
+  assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
 test('repository write access starts only after sanitization', async () => {

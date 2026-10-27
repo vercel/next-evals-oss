@@ -40,6 +40,9 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /eve-session:/);
   assert.match(workflow, /needs\.notify\.outputs\.session-id/);
   assert.doesNotMatch(workflow, /Install Vercel CLI/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04/);
+  assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/);
+  assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
 test('model notifications use short-lived OIDC and one durable Slack thread', async () => {
