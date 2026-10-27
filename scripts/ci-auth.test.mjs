@@ -1,12 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,27 +20,15 @@ test("fails before invoking Vercel when required values are missing", () => {
 
 async function createFixture(
   t,
-  pulledCredentials = "VERCEL_OIDC_TOKEN=test-oidc-token\nAI_GATEWAY_API_KEY=test-gateway-key\n",
+  projectEnvironment = {
+    VERCEL_OIDC_TOKEN: "test-oidc-token",
+    AI_GATEWAY_API_KEY: "test-gateway-key",
+  },
 ) {
   const directory = await mkdtemp(join(tmpdir(), "next-evals-ci-auth-test-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const bin = join(directory, "bin");
   const githubEnv = join(directory, "github-env");
   const mockFetch = join(directory, "mock-fetch.mjs");
-  await mkdir(bin);
-
-  const vercel = join(bin, "vercel");
-  await writeFile(
-    vercel,
-    `#!/usr/bin/env node
-import { writeFileSync } from 'node:fs'
-if (process.env.VERCEL_TOKEN !== 'test-access-token') process.exit(2)
-if (process.env.VERCEL_ORG_ID !== 'team_test') process.exit(3)
-if (process.argv.includes('--token') || process.argv.includes('--scope')) process.exit(4)
-writeFileSync(process.argv[4], ${JSON.stringify(pulledCredentials)})
-`,
-  );
-  await chmod(vercel, 0o755);
 
   await writeFile(
     mockFetch,
@@ -57,27 +38,33 @@ globalThis.fetch = async (url, init = {}) => {
     assert.equal(init.headers.authorization, 'bearer test-request-token')
     return new Response(JSON.stringify({ value: 'test-github-oidc-token' }))
   }
-  assert.equal(url, 'https://api.vercel.com/login/oauth/token')
-  assert.equal(init.method, 'POST')
-  const params = new URLSearchParams(init.body)
-  assert.equal(params.get('grant_type'), 'urn:ietf:params:oauth:grant-type:token-exchange')
-  assert.equal(params.get('client_id'), 'test-client-id')
-  assert.equal(params.get('subject_token'), 'test-github-oidc-token')
-  assert.equal(params.get('team_id_or_slug'), 'team_test')
-  return new Response(JSON.stringify({ access_token: 'test-access-token' }))
+  if (url === 'https://api.vercel.com/login/oauth/token') {
+    assert.equal(init.method, 'POST')
+    const params = new URLSearchParams(init.body)
+    assert.equal(params.get('grant_type'), 'urn:ietf:params:oauth:grant-type:token-exchange')
+    assert.equal(params.get('client_id'), 'test-client-id')
+    assert.equal(params.get('subject_token'), 'test-github-oidc-token')
+    assert.equal(params.get('team_id_or_slug'), 'team_test')
+    return new Response(JSON.stringify({ access_token: 'test-access-token' }))
+  }
+  assert.equal(
+    url.toString(),
+    'https://api.vercel.com/v3/env/pull/test-project/development?source=vercel-cli%3Aenv%3Apull&teamId=team_test',
+  )
+  assert.equal(init.headers.authorization, 'Bearer test-access-token')
+  return new Response(JSON.stringify({ env: ${JSON.stringify(projectEnvironment)} }))
 }
 `,
   );
 
-  return { bin, githubEnv, mockFetch };
+  return { githubEnv, mockFetch };
 }
 
-function runScript({ bin, githubEnv, mockFetch }, extraEnv = {}) {
+function runScript({ githubEnv, mockFetch }, extraEnv = {}) {
   return spawnSync(process.execPath, ["--import", mockFetch, script], {
     encoding: "utf8",
     env: {
       ...process.env,
-      PATH: `${bin}:${process.env.PATH}`,
       ACTIONS_ID_TOKEN_REQUEST_URL: "https://github.example.test/oidc",
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: "test-request-token",
       GITHUB_ENV: githubEnv,
@@ -116,7 +103,9 @@ test("exports the budgeted Gateway key when a job runs models", async (t) => {
 });
 
 test("fails model-running jobs without the budgeted Gateway key", async (t) => {
-  const fixture = await createFixture(t, "VERCEL_OIDC_TOKEN=test-oidc-token\n");
+  const fixture = await createFixture(t, {
+    VERCEL_OIDC_TOKEN: "test-oidc-token",
+  });
   const result = runScript(fixture, { REQUIRE_AI_GATEWAY_API_KEY: "1" });
 
   assert.notEqual(result.status, 0);
