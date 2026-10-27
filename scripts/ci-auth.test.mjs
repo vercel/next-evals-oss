@@ -90,6 +90,30 @@ test("exports only OIDC when the job does not run models", async (t) => {
   );
 });
 
+test("normalizes surrounding whitespace in project credentials", async (t) => {
+  const fixture = await createFixture(t, {
+    VERCEL_OIDC_TOKEN: "\n  test-oidc-token  \r\n",
+    AI_GATEWAY_API_KEY: "\n test-gateway-key \r\n",
+  });
+  const result = runScript(fixture, { REQUIRE_AI_GATEWAY_API_KEY: "1" });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    await readFile(fixture.githubEnv, "utf8"),
+    "VERCEL_OIDC_TOKEN=test-oidc-token\nAI_GATEWAY_API_KEY=test-gateway-key\nVERCEL_TOKEN=\n",
+  );
+});
+
+test("rejects credentials with embedded line breaks", async (t) => {
+  const fixture = await createFixture(t, {
+    VERCEL_OIDC_TOKEN: "test-oidc\ntoken",
+  });
+  const result = runScript(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /did not provide a single-line OIDC token/);
+});
+
 test("exports the budgeted Gateway key when a job runs models", async (t) => {
   const fixture = await createFixture(t);
   const result = runScript(fixture, { REQUIRE_AI_GATEWAY_API_KEY: "1" });
