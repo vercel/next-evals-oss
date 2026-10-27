@@ -33,6 +33,7 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /review\.state !== 'APPROVED'/);
   assert.match(workflow, /measuredByAutomation/);
   assert.match(workflow, /Record model evaluation results/);
+  assert.doesNotMatch(workflow, /Install Vercel CLI/);
 });
 
 test('credentialed model jobs run main code plus only the new experiment files', async () => {
