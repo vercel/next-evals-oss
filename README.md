@@ -197,12 +197,16 @@ against the pinned eval suite. A manual dispatch can select an eligible pull req
 by number. It records normal pass@4 results, regenerates `agent-results.json`, and
 pushes the sanitized output back to the draft pull request.
 
-The model jobs have short-lived Vercel credentials and read-only repository access.
-A separate job receives no Vercel or model credential and is the only job allowed
-to update the pull request. The pull request still requires human review of the
-model configuration, complete results, tier, and recurring-release decision before
-merge. The Vercel CLI OIDC policy must allow this workflow on `main` as well as the
-release workflow.
+Every job that holds a credential runs this repository's `main` code. The model
+jobs check out `main`, copy in only the pull request's new experiment files, and
+hold short-lived Vercel credentials with read-only repository access. The pull
+request's own export and cost scripts run in a separate job with no Vercel or
+model credential and no write access. The only job allowed to push receives the
+sanitized artifacts, rechecks them for credentials with `main`'s script, and
+commits them without installing or running anything from the pull request. The
+pull request still requires human review of the model configuration, complete
+results, tier, and recurring-release decision before merge. The Vercel CLI OIDC
+policy must allow this workflow on `main` as well as the release workflow.
 
 ### Reasoning effort
 
