@@ -30,7 +30,6 @@ export const TIER_ONE_EXPERIMENTS = [
   'minimax-m3',
   // Grok 4.7 shipped 40 days after 4.6, outside the carve-out.
   'grok-4.7',
-  'pixel-canary',
 ] as const;
 
 const RELEASE_EXCLUDED_EXPERIMENTS = new Set<string>([
