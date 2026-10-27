@@ -27,6 +27,8 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      has-candidate: ${{ steps.registration.outputs.has-candidate }}
+      approval-needed: ${{ steps.registration.outputs.approval-needed }}
       should-run: ${{ steps.registration.outputs.should-run }}
       pr-number: ${{ steps.registration.outputs.pr-number }}
       head-ref: ${{ steps.registration.outputs.head-ref }}
@@ -134,9 +136,103 @@ jobs:
           MODEL_PR_CANDIDATES_JSON: ${{ runner.temp }}/model-pr-candidates.json
         run: pnpm tsx scripts/model-pr.ts discover
 
+  notify:
+    name: Open the model eval Slack thread
+    needs: prepare
+    if: needs.prepare.outputs.has-candidate == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      id-token: write
+    outputs:
+      check-run-id: ${{ steps.thread.outputs.check-run-id }}
+      session-id: ${{ steps.thread.outputs.session-id }}
+    steps:
+      - name: Reuse or open the model PR thread
+        id: thread
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          APPROVAL_NEEDED: ${{ needs.prepare.outputs.approval-needed }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
+          RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const checkName = 'Model eval Slack thread';
+            const headSha = process.env.HEAD_SHA;
+            const existing = await github.rest.checks.listForRef({
+              owner,
+              repo,
+              ref: headSha,
+              check_name: checkName,
+              filter: 'latest',
+              per_page: 100,
+            });
+            const check = existing.data.check_runs.find((run) =>
+              run.external_id?.startsWith('eve-session:')
+            );
+            if (check) {
+              core.setOutput('check-run-id', String(check.id));
+              core.setOutput('session-id', check.external_id.slice('eve-session:'.length));
+              return;
+            }
+
+            const agentUrl = process.env.RELEASE_AGENT_URL?.replace(/\/$/, '');
+            if (!agentUrl) throw new Error('VERCEL_NEXT_EVALS_AGENT_URL is required');
+            const prNumber = Number(process.env.PR_NUMBER);
+            const workflowUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const oidcToken = await core.getIDToken('https://github.com/vercel');
+            core.setSecret(oidcToken);
+            const response = await fetch(`${agentUrl}/model-evals`, {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${oidcToken}`,
+                'content-type': 'application/json',
+                'x-vercel-trusted-oidc-idp-token': oidcToken,
+              },
+              body: JSON.stringify({
+                event: process.env.APPROVAL_NEEDED === 'true'
+                  ? 'approval_required'
+                  : 'run_started',
+                prNumber,
+                prUrl: `${context.serverUrl}/${owner}/${repo}/pull/${prNumber}`,
+                headSha,
+                pairs: JSON.parse(process.env.PAIRS_JSON),
+                workflowUrl,
+              }),
+            });
+            if (!response.ok) {
+              throw new Error(`Eve rejected the model notification with status ${response.status}`);
+            }
+            const result = await response.json();
+            if (typeof result.sessionId !== 'string' || result.sessionId.length > 256) {
+              throw new Error('Eve did not return a valid session ID');
+            }
+
+            const created = await github.rest.checks.create({
+              owner,
+              repo,
+              name: checkName,
+              head_sha: headSha,
+              status: 'completed',
+              conclusion: 'neutral',
+              external_id: `eve-session:${result.sessionId}`,
+              details_url: workflowUrl,
+              output: {
+                title: process.env.APPROVAL_NEEDED === 'true'
+                  ? 'Waiting for exact-SHA approval'
+                  : 'Model evals started',
+                summary: 'Operational updates for this exact PR head are kept in one Slack thread.',
+              },
+            });
+            core.setOutput('check-run-id', String(created.data.id));
+            core.setOutput('session-id', result.sessionId);
+
   evaluate:
     name: ${{ matrix.pair.base }}
-    needs: prepare
+    needs: [prepare, notify]
     if: needs.prepare.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -375,3 +471,68 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Record model evaluation results"
           git push origin "HEAD:$HEAD_REF"
+
+  report:
+    name: Reply with the model eval outcome
+    needs: [prepare, notify, evaluate, export, update]
+    if: always() && needs.prepare.outputs.should-run == 'true' && needs.notify.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      id-token: write
+    steps:
+      - name: Post the outcome in the existing Slack thread
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          CHECK_RUN_ID: ${{ needs.notify.outputs.check-run-id }}
+          HEAD_SHA: ${{ needs.prepare.outputs.head-sha }}
+          PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
+          PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
+          RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
+          SESSION_ID: ${{ needs.notify.outputs.session-id }}
+          UPDATE_RESULT: ${{ needs.update.result }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const agentUrl = process.env.RELEASE_AGENT_URL?.replace(/\/$/, '');
+            if (!agentUrl) throw new Error('VERCEL_NEXT_EVALS_AGENT_URL is required');
+            const succeeded = process.env.UPDATE_RESULT === 'success';
+            const prNumber = Number(process.env.PR_NUMBER);
+            const workflowUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const oidcToken = await core.getIDToken('https://github.com/vercel');
+            core.setSecret(oidcToken);
+            const response = await fetch(`${agentUrl}/model-evals`, {
+              method: 'POST',
+              headers: {
+                authorization: `Bearer ${oidcToken}`,
+                'content-type': 'application/json',
+                'x-vercel-trusted-oidc-idp-token': oidcToken,
+              },
+              body: JSON.stringify({
+                event: succeeded ? 'run_succeeded' : 'run_failed',
+                sessionId: process.env.SESSION_ID,
+                prNumber,
+                prUrl: `${context.serverUrl}/${owner}/${repo}/pull/${prNumber}`,
+                headSha: process.env.HEAD_SHA,
+                pairs: JSON.parse(process.env.PAIRS_JSON),
+                workflowUrl,
+              }),
+            });
+            if (!response.ok) {
+              throw new Error(`Eve rejected the model outcome with status ${response.status}`);
+            }
+
+            await github.rest.checks.update({
+              owner,
+              repo,
+              check_run_id: Number(process.env.CHECK_RUN_ID),
+              status: 'completed',
+              conclusion: succeeded ? 'success' : 'failure',
+              details_url: workflowUrl,
+              output: {
+                title: succeeded ? 'Model evals finished' : 'Model evals failed',
+                summary: succeeded
+                  ? 'Validated results were added to the registration PR. Review and merge it manually.'
+                  : 'The workflow failed. The existing Slack thread links to this run.',
+              },
+            });

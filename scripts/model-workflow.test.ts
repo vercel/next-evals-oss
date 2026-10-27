@@ -33,7 +33,28 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /review\.state !== 'APPROVED'/);
   assert.match(workflow, /measuredByAutomation/);
   assert.match(workflow, /Record model evaluation results/);
+  assert.match(workflow, /Model eval Slack thread/);
+  assert.match(workflow, /approval_required/);
+  assert.match(workflow, /run_succeeded/);
+  assert.match(workflow, /run_failed/);
+  assert.match(workflow, /eve-session:/);
+  assert.match(workflow, /needs\.notify\.outputs\.session-id/);
   assert.doesNotMatch(workflow, /Install Vercel CLI/);
+});
+
+test('model notifications use short-lived OIDC and one durable Slack thread', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const notify = job(workflow, 'notify');
+  const report = job(workflow, 'report');
+
+  assert.match(notify, /id-token: write/);
+  assert.match(notify, /core\.getIDToken\('https:\/\/github\.com\/vercel'\)/);
+  assert.match(notify, /checks\.listForRef/);
+  assert.match(notify, /checks\.create/);
+  assert.match(report, /id-token: write/);
+  assert.match(report, /sessionId: process\.env\.SESSION_ID/);
+  assert.match(report, /checks\.update/);
+  assert.doesNotMatch(workflow, /SLACK_BOT_TOKEN/);
 });
 
 test('credentialed model jobs run main code plus only the new experiment files', async () => {
@@ -59,9 +80,9 @@ test('pull request code runs only without credentials or write access', async ()
 
 test('only the credential-free update job can write results', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
-  const [beforeUpdate, update] = workflow.split('\n  update:\n');
+  const [beforeUpdate] = workflow.split('\n  update:\n');
+  const update = job(workflow, 'update');
   assert.ok(beforeUpdate);
-  assert.ok(update);
   assert.doesNotMatch(beforeUpdate, /contents: write/);
   assert.match(update, /contents: write/);
   assert.doesNotMatch(update, /id-token: write/);

@@ -64,6 +64,7 @@ export function selectModelExperiments(
   files: PullRequestFile[],
   repository: string,
   review: PullRequestReview,
+  options: { requireApproval?: boolean } = {},
 ) {
   if (pullRequest.state !== 'open') fail('the pull request is not open');
   if (pullRequest.user.login !== 'roboeve[bot]') {
@@ -94,7 +95,7 @@ export function selectModelExperiments(
     )
     .map((approval) => approval.login)
     .sort();
-  if (approvedBy.length === 0) {
+  if (options.requireApproval !== false && approvedBy.length === 0) {
     fail(
       'the head commit needs an approving review from a maintainer who did not author it',
     );
@@ -185,6 +186,30 @@ export function selectModelCandidate(
   return null;
 }
 
+export function selectModelNotificationCandidate(
+  candidates: ModelPullRequestCandidate[],
+  repository: string,
+  includeMeasured = false,
+) {
+  for (const candidate of candidates) {
+    try {
+      if (!includeMeasured && candidate.measuredByAutomation) continue;
+      return selectModelExperiments(
+        candidate.pullRequest,
+        candidate.files,
+        repository,
+        candidate,
+        { requireApproval: false },
+      );
+    } catch (error) {
+      console.warn(
+        `Skipping PR #${candidate.pullRequest.number}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  return null;
+}
+
 function writeOutput(name: string, value: string | number) {
   const output = process.env.GITHUB_OUTPUT;
   if (!output) throw new Error('GITHUB_OUTPUT is required');
@@ -203,26 +228,42 @@ function discover() {
   const candidates = JSON.parse(
     readFileSync(candidatesPath, 'utf8'),
   ) as ModelPullRequestCandidate[];
-  const selected = selectModelCandidate(
+  const includeMeasured = process.env.FORCE === 'true';
+  const candidate = selectModelNotificationCandidate(
     candidates,
     repository,
-    process.env.FORCE === 'true',
+    includeMeasured,
   );
-  if (!selected) {
+  if (!candidate) {
+    writeOutput('has-candidate', 'false');
     writeOutput('should-run', 'false');
     writeOutput('pairs', '[]');
     console.log('No unmeasured RoboEve model-registration PR found');
     return;
   }
 
+  writeOutput('has-candidate', 'true');
+  writeOutput('pr-number', candidate.number);
+  writeOutput('head-ref', candidate.headRef);
+  writeOutput('head-sha', candidate.headSha);
+  writeOutput('pairs', JSON.stringify(candidate.pairs));
+  writeOutput(
+    'approval-needed',
+    candidate.approvedBy.length === 0 ? 'true' : 'false',
+  );
+
+  if (candidate.approvedBy.length === 0) {
+    writeOutput('should-run', 'false');
+    console.log(
+      `PR #${candidate.number} needs an approving review for ${candidate.headSha}`,
+    );
+    return;
+  }
+
   console.log(
-    `Measuring PR #${selected.number} at ${selected.headSha}, approved by ${selected.approvedBy.join(', ')}`,
+    `Measuring PR #${candidate.number} at ${candidate.headSha}, approved by ${candidate.approvedBy.join(', ')}`,
   );
   writeOutput('should-run', 'true');
-  writeOutput('pr-number', selected.number);
-  writeOutput('head-ref', selected.headRef);
-  writeOutput('head-sha', selected.headSha);
-  writeOutput('pairs', JSON.stringify(selected.pairs));
 }
 
 interface Summary {

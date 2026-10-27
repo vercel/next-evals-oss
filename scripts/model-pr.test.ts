@@ -11,6 +11,7 @@ import {
   findIncompleteResults,
   selectModelCandidate,
   selectModelExperiments,
+  selectModelNotificationCandidate,
 } from './model-pr.js';
 
 const pullRequest: PullRequestSnapshot = {
@@ -150,6 +151,30 @@ test('requires a maintainer approval of the exact head commit', () => {
     }).approvedBy,
     ['maintainer', 'owner'],
   );
+});
+
+test('selects a structurally valid model PR before approval for notification', () => {
+  const candidate = selectModelNotificationCandidate(
+    [
+      {
+        pullRequest,
+        files,
+        headCommitAuthors: ['roboeve[bot]'],
+        approvals: [],
+        measuredByAutomation: false,
+      },
+    ],
+    'vercel/next-evals-oss',
+  );
+
+  assert.equal(candidate?.number, 132);
+  assert.deepEqual(candidate?.approvedBy, []);
+  assert.deepEqual(candidate?.pairs, [
+    {
+      base: 'gpt-6.1-sol-high',
+      experiments: ['gpt-6.1-sol-high', 'gpt-6.1-sol-high--agents-md'],
+    },
+  ]);
 });
 
 test('scheduled discovery skips only workflow-authored complete results', () => {
