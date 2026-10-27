@@ -72,7 +72,7 @@ if (!credentials || typeof credentials !== "object") {
   throw new Error("Vercel did not provide project environment variables");
 }
 
-const oidcToken = credentials.VERCEL_OIDC_TOKEN;
+const oidcToken = credentials.VERCEL_OIDC_TOKEN?.trim();
 if (!oidcToken || /[\r\n]/.test(oidcToken)) {
   throw new Error("Vercel did not provide a single-line OIDC token");
 }
@@ -80,7 +80,7 @@ console.log(`::add-mask::${oidcToken}`);
 
 let gatewayCredential = "";
 if (process.env.REQUIRE_AI_GATEWAY_API_KEY === "1") {
-  const gatewayApiKey = credentials.AI_GATEWAY_API_KEY;
+  const gatewayApiKey = credentials.AI_GATEWAY_API_KEY?.trim();
   if (!gatewayApiKey || /[\r\n]/.test(gatewayApiKey)) {
     throw new Error(
       "Vercel did not provide a single-line AI_GATEWAY_API_KEY",
