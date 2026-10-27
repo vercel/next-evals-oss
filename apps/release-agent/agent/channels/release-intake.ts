@@ -2,7 +2,6 @@ import { defineChannel, POST } from "eve/channels";
 import {
   createUnauthorizedResponse,
   extractBearerToken,
-  vercelSubject,
   verifyOidc,
 } from "eve/channels/auth";
 
@@ -16,13 +15,10 @@ import slack, {
 } from "./slack";
 
 const maxPayloadBytes = 512 * 1024;
-const releaseWorkflowSubject = vercelSubject({
-  teamSlug: "vercel-labs",
-  projectName: "next.js",
-  environment: "development",
-});
-const releaseWorkflowIssuer = "https://oidc.vercel.com/vercel-labs";
-const releaseWorkflowAudience = "https://vercel.com/vercel-labs";
+const releaseWorkflowSubject =
+  "repo:vercel/next-evals-oss:ref:refs/heads/main";
+const releaseWorkflowIssuer = "https://token.actions.githubusercontent.com";
+const releaseWorkflowAudience = "https://github.com/vercel";
 
 export default defineChannel({
   routes: [
