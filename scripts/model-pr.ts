@@ -4,6 +4,7 @@ import {
   existsSync,
   readFileSync,
   readdirSync,
+  rmSync,
 } from 'node:fs';
 import { join } from 'node:path';
 
@@ -265,17 +266,24 @@ function listDirectories(path: string, pattern = /^[^.]/) {
  * run without a transcript. Those are infrastructure gaps, not model signal.
  * Apply the release gate's validity rules to the newest batch of every eval
  * before accepting a matrix as complete.
+ *
+ * The runner also reuses any fresh batch with a pass, so a rejected result
+ * would survive every recovery pass. With `remove`, the rejected eval result
+ * is deleted so the next `eval:run` measures it again, as the release
+ * workflow does for infrastructure attempts.
  */
 export function findIncompleteResults(
   root: string,
   experiment: string,
   evalNames: readonly string[],
+  options: { remove?: boolean } = {},
 ) {
   const problems: string[] = [];
   const experimentDir = join(root, 'results', experiment);
   const batches = listDirectories(experimentDir).sort().reverse();
 
   for (const evalName of evalNames) {
+    const found = problems.length;
     const batch = batches.find((name) =>
       existsSync(join(experimentDir, name, evalName, 'summary.json')),
     );
@@ -345,6 +353,11 @@ export function findIncompleteResults(
       });
       if (reason) problems.push(`${evalName}/${run}: ${reason}`);
     }
+
+    if (options.remove && problems.length > found) {
+      rmSync(evalDir, { recursive: true, force: true });
+      problems.push(`${evalName}: removed so the next recovery pass re-runs it`);
+    }
   }
   return problems;
 }
@@ -376,7 +389,9 @@ function validateResults(experiments: string[]) {
         `${experiment}: ${pending.new.length} new, ${pending.changed.length} changed eval(s)`,
       );
     }
-    for (const problem of findIncompleteResults('.', experiment, evalNames)) {
+    for (const problem of findIncompleteResults('.', experiment, evalNames, {
+      remove: true,
+    })) {
       incomplete.push(`${experiment}/${problem}`);
     }
   }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -293,6 +294,39 @@ test('validates only the newest batch that contains each eval', async () => {
       findIncompleteResults(root, 'gpt-6.1-sol-high', ['agent-000']),
       [],
     );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('removes rejected results so the recovery pass re-runs them', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'next-evals-model-pr-'));
+  try {
+    await writeResult(root, 'agent-000', { totalRuns: 2, passedRuns: 1 });
+    await writeResult(root, 'agent-021', {
+      totalRuns: 2,
+      passedRuns: 1,
+      transcript: false,
+    });
+    const problems = findIncompleteResults(
+      root,
+      'gpt-6.1-sol-high',
+      ['agent-000', 'agent-021'],
+      { remove: true },
+    );
+    assert.deepEqual(problems, [
+      'agent-021/run-1: has no agent transcript',
+      'agent-021/run-2: has no agent transcript',
+      'agent-021: removed so the next recovery pass re-runs it',
+    ]);
+    const batch = join(
+      root,
+      'results',
+      'gpt-6.1-sol-high',
+      '2026-10-27T12-00-00.000Z',
+    );
+    assert.ok(existsSync(join(batch, 'agent-000', 'summary.json')));
+    assert.ok(!existsSync(join(batch, 'agent-021')));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

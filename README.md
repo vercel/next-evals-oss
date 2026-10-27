@@ -204,7 +204,8 @@ by number but cannot skip the approval. It records normal pass@4 results against
 request. A matrix counts as complete only when every eval has a fresh result
 that passes the release gate's validity rules: a classified model failure or a
 pass, a transcript and evaluator output for every run, and no batch marked
-invalid. Anything else is retried as infrastructure, then fails the run.
+invalid. A rejected result is deleted and measured again on the next recovery
+pass; after the last pass the run fails instead of publishing it.
 
 Every job that holds a credential runs this repository's `main` code. The model
 jobs check out `main`, copy in only the pull request's new experiment files, and
