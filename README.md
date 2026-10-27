@@ -189,6 +189,21 @@ Editing an existing experiment config changes its fingerprint, which makes its
 cached results stale. That is the intended signal, but it means config churn costs
 real re-runs.
 
+RoboEve model-registration pull requests run through the hourly
+[`model-pr-evals.yml`](.github/workflows/model-pr-evals.yml). The workflow accepts
+only same-repository branches created by `roboeve[bot]` under `v/register-*`, then
+runs the oldest unmeasured pull request's new base and AGENTS.md pairs sequentially
+against the pinned eval suite. A manual dispatch can select an eligible pull request
+by number. It records normal pass@4 results, regenerates `agent-results.json`, and
+pushes the sanitized output back to the draft pull request.
+
+The model jobs have short-lived Vercel credentials and read-only repository access.
+A separate job receives no Vercel or model credential and is the only job allowed
+to update the pull request. The pull request still requires human review of the
+model configuration, complete results, tier, and recurring-release decision before
+merge. The Vercel CLI OIDC policy must allow this workflow on `main` as well as the
+release workflow.
+
 ### Reasoning effort
 
 Models that expose a reasoning-effort ladder get published at a **reasonable
