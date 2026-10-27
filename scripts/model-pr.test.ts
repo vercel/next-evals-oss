@@ -177,6 +177,34 @@ test('selects a structurally valid model PR before approval for notification', (
   ]);
 });
 
+test('an older unapproved PR does not block a newer approved PR', () => {
+  const waiting = {
+    pullRequest,
+    files,
+    headCommitAuthors: ['roboeve[bot]'],
+    approvals: [],
+    measuredByAutomation: false,
+  };
+  const approved = {
+    ...waiting,
+    pullRequest: {
+      ...pullRequest,
+      number: 133,
+      head: {
+        ...pullRequest.head,
+        ref: 'v/register-newer-models-2026-10-08',
+        sha: 'b'.repeat(40),
+      },
+    },
+    approvals: [{ login: 'maintainer', permission: 'write' }],
+  };
+
+  assert.equal(
+    selectModelCandidate([waiting, approved], 'vercel/next-evals-oss')?.number,
+    133,
+  );
+});
+
 test('scheduled discovery skips only workflow-authored complete results', () => {
   const measuredFiles = [
     ...files,

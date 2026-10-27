@@ -229,11 +229,17 @@ function discover() {
     readFileSync(candidatesPath, 'utf8'),
   ) as ModelPullRequestCandidate[];
   const includeMeasured = process.env.FORCE === 'true';
-  const candidate = selectModelNotificationCandidate(
+  // Do not let an older PR that still needs approval starve a newer approved
+  // PR. Run the oldest approved candidate first; only use the oldest
+  // unapproved candidate for an approval notification when no work can run.
+  const approvedCandidate = selectModelCandidate(
     candidates,
     repository,
     includeMeasured,
   );
+  const candidate =
+    approvedCandidate ??
+    selectModelNotificationCandidate(candidates, repository, includeMeasured);
   if (!candidate) {
     writeOutput('has-candidate', 'false');
     writeOutput('should-run', 'false');
@@ -252,7 +258,7 @@ function discover() {
     candidate.approvedBy.length === 0 ? 'true' : 'false',
   );
 
-  if (candidate.approvedBy.length === 0) {
+  if (!approvedCandidate) {
     writeOutput('should-run', 'false');
     console.log(
       `PR #${candidate.number} needs an approving review for ${candidate.headSha}`,
