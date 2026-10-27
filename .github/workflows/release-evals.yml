@@ -108,10 +108,6 @@ jobs:
           SUITE_REF: ${{ steps.release.outputs.suite-ref }}
         run: pnpm sync-evals "$SUITE_REF"
 
-      - name: Install Vercel CLI
-        if: steps.discovery.outputs.should-run == 'true'
-        run: npm install --global vercel@59.11.0
-
       - name: Check the release project's credentials
         if: steps.discovery.outputs.should-run == 'true'
         env:
@@ -172,9 +168,6 @@ jobs:
           RELEASE_EVAL_WORKSPACE: ${{ runner.temp }}/release-eval-workspace
           RELEASE_EVAL_SUITE_PATH: ${{ runner.temp }}/release-eval-suite
         run: pnpm tsx scripts/release-automation.ts prepare-workspace
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@59.11.0
 
       - name: Pull short-lived Vercel credentials
         env:
@@ -449,9 +442,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@59.11.0
-
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-durable-measurement
@@ -554,8 +544,8 @@ jobs:
           RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
         run: |
           curl --fail-with-body --retry 3 --retry-all-errors \
-            -H "authorization: Bearer $VERCEL_OIDC_TOKEN" \
-            -H "x-vercel-trusted-oidc-idp-token: $VERCEL_OIDC_TOKEN" \
+            -H "authorization: Bearer $RELEASE_WORKFLOW_OIDC_TOKEN" \
+            -H "x-vercel-trusted-oidc-idp-token: $RELEASE_WORKFLOW_OIDC_TOKEN" \
             -H 'content-type: application/json' \
             --data-binary "@$RUNNER_TEMP/release-notification.json" \
             "${RELEASE_AGENT_URL%/}/release-evals"

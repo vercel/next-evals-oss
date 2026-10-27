@@ -317,17 +317,16 @@ use Eve's read-only repository tool.
 
 Scheduled and manual runs are accepted only from this repository's `main`
 branch. Model jobs receive read-only repository access and `id-token: write`.
-They exchange the GitHub Actions identity for short-lived Vercel CLI access,
-then pull a short-lived `VERCEL_OIDC_TOKEN` from the release-eval project. The
-Vercel CLI policy must be restricted to `vercel/next-evals-oss` and this
-workflow on `main`. The temporary CLI credential is cleared before the eval
-runner starts.
-The project OIDC token authenticates Vercel Sandbox and the release agent's
-OIDC-protected intake route. Model-running jobs also receive the project's
-separately budgeted `AI_GATEWAY_API_KEY`; the reporting job does not. Direct
-agents are excluded from this matrix. The non-secret Vercel project identifiers
-and agent URL are repository variables. No long-lived Vercel token or
-model-provider secret is stored in GitHub.
+They exchange the GitHub Actions identity for a short-lived, project-scoped
+Vercel access token. That token and the non-secret team and project IDs
+authenticate Vercel Sandbox. The same fresh GitHub identity authenticates the
+release agent's intake route. The Vercel CLI policy must be restricted to
+`vercel/next-evals-oss` and this workflow on `main`.
+Model-running jobs also receive the project's separately budgeted
+`AI_GATEWAY_API_KEY`; the reporting job does not. Direct agents are excluded
+from this matrix. The non-secret Vercel project identifiers and agent URL are
+repository variables. No long-lived Vercel token or model-provider secret is
+stored in GitHub.
 
 Only the final publishing job receives write-scoped `GITHUB_TOKEN` permissions
 after aggregation has produced and rechecked a sanitized measurement artifact.
