@@ -24,6 +24,10 @@ test('model registration automation is restricted to merged main', async () => {
   );
   assert.match(workflow, /roboeve\[bot\]/);
   assert.match(workflow, /v\/register-/);
+  // Credentials are granted only for a head SHA a maintainer approved.
+  assert.match(workflow, /pulls\.listReviews/);
+  assert.match(workflow, /getCollaboratorPermissionLevel/);
+  assert.match(workflow, /review\.commit_id !== pull\.head\.sha/);
 });
 
 test('credentialed model jobs run main code plus only the new experiment files', async () => {

@@ -26,7 +26,20 @@ export interface PullRequestFile {
   status: string;
 }
 
-export interface ModelPullRequestCandidate {
+export interface PullRequestApproval {
+  login: string;
+  /** GitHub collaborator permission: admin, write, read, or none. */
+  permission: string;
+}
+
+export interface PullRequestReview {
+  /** Logins of the head commit's author and committer. */
+  headCommitAuthors: string[];
+  /** Approving reviews submitted for exactly the head SHA. */
+  approvals: PullRequestApproval[];
+}
+
+export interface ModelPullRequestCandidate extends PullRequestReview {
   pullRequest: PullRequestSnapshot;
   files: PullRequestFile[];
 }
@@ -48,6 +61,7 @@ export function selectModelExperiments(
   pullRequest: PullRequestSnapshot,
   files: PullRequestFile[],
   repository: string,
+  review: PullRequestReview,
 ) {
   if (pullRequest.state !== 'open') fail('the pull request is not open');
   if (pullRequest.user.login !== 'roboeve[bot]') {
@@ -62,6 +76,23 @@ export function selectModelExperiments(
   }
   if (!/^[a-f0-9]{40}$/.test(pullRequest.head.sha)) {
     fail('the head SHA is invalid');
+  }
+
+  // The experiment files are TypeScript that the credentialed job executes,
+  // so a maintainer must have reviewed exactly this head SHA. Any later push
+  // drops the approval until someone reviews the new head.
+  const approvedBy = review.approvals
+    .filter(
+      (approval) =>
+        (approval.permission === 'admin' || approval.permission === 'write') &&
+        !review.headCommitAuthors.includes(approval.login),
+    )
+    .map((approval) => approval.login)
+    .sort();
+  if (approvedBy.length === 0) {
+    fail(
+      'the head commit needs an approving review from a maintainer who did not author it',
+    );
   }
 
   const added = new Set<string>();
@@ -114,6 +145,7 @@ export function selectModelExperiments(
     number: pullRequest.number,
     headRef: pullRequest.head.ref,
     headSha: pullRequest.head.sha,
+    approvedBy,
     pairs: bases.map((base) => ({
       base,
       experiments: [base, `${base}--agents-md`],
@@ -146,6 +178,7 @@ export function selectModelCandidate(
         candidate.pullRequest,
         candidate.files,
         repository,
+        candidate,
       );
       if (
         includeMeasured ||
@@ -192,6 +225,9 @@ function discover() {
     return;
   }
 
+  console.log(
+    `Measuring PR #${selected.number} at ${selected.headSha}, approved by ${selected.approvedBy.join(', ')}`,
+  );
   writeOutput('should-run', 'true');
   writeOutput('pr-number', selected.number);
   writeOutput('head-ref', selected.headRef);

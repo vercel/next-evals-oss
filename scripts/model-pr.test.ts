@@ -24,6 +24,11 @@ const pullRequest: PullRequestSnapshot = {
   },
 };
 
+const review = {
+  headCommitAuthors: ['roboeve[bot]'],
+  approvals: [{ login: 'maintainer', permission: 'write' }],
+};
+
 const files: PullRequestFile[] = [
   { filename: 'experiments/gpt-6.1-sol-high.ts', status: 'added' },
   {
@@ -37,11 +42,17 @@ const files: PullRequestFile[] = [
 
 test('selects paired experiments from a RoboEve registration PR', () => {
   assert.deepEqual(
-    selectModelExperiments(pullRequest, files, 'vercel/next-evals-oss'),
+    selectModelExperiments(
+      pullRequest,
+      files,
+      'vercel/next-evals-oss',
+      review,
+    ),
     {
       number: 132,
       headRef: 'v/register-new-models-2026-10-07',
       headSha: 'a'.repeat(40),
+      approvedBy: ['maintainer'],
       pairs: [
         {
           base: 'gpt-6.1-sol-high',
@@ -55,7 +66,12 @@ test('selects paired experiments from a RoboEve registration PR', () => {
 test('rejects a missing AGENTS.md pair', () => {
   assert.throws(
     () =>
-      selectModelExperiments(pullRequest, [files[0]], 'vercel/next-evals-oss'),
+      selectModelExperiments(
+        pullRequest,
+        [files[0]],
+        'vercel/next-evals-oss',
+        review,
+      ),
     /missing its --agents-md experiment/,
   );
 });
@@ -67,6 +83,7 @@ test('rejects non-bot and cross-repository pull requests', () => {
         { ...pullRequest, user: { login: 'someone' } },
         files,
         'vercel/next-evals-oss',
+        review,
       ),
     /only RoboEve-authored/,
   );
@@ -82,6 +99,7 @@ test('rejects non-bot and cross-repository pull requests', () => {
         },
         files,
         'vercel/next-evals-oss',
+        review,
       ),
     /head branch must belong/,
   );
@@ -94,8 +112,38 @@ test('rejects changes outside model-registration paths', () => {
         pullRequest,
         [...files, { filename: 'package.json', status: 'modified' }],
         'vercel/next-evals-oss',
+        review,
       ),
     /unexpected changed path package.json/,
+  );
+});
+
+test('requires a maintainer approval of the exact head commit', () => {
+  const select = (candidate: Partial<typeof review>) =>
+    selectModelExperiments(pullRequest, files, 'vercel/next-evals-oss', {
+      ...review,
+      ...candidate,
+    });
+  const needsApproval = /needs an approving review from a maintainer/;
+
+  assert.throws(() => select({ approvals: [] }), needsApproval);
+  assert.throws(
+    () => select({ approvals: [{ login: 'reader', permission: 'read' }] }),
+    needsApproval,
+  );
+  assert.throws(
+    () => select({ headCommitAuthors: ['roboeve[bot]', 'maintainer'] }),
+    needsApproval,
+  );
+  assert.deepEqual(
+    select({
+      approvals: [
+        { login: 'reader', permission: 'read' },
+        { login: 'owner', permission: 'admin' },
+        { login: 'maintainer', permission: 'write' },
+      ],
+    }).approvedBy,
+    ['maintainer', 'owner'],
   );
 });
 
@@ -114,14 +162,14 @@ test('scheduled discovery skips a registration that already has results', () => 
   ];
   assert.equal(
     selectModelCandidate(
-      [{ pullRequest, files: measuredFiles }],
+      [{ pullRequest, files: measuredFiles, ...review }],
       'vercel/next-evals-oss',
     ),
     null,
   );
   assert.ok(
     selectModelCandidate(
-      [{ pullRequest, files: measuredFiles }],
+      [{ pullRequest, files: measuredFiles, ...review }],
       'vercel/next-evals-oss',
       true,
     ),

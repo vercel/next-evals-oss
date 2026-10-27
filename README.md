@@ -191,10 +191,15 @@ real re-runs.
 
 RoboEve model-registration pull requests run through the hourly
 [`model-pr-evals.yml`](.github/workflows/model-pr-evals.yml). The workflow accepts
-only same-repository branches created by `roboeve[bot]` under `v/register-*`, then
-runs the oldest unmeasured pull request's new base and AGENTS.md pairs sequentially
+only same-repository branches created by `roboeve[bot]` under `v/register-*` whose
+head commit a maintainer with write access, other than the person who wrote that
+commit, has approved in a pull request review. The experiment files are code the
+credentialed job executes, so that review is the gate: approve the pull request
+once the two new experiment files look right, and any later push drops the
+approval until someone reviews the new head. The workflow then runs the oldest
+unmeasured eligible pull request's new base and AGENTS.md pairs sequentially
 against the pinned eval suite. A manual dispatch can select an eligible pull request
-by number. It records normal pass@4 results against `next@canary`, regenerates
+by number but cannot skip the approval. It records normal pass@4 results against `next@canary`, regenerates
 `agent-results.json`, and pushes the sanitized output back to the draft pull
 request. A matrix counts as complete only when every eval has a fresh result
 that passes the release gate's validity rules: a classified model failure or a
