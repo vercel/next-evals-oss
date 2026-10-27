@@ -322,8 +322,9 @@ branch. Model jobs receive read-only repository access and `id-token: write`.
 They exchange the GitHub Actions identity for a short-lived, project-scoped
 Vercel access token. That token and the non-secret team and project IDs
 authenticate Vercel Sandbox. The same fresh GitHub identity authenticates the
-release agent's intake route. The Vercel CLI policy must be restricted to
-`vercel/next-evals-oss` and this workflow on `main`.
+release agent's intake route. Restrict the Vercel CLI policy to this workflow
+on `vercel/next-evals-oss@main`. For the scoped project, allow `vc sandbox
+create` and non-production `vc env` commands.
 Model-running jobs also receive the project's separately budgeted
 `AI_GATEWAY_API_KEY`; the reporting job does not. Direct agents are excluded
 from this matrix. The non-secret Vercel project identifiers and agent URL are
