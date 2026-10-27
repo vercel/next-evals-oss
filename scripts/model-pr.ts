@@ -1,6 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
+
+import { findInvalidRunReason } from './release-automation.js';
 
 export interface PullRequestSnapshot {
   number: number;
@@ -192,8 +199,125 @@ function discover() {
   writeOutput('pairs', JSON.stringify(selected.pairs));
 }
 
+interface Summary {
+  totalRuns: number;
+  passedRuns: number;
+  valid?: boolean;
+}
+
+function readJson<T>(path: string): T | undefined {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function listDirectories(path: string, pattern = /^[^.]/) {
+  try {
+    return readdirSync(path, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && pattern.test(entry.name))
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The runner's status check only compares fingerprints, so it accepts a 0%
+ * result whose failure classification never ran, a batch marked invalid, or a
+ * run without a transcript. Those are infrastructure gaps, not model signal.
+ * Apply the release gate's validity rules to the newest batch of every eval
+ * before accepting a matrix as complete.
+ */
+export function findIncompleteResults(
+  root: string,
+  experiment: string,
+  evalNames: readonly string[],
+) {
+  const problems: string[] = [];
+  const experimentDir = join(root, 'results', experiment);
+  const batches = listDirectories(experimentDir).sort().reverse();
+
+  for (const evalName of evalNames) {
+    const batch = batches.find((name) =>
+      existsSync(join(experimentDir, name, evalName, 'summary.json')),
+    );
+    if (!batch) {
+      problems.push(`${evalName}: no result`);
+      continue;
+    }
+    const evalDir = join(experimentDir, batch, evalName);
+    const summary = readJson<Summary>(join(evalDir, 'summary.json'));
+    if (!summary) {
+      problems.push(`${evalName}: invalid summary.json`);
+      continue;
+    }
+    if (summary.valid === false) {
+      problems.push(`${evalName}: summary is marked invalid`);
+    }
+    if (
+      !Number.isInteger(summary.totalRuns) ||
+      summary.totalRuns < 1 ||
+      !Number.isInteger(summary.passedRuns) ||
+      summary.passedRuns < 0 ||
+      summary.passedRuns > summary.totalRuns
+    ) {
+      problems.push(`${evalName}: impossible run counts in summary.json`);
+      continue;
+    }
+    if (summary.passedRuns === 0) {
+      const classification = readJson<{ failureType?: string }>(
+        join(evalDir, 'classification.json'),
+      );
+      if (!classification) {
+        problems.push(`${evalName}: failure was never classified`);
+      } else if (classification.failureType !== 'model') {
+        problems.push(
+          `${evalName}: ${classification.failureType} failure is not model signal`,
+        );
+      }
+    }
+
+    const runs = listDirectories(evalDir, /^run-\d+$/).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true }),
+    );
+    if (runs.length !== summary.totalRuns) {
+      problems.push(
+        `${evalName}: summary reports ${summary.totalRuns} run(s), found ${runs.length}`,
+      );
+    }
+    for (const run of runs) {
+      const runDir = join(evalDir, run);
+      const result = readJson<{ status?: string; error?: string }>(
+        join(runDir, 'result.json'),
+      );
+      if (!result) {
+        problems.push(`${evalName}/${run}: missing or invalid result.json`);
+        continue;
+      }
+      let evalOutput: string | undefined;
+      try {
+        evalOutput = readFileSync(join(runDir, 'outputs', 'eval.txt'), 'utf8');
+      } catch {}
+      const reason = findInvalidRunReason({
+        result,
+        hasTranscript:
+          existsSync(join(runDir, 'transcript-raw.jsonl')) ||
+          existsSync(join(runDir, 'transcript.json')),
+        evalOutput,
+      });
+      if (reason) problems.push(`${evalName}/${run}: ${reason}`);
+    }
+  }
+  return problems;
+}
+
 function validateResults(experiments: string[]) {
   if (experiments.length === 0) throw new Error('No experiments were provided');
+
+  const evalNames = listDirectories('evals').sort();
+  if (evalNames.length === 0) throw new Error('The eval suite is empty');
 
   const status = JSON.parse(
     execFileSync('pnpm', ['exec', 'agent-eval', 'status', '--json'], {
@@ -216,6 +340,9 @@ function validateResults(experiments: string[]) {
         `${experiment}: ${pending.new.length} new, ${pending.changed.length} changed eval(s)`,
       );
     }
+    for (const problem of findIncompleteResults('.', experiment, evalNames)) {
+      incomplete.push(`${experiment}/${problem}`);
+    }
   }
 
   if (incomplete.length > 0) {
@@ -224,11 +351,13 @@ function validateResults(experiments: string[]) {
   console.log(`Complete results for ${experiments.join(', ')}`);
 }
 
-const [command, ...args] = process.argv.slice(2);
-if (command === 'discover') discover();
-else if (command === 'validate-results') validateResults(args);
-else if (import.meta.url === `file://${process.argv[1]}`) {
-  throw new Error(
-    'Usage: model-pr.ts discover | validate-results <experiment...>',
-  );
+if (process.argv[1]?.endsWith('model-pr.ts')) {
+  const [command, ...args] = process.argv.slice(2);
+  if (command === 'discover') discover();
+  else if (command === 'validate-results') validateResults(args);
+  else {
+    throw new Error(
+      'Usage: model-pr.ts discover | validate-results <experiment...>',
+    );
+  }
 }

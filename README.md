@@ -194,8 +194,12 @@ RoboEve model-registration pull requests run through the hourly
 only same-repository branches created by `roboeve[bot]` under `v/register-*`, then
 runs the oldest unmeasured pull request's new base and AGENTS.md pairs sequentially
 against the pinned eval suite. A manual dispatch can select an eligible pull request
-by number. It records normal pass@4 results, regenerates `agent-results.json`, and
-pushes the sanitized output back to the draft pull request.
+by number. It records normal pass@4 results against `next@canary`, regenerates
+`agent-results.json`, and pushes the sanitized output back to the draft pull
+request. A matrix counts as complete only when every eval has a fresh result
+that passes the release gate's validity rules: a classified model failure or a
+pass, a transcript and evaluator output for every run, and no batch marked
+invalid. Anything else is retried as infrastructure, then fails the run.
 
 Every job that holds a credential runs this repository's `main` code. The model
 jobs check out `main`, copy in only the pull request's new experiment files, and
