@@ -9,6 +9,7 @@ import {
   type PullRequestFile,
   type PullRequestSnapshot,
   findIncompleteResults,
+  hasRequiredModelApprovals,
   selectModelCandidate,
   selectModelExperiments,
   selectModelNotificationCandidate,
@@ -27,8 +28,10 @@ const pullRequest: PullRequestSnapshot = {
 };
 
 const review = {
-  headCommitAuthors: ['roboeve[bot]'],
-  approvals: [{ login: 'maintainer', permission: 'write' }],
+  approvals: [
+    { login: 'maintainer', permission: 'write' },
+    { login: 'owner', permission: 'admin' },
+  ],
 };
 
 const files: PullRequestFile[] = [
@@ -54,7 +57,7 @@ test('selects paired experiments from a RoboEve registration PR', () => {
       number: 132,
       headRef: 'v/register-new-models-2026-10-07',
       headSha: 'a'.repeat(40),
-      approvedBy: ['maintainer'],
+      approvedBy: ['maintainer', 'owner'],
       pairs: [
         {
           base: 'gpt-6.1-sol-high',
@@ -120,13 +123,13 @@ test('rejects changes outside model-registration paths', () => {
   );
 });
 
-test('requires a maintainer approval of the exact head commit', () => {
+test('requires two maintainer approvals of the exact head commit', () => {
   const select = (candidate: Partial<typeof review>) =>
     selectModelExperiments(pullRequest, files, 'vercel/next-evals-oss', {
       ...review,
       ...candidate,
     });
-  const needsApproval = /needs an approving review from a maintainer/;
+  const needsApproval = /needs approving reviews from two maintainers/;
 
   assert.throws(() => select({ approvals: [] }), needsApproval);
   assert.throws(
@@ -134,12 +137,19 @@ test('requires a maintainer approval of the exact head commit', () => {
     needsApproval,
   );
   assert.throws(
-    () => select({ headCommitAuthors: ['roboeve[bot]', 'maintainer'] }),
+    () =>
+      select({ approvals: [{ login: 'maintainer', permission: 'write' }] }),
     needsApproval,
   );
   assert.throws(
-    () => select({ headCommitAuthors: [] }),
-    /could not identify the head commit author or committer/,
+    () =>
+      select({
+        approvals: [
+          { login: 'maintainer', permission: 'write' },
+          { login: 'maintainer', permission: 'write' },
+        ],
+      }),
+    needsApproval,
   );
   assert.deepEqual(
     select({
@@ -153,13 +163,18 @@ test('requires a maintainer approval of the exact head commit', () => {
   );
 });
 
+test('keeps approval notifications pending until two maintainers approve', () => {
+  assert.equal(hasRequiredModelApprovals([]), false);
+  assert.equal(hasRequiredModelApprovals(['maintainer']), false);
+  assert.equal(hasRequiredModelApprovals(['maintainer', 'owner']), true);
+});
+
 test('selects a structurally valid model PR before approval for notification', () => {
   const candidate = selectModelNotificationCandidate(
     [
       {
         pullRequest,
         files,
-        headCommitAuthors: ['roboeve[bot]'],
         approvals: [],
         measuredByAutomation: false,
       },
@@ -181,7 +196,6 @@ test('an older unapproved PR does not block a newer approved PR', () => {
   const waiting = {
     pullRequest,
     files,
-    headCommitAuthors: ['roboeve[bot]'],
     approvals: [],
     measuredByAutomation: false,
   };
@@ -196,7 +210,7 @@ test('an older unapproved PR does not block a newer approved PR', () => {
         sha: 'b'.repeat(40),
       },
     },
-    approvals: [{ login: 'maintainer', permission: 'write' }],
+    approvals: review.approvals,
   };
 
   assert.equal(

@@ -24,13 +24,14 @@ test('model registration automation is restricted to merged main', async () => {
   );
   assert.match(workflow, /roboeve\[bot\]/);
   assert.match(workflow, /v\/register-/);
-  // Credentials are granted only for a head SHA a maintainer approved.
+  // Credentials are granted only after two maintainers approve the head SHA.
   assert.match(workflow, /pulls\.listReviews/);
   assert.match(workflow, /getCollaboratorPermissionLevel/);
   assert.match(workflow, /review\.commit_id !== pull\.head\.sha/);
   assert.match(workflow, /latestReviewByUser/);
   assert.match(workflow, /review\.id > previous\.id/);
   assert.match(workflow, /review\.state !== 'APPROVED'/);
+  assert.match(workflow, /two maintainers approve/);
   assert.match(workflow, /measuredByAutomation/);
   assert.match(workflow, /Record model evaluation results/);
   assert.match(workflow, /Model eval Slack thread/);

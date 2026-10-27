@@ -81,9 +81,9 @@ jobs:
                 pull_number: pull.number,
                 per_page: 100,
               });
-              // Credentials are granted only for a head SHA that a maintainer
-              // approved, so collect approvals pinned to that exact commit and
-              // who wrote the commit itself.
+              // Credentials are granted only after two maintainers approve the
+              // exact head SHA, so collect each reviewer's latest decision for
+              // that commit.
               const reviews = await github.paginate(github.rest.pulls.listReviews, {
                 owner,
                 repo,
@@ -111,8 +111,6 @@ jobs:
               const headCommit = (
                 await github.rest.repos.getCommit({ owner, repo, ref: pull.head.sha })
               ).data;
-              const headCommitAuthors = [headCommit.author?.login, headCommit.committer?.login]
-                .filter(Boolean);
               const measuredByAutomation =
                 headCommit.committer?.login === 'github-actions[bot]' &&
                 headCommit.commit.message.split('\n', 1)[0] === 'Record model evaluation results';
@@ -120,7 +118,6 @@ jobs:
                 pullRequest: pull,
                 files,
                 approvals,
-                headCommitAuthors,
                 measuredByAutomation,
               });
             }

@@ -45,7 +45,7 @@ export function modelPrNotificationPrompt(payload: ModelPrNotification) {
   ].join("\n");
 
   if (payload.event === "approval_required") {
-    return `Post one concise Slack message saying model registration PR #${payload.prNumber} needs a maintainer who did not author the head commit to review and approve that exact SHA before credentialed evals can run. Include the models and PR link. Do not add a heading, table, thread replies, or implementation detail.\n\n${shared}`;
+    return `Post one concise Slack message saying model registration PR #${payload.prNumber} needs two maintainers to review and approve that exact SHA before credentialed evals can run. Include the models and PR link. Do not add a heading, table, thread replies, or implementation detail.\n\n${shared}`;
   }
   if (payload.event === "run_started") {
     return `Post one concise Slack message saying model registration PR #${payload.prNumber} is approved and its model evals are starting. Include the models and PR link. Do not add a heading, table, thread replies, or implementation detail.\n\n${shared}`;

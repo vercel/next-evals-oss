@@ -34,8 +34,6 @@ export interface PullRequestApproval {
 }
 
 export interface PullRequestReview {
-  /** Logins of the head commit's author and committer. */
-  headCommitAuthors: string[];
   /** Approving reviews submitted for exactly the head SHA. */
   approvals: PullRequestApproval[];
 }
@@ -57,6 +55,10 @@ const SAFE_SUPPORT_FILES = new Set([
 
 function fail(message: string): never {
   throw new Error(`Model registration PR is not eligible: ${message}`);
+}
+
+export function hasRequiredModelApprovals(approvedBy: string[]) {
+  return approvedBy.length >= 2;
 }
 
 export function selectModelExperiments(
@@ -81,24 +83,25 @@ export function selectModelExperiments(
     fail('the head SHA is invalid');
   }
 
-  // The experiment files are TypeScript that the credentialed job executes,
-  // so a maintainer must have reviewed exactly this head SHA. Any later push
-  // drops the approval until someone reviews the new head.
-  if (review.headCommitAuthors.length === 0) {
-    fail('GitHub could not identify the head commit author or committer');
-  }
-  const approvedBy = review.approvals
-    .filter(
-      (approval) =>
-        (approval.permission === 'admin' || approval.permission === 'write') &&
-        !review.headCommitAuthors.includes(approval.login),
-    )
-    .map((approval) => approval.login)
-    .sort();
-  if (options.requireApproval !== false && approvedBy.length === 0) {
-    fail(
-      'the head commit needs an approving review from a maintainer who did not author it',
-    );
+  // The experiment files are TypeScript that the credentialed job executes.
+  // Git author and committer identities are editable metadata, so require two
+  // distinct maintainers to approve exactly this head SHA. Any later push
+  // drops both approvals until the new head is reviewed.
+  const approvedBy = [
+    ...new Set(
+      review.approvals
+        .filter(
+          (approval) =>
+            approval.permission === 'admin' || approval.permission === 'write',
+        )
+        .map((approval) => approval.login),
+    ),
+  ].sort();
+  if (
+    options.requireApproval !== false &&
+    !hasRequiredModelApprovals(approvedBy)
+  ) {
+    fail('the head commit needs approving reviews from two maintainers');
   }
 
   const added = new Set<string>();
@@ -255,13 +258,13 @@ function discover() {
   writeOutput('pairs', JSON.stringify(candidate.pairs));
   writeOutput(
     'approval-needed',
-    candidate.approvedBy.length === 0 ? 'true' : 'false',
+    hasRequiredModelApprovals(candidate.approvedBy) ? 'false' : 'true',
   );
 
   if (!approvedCandidate) {
     writeOutput('should-run', 'false');
     console.log(
-      `PR #${candidate.number} needs an approving review for ${candidate.headSha}`,
+      `PR #${candidate.number} needs two approving reviews for ${candidate.headSha}`,
     );
     return;
   }

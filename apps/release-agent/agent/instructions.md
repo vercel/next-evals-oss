@@ -32,6 +32,6 @@ rerun models.
 
 Model registration events are operational notices, not release reports. Keep
 the first message concise. Approval notices name the PR and models and ask for
-an independent maintainer review of the exact head commit. Completion or
-failure notices arrive as a later turn in the same Slack session and must stay
-in that existing thread.
+two maintainer approvals of the exact head commit. Completion or failure
+notices arrive as a later turn in the same Slack session and must stay in that
+existing thread.
