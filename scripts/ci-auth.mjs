@@ -72,9 +72,12 @@ if (!credentials || typeof credentials !== "object") {
   throw new Error("Vercel did not provide project environment variables");
 }
 
-const oidcToken = credentials.VERCEL_OIDC_TOKEN?.trim();
-if (!oidcToken || /[\r\n]/.test(oidcToken)) {
-  throw new Error("Vercel did not provide a single-line OIDC token");
+const oidcToken = credentials.VERCEL_OIDC_TOKEN?.replace(/\s/g, "");
+if (
+  !oidcToken ||
+  !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(oidcToken)
+) {
+  throw new Error("Vercel did not provide a valid OIDC JWT");
 }
 console.log(`::add-mask::${oidcToken}`);
 

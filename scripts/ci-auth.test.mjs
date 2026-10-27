@@ -21,7 +21,7 @@ test("fails before invoking Vercel when required values are missing", () => {
 async function createFixture(
   t,
   projectEnvironment = {
-    VERCEL_OIDC_TOKEN: "test-oidc-token",
+    VERCEL_OIDC_TOKEN: "test.oidc.token",
     AI_GATEWAY_API_KEY: "test-gateway-key",
   },
 ) {
@@ -83,16 +83,16 @@ test("exports only OIDC when the job does not run models", async (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /::add-mask::test-github-oidc-token/);
   assert.match(result.stdout, /::add-mask::test-access-token/);
-  assert.match(result.stdout, /::add-mask::test-oidc-token/);
+  assert.match(result.stdout, /::add-mask::test\.oidc\.token/);
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\nVERCEL_TOKEN=\n",
+    "VERCEL_OIDC_TOKEN=test.oidc.token\nVERCEL_TOKEN=\n",
   );
 });
 
 test("normalizes surrounding whitespace in project credentials", async (t) => {
   const fixture = await createFixture(t, {
-    VERCEL_OIDC_TOKEN: "\n  test-oidc-token  \r\n",
+    VERCEL_OIDC_TOKEN: "\n test.\noidc.\ntoken \r\n",
     AI_GATEWAY_API_KEY: "\n test-gateway-key \r\n",
   });
   const result = runScript(fixture, { REQUIRE_AI_GATEWAY_API_KEY: "1" });
@@ -100,18 +100,18 @@ test("normalizes surrounding whitespace in project credentials", async (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\nAI_GATEWAY_API_KEY=test-gateway-key\nVERCEL_TOKEN=\n",
+    "VERCEL_OIDC_TOKEN=test.oidc.token\nAI_GATEWAY_API_KEY=test-gateway-key\nVERCEL_TOKEN=\n",
   );
 });
 
-test("rejects credentials with embedded line breaks", async (t) => {
+test("rejects malformed OIDC credentials", async (t) => {
   const fixture = await createFixture(t, {
-    VERCEL_OIDC_TOKEN: "test-oidc\ntoken",
+    VERCEL_OIDC_TOKEN: "not-a-jwt",
   });
   const result = runScript(fixture);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /did not provide a single-line OIDC token/);
+  assert.match(result.stderr, /did not provide a valid OIDC JWT/);
 });
 
 test("exports the budgeted Gateway key when a job runs models", async (t) => {
@@ -122,13 +122,13 @@ test("exports the budgeted Gateway key when a job runs models", async (t) => {
   assert.match(result.stdout, /::add-mask::test-gateway-key/);
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
-    "VERCEL_OIDC_TOKEN=test-oidc-token\nAI_GATEWAY_API_KEY=test-gateway-key\nVERCEL_TOKEN=\n",
+    "VERCEL_OIDC_TOKEN=test.oidc.token\nAI_GATEWAY_API_KEY=test-gateway-key\nVERCEL_TOKEN=\n",
   );
 });
 
 test("fails model-running jobs without the budgeted Gateway key", async (t) => {
   const fixture = await createFixture(t, {
-    VERCEL_OIDC_TOKEN: "test-oidc-token",
+    VERCEL_OIDC_TOKEN: "test.oidc.token",
   });
   const result = runScript(fixture, { REQUIRE_AI_GATEWAY_API_KEY: "1" });
 
