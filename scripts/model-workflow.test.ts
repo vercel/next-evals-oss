@@ -28,6 +28,11 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /pulls\.listReviews/);
   assert.match(workflow, /getCollaboratorPermissionLevel/);
   assert.match(workflow, /review\.commit_id !== pull\.head\.sha/);
+  assert.match(workflow, /latestReviewByUser/);
+  assert.match(workflow, /review\.id > previous\.id/);
+  assert.match(workflow, /review\.state !== 'APPROVED'/);
+  assert.match(workflow, /measuredByAutomation/);
+  assert.match(workflow, /Record model evaluation results/);
 });
 
 test('credentialed model jobs run main code plus only the new experiment files', async () => {

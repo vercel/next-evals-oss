@@ -136,6 +136,10 @@ test('requires a maintainer approval of the exact head commit', () => {
     () => select({ headCommitAuthors: ['roboeve[bot]', 'maintainer'] }),
     needsApproval,
   );
+  assert.throws(
+    () => select({ headCommitAuthors: [] }),
+    /could not identify the head commit author or committer/,
+  );
   assert.deepEqual(
     select({
       approvals: [
@@ -148,7 +152,7 @@ test('requires a maintainer approval of the exact head commit', () => {
   );
 });
 
-test('scheduled discovery skips a registration that already has results', () => {
+test('scheduled discovery skips only workflow-authored complete results', () => {
   const measuredFiles = [
     ...files,
     { filename: 'agent-results.json', status: 'modified' },
@@ -163,17 +167,45 @@ test('scheduled discovery skips a registration that already has results', () => 
   ];
   assert.equal(
     selectModelCandidate(
-      [{ pullRequest, files: measuredFiles, ...review }],
+      [
+        {
+          pullRequest,
+          files: measuredFiles,
+          ...review,
+          measuredByAutomation: true,
+        },
+      ],
       'vercel/next-evals-oss',
     ),
     null,
   );
   assert.ok(
     selectModelCandidate(
-      [{ pullRequest, files: measuredFiles, ...review }],
+      [
+        {
+          pullRequest,
+          files: measuredFiles,
+          ...review,
+          measuredByAutomation: true,
+        },
+      ],
       'vercel/next-evals-oss',
       true,
     ),
+  );
+  assert.ok(
+    selectModelCandidate(
+      [
+        {
+          pullRequest,
+          files: measuredFiles,
+          ...review,
+          measuredByAutomation: false,
+        },
+      ],
+      'vercel/next-evals-oss',
+    ),
+    'committed smoke or partial results must not suppress measurement',
   );
 });
 

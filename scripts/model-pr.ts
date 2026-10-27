@@ -43,6 +43,7 @@ export interface PullRequestReview {
 export interface ModelPullRequestCandidate extends PullRequestReview {
   pullRequest: PullRequestSnapshot;
   files: PullRequestFile[];
+  measuredByAutomation: boolean;
 }
 
 const EXPERIMENT = /^experiments\/([a-z0-9][a-z0-9.-]*)(--agents-md)?\.ts$/;
@@ -82,6 +83,9 @@ export function selectModelExperiments(
   // The experiment files are TypeScript that the credentialed job executes,
   // so a maintainer must have reviewed exactly this head SHA. Any later push
   // drops the approval until someone reviews the new head.
+  if (review.headCommitAuthors.length === 0) {
+    fail('GitHub could not identify the head commit author or committer');
+  }
   const approvedBy = review.approvals
     .filter(
       (approval) =>
@@ -154,20 +158,6 @@ export function selectModelExperiments(
   };
 }
 
-function hasCompleteResultPaths(
-  selection: ReturnType<typeof selectModelExperiments>,
-  files: PullRequestFile[],
-) {
-  const changed = new Set(files.map((file) => file.filename));
-  const experiments = selection.pairs.flatMap((pair) => pair.experiments);
-  return (
-    changed.has('agent-results.json') &&
-    experiments.every((experiment) =>
-      files.some((file) => file.filename.startsWith(`results/${experiment}/`)),
-    )
-  );
-}
-
 export function selectModelCandidate(
   candidates: ModelPullRequestCandidate[],
   repository: string,
@@ -175,18 +165,17 @@ export function selectModelCandidate(
 ) {
   for (const candidate of candidates) {
     try {
+      // Partial or smoke results may already be committed to a registration
+      // PR. Only the workflow's own verified result commit proves that its
+      // complete matrix was written successfully.
+      if (!includeMeasured && candidate.measuredByAutomation) continue;
       const selection = selectModelExperiments(
         candidate.pullRequest,
         candidate.files,
         repository,
         candidate,
       );
-      if (
-        includeMeasured ||
-        !hasCompleteResultPaths(selection, candidate.files)
-      ) {
-        return selection;
-      }
+      return selection;
     } catch (error) {
       console.warn(
         `Skipping PR #${candidate.pullRequest.number}: ${error instanceof Error ? error.message : String(error)}`,
