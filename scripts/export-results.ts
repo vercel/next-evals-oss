@@ -75,6 +75,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'gemini-3.1-pro-preview--agents-md': 'gemini-3.1-pro-preview',
   'gemini-3.8-flash--agents-md': 'gemini-3.8-flash',
   'gemini-4-argon--agents-md': 'gemini-4-argon',
+  'muse-spark-open--agents-md': 'muse-spark-open',
   'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
   'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
   'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
@@ -238,6 +239,10 @@ const MODEL_NAMES: Record<string, string> = {
   'gemini-3.8-flash--agents-md': 'Gemini 3.8 Flash + AGENTS.md',
   'gemini-4-argon': 'Gemini 4 Argon',
   'gemini-4-argon--agents-md': 'Gemini 4 Argon + AGENTS.md',
+  // No effort suffix: OpenCode never sends one for a gateway model — see the
+  // comment in experiments/muse-spark-open.ts.
+  'muse-spark-open': 'Muse Spark Open',
+  'muse-spark-open--agents-md': 'Muse Spark Open + AGENTS.md',
   'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
   'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
