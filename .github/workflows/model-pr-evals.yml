@@ -214,6 +214,9 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const checkName = 'Model eval Slack thread';
+            const confirmedPrefix = 'eve-slack-session:';
+            const legacyPrefix = 'eve-session:';
+            const legacyThreadLink = '[one Slack thread](https://vercel.slack.com/archives/';
             const headSha = process.env.HEAD_SHA;
             const existing = await github.rest.checks.listForRef({
               owner,
@@ -223,13 +226,20 @@ jobs:
               filter: 'latest',
               per_page: 100,
             });
-            const check = existing.data.check_runs.find((run) =>
-              run.external_id?.startsWith('eve-session:') &&
-              run.details_url?.startsWith('https://vercel.slack.com/archives/')
-            );
+            // GitHub Actions rewrites a check's details_url to the job URL, so
+            // external_id is the durable marker for confirmed Slack delivery.
+            // The summary fallback migrates checks created before that marker.
+            const check = existing.data.check_runs.find((run) => {
+              if (run.external_id?.startsWith(confirmedPrefix)) return true;
+              return run.external_id?.startsWith(legacyPrefix) &&
+                run.output?.summary?.includes(legacyThreadLink);
+            });
             if (check) {
+              const prefix = check.external_id.startsWith(confirmedPrefix)
+                ? confirmedPrefix
+                : legacyPrefix;
               core.setOutput('check-run-id', String(check.id));
-              core.setOutput('session-id', check.external_id.slice('eve-session:'.length));
+              core.setOutput('session-id', check.external_id.slice(prefix.length));
               return;
             }
 
@@ -278,7 +288,7 @@ jobs:
               head_sha: headSha,
               status: 'completed',
               conclusion: 'neutral',
-              external_id: `eve-session:${result.sessionId}`,
+              external_id: `${confirmedPrefix}${result.sessionId}`,
               details_url: result.threadUrl,
               output: {
                 title: process.env.APPROVAL_NEEDED === 'true'
