@@ -6,6 +6,10 @@ const workflowPath = new URL(
   '../.github/workflows/model-pr-evals.yml',
   import.meta.url,
 );
+const notificationPath = new URL(
+  '../apps/release-agent/agent/lib/model-pr-notification.ts',
+  import.meta.url,
+);
 
 function job(workflow: string, name: string) {
   const [, rest] = workflow.split(`\n  ${name}:\n`);
@@ -15,6 +19,7 @@ function job(workflow: string, name: string) {
 
 test('model registration automation is restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(workflow, /pull_request:\n    types: \[opened, reopened, synchronize\]/);
   assert.match(workflow, /pull_request_review:/);
   assert.match(workflow, /types: \[submitted\]/);
   assert.doesNotMatch(workflow, /schedule:/);
@@ -23,7 +28,15 @@ test('model registration automation is restricted to merged main', async () => {
     workflow,
     /run-name: Measure models from PR \$\{\{ github\.event\.pull_request\.number \|\| inputs\.prNumber \|\| 'queue' \}\}/,
   );
-  assert.doesNotMatch(workflow, /pull_request(?:_target)?:/);
+  assert.doesNotMatch(workflow, /pull_request_target:/);
+  assert.match(
+    workflow,
+    /github\.event_name == 'pull_request'[\s\S]*github\.event\.pull_request\.base\.ref == 'main'/,
+  );
+  assert.match(
+    workflow,
+    /github\.event\.pull_request\.user\.login == 'roboeve\[bot\]'[\s\S]*startsWith\(github\.event\.pull_request\.head\.ref, 'v\/register-'\)/,
+  );
   assert.match(
     workflow,
     /github\.event_name == 'pull_request_review'[\s\S]*github\.event\.review\.state == 'approved'[\s\S]*github\.event\.pull_request\.base\.ref == 'main'/,
@@ -75,9 +88,21 @@ test('model notifications use short-lived OIDC and one durable Slack thread', as
   assert.match(notify, /checks\.listForRef/);
   assert.match(notify, /checks\.create/);
   assert.match(report, /id-token: write/);
+  assert.match(report, /actions: read/);
   assert.match(report, /sessionId: process\.env\.SESSION_ID/);
+  assert.match(report, /actions\.listJobsForWorkflowRun/);
+  assert.match(report, /failure/);
   assert.match(report, /checks\.update/);
   assert.doesNotMatch(workflow, /SLACK_BOT_TOKEN/);
+});
+
+test('model failure notifications are classified without raw logs', async () => {
+  const notification = await readFile(notificationPath, 'utf8');
+  assert.match(notification, /event: z\.literal\("run_failed"\)/);
+  assert.match(notification, /stage: z\.string\(\)\.min\(1\)\.max\(80\)/);
+  assert.match(notification, /summary: z\.string\(\)\.min\(1\)\.max\(240\)/);
+  assert.match(notification, /without adding speculation/);
+  assert.match(notification, /Do not quote raw logs/);
 });
 
 test('credentialed model jobs run main code plus only the new experiment files', async () => {

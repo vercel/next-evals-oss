@@ -200,8 +200,11 @@ the pull request once the two new experiment files look right, and any later pus
 runs the workflow again only after two maintainers review the new head. The
 second qualifying approval dispatches the workflow immediately. Different model
 pull requests can run in parallel, while duplicate events for the same pull
-request are serialized. The workflow runs that pull request's new base and
-AGENTS.md pairs sequentially against the pinned eval suite. A manual dispatch
+request are serialized. Opening a registration PR creates one Slack thread
+asking for those approvals. The same thread receives the final success or a
+classified, sanitized failure without raw logs. The workflow then runs that
+pull request's new base and AGENTS.md pairs sequentially against the pinned eval
+suite. A manual dispatch
 can select an eligible pull request by number but cannot skip the approval. It
 records normal pass@4 results against `next@canary`, regenerates
 `agent-results.json`, and pushes the sanitized output back to the draft pull

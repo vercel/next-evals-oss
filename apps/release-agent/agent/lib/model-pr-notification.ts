@@ -24,8 +24,19 @@ export const modelPrNotificationSchema = z.discriminatedUnion("event", [
     ...common,
   }),
   z.object({
-    event: z.enum(["run_succeeded", "run_failed"]),
+    event: z.literal("run_succeeded"),
     sessionId: z.string().min(1).max(256),
+    ...common,
+  }),
+  z.object({
+    event: z.literal("run_failed"),
+    sessionId: z.string().min(1).max(256),
+    failure: z
+      .object({
+        stage: z.string().min(1).max(80),
+        summary: z.string().min(1).max(240),
+      })
+      .optional(),
     ...common,
   }),
 ]);
@@ -52,6 +63,9 @@ export function modelPrNotificationPrompt(payload: ModelPrNotification) {
   }
   if (payload.event === "run_succeeded") {
     return `Reply concisely in this existing Slack thread that the model eval run finished successfully, the validated results were added to PR #${payload.prNumber}, and the PR is ready for human review and merge. Include the PR and workflow links. Do not repeat the original message or start a new report.\n\n${shared}`;
+  }
+  if (payload.event === "run_failed" && payload.failure) {
+    return `Reply concisely in this existing Slack thread that the model eval run failed during ${payload.failure.stage}. Use this exact failure description without adding speculation: ${payload.failure.summary} Include PR #${payload.prNumber} and the workflow link. Do not quote raw logs, repeat the original message, or start a new report.\n\n${shared}`;
   }
   return `Reply concisely in this existing Slack thread that the model eval run failed and needs attention. Include PR #${payload.prNumber} and the workflow link. Do not repeat the original message or start a new report.\n\n${shared}`;
 }

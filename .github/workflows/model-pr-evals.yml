@@ -3,6 +3,8 @@ name: Evaluate a model registration PR
 run-name: Measure models from PR ${{ github.event.pull_request.number || inputs.prNumber || 'queue' }}
 
 on:
+  pull_request:
+    types: [opened, reopened, synchronize]
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
@@ -26,7 +28,17 @@ jobs:
     if: >-
       github.repository == 'vercel/next-evals-oss' &&
       (
-        (github.event_name != 'pull_request_review' && github.ref == 'refs/heads/main') ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main'
+        ) ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref == 'main' &&
+          github.event.pull_request.user.login == 'roboeve[bot]' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          startsWith(github.event.pull_request.head.ref, 'v/register-')
+        ) ||
         (
           github.event_name == 'pull_request_review' &&
           github.event.review.state == 'approved' &&
@@ -491,6 +503,7 @@ jobs:
     if: always() && needs.prepare.outputs.should-run == 'true' && needs.notify.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       checks: write
       id-token: write
     steps:
@@ -503,6 +516,7 @@ jobs:
           PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
           RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
           SESSION_ID: ${{ needs.notify.outputs.session-id }}
+          EXPORT_RESULT: ${{ needs.export.result }}
           UPDATE_RESULT: ${{ needs.update.result }}
         with:
           script: |
@@ -512,6 +526,58 @@ jobs:
             const succeeded = process.env.UPDATE_RESULT === 'success';
             const prNumber = Number(process.env.PR_NUMBER);
             const workflowUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            let failure;
+            if (!succeeded) {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner,
+                repo,
+                run_id: context.runId,
+                per_page: 100,
+              });
+              const failedSteps = new Set(
+                jobs.flatMap((job) =>
+                  (job.steps ?? [])
+                    .filter((step) => step.conclusion === 'failure')
+                    .map((step) => step.name),
+                ),
+              );
+              if (failedSteps.has('Pull short-lived Vercel credentials')) {
+                failure = {
+                  stage: 'authentication',
+                  summary: 'The workflow could not obtain its short-lived Vercel credentials, so the eval matrix did not start.',
+                };
+              } else if (failedSteps.has('Preflight the new model pair')) {
+                failure = {
+                  stage: 'experiment preflight',
+                  summary: 'The new model configuration failed preflight before the eval matrix started.',
+                };
+              } else if (failedSteps.has('Verify live model access')) {
+                failure = {
+                  stage: 'model access',
+                  summary: 'The live AI Gateway access check failed before the eval matrix started, so no pass@4 sandboxes were launched for the affected model.',
+                };
+              } else if (failedSteps.has('Run the complete pass@4 matrices')) {
+                failure = {
+                  stage: 'evaluation',
+                  summary: 'The eval matrix did not produce a complete valid result after its recovery attempts.',
+                };
+              } else if (process.env.EXPORT_RESULT === 'failure') {
+                failure = {
+                  stage: 'result validation',
+                  summary: 'The completed model results failed export or public-dataset validation.',
+                };
+              } else if (process.env.UPDATE_RESULT === 'failure') {
+                failure = {
+                  stage: 'PR update',
+                  summary: 'The sanitized results could not be added to the model registration PR.',
+                };
+              } else {
+                failure = {
+                  stage: 'workflow',
+                  summary: 'The workflow stopped before validated results were added to the model registration PR.',
+                };
+              }
+            }
             const oidcToken = await core.getIDToken('https://github.com/vercel');
             core.setSecret(oidcToken);
             const response = await fetch(`${agentUrl}/model-evals`, {
@@ -529,6 +595,7 @@ jobs:
                 headSha: process.env.HEAD_SHA,
                 pairs: JSON.parse(process.env.PAIRS_JSON),
                 workflowUrl,
+                ...(failure ? { failure } : {}),
               }),
             });
             if (!response.ok) {
