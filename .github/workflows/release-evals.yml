@@ -243,7 +243,9 @@ jobs:
           cd "$RELEASE_EVAL_WORKSPACE/results"
           find "$EXPERIMENT" -type f -name summary.json -print0 \
             | tar --null -czf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" --files-from=-
-          tar -tzf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" | head -1
+          # Consume the full listing so tar does not receive SIGPIPE under
+          # GitHub Actions' `set -o pipefail` shell.
+          tar -tzf "$RUNNER_TEMP/$EXPERIMENT.tar.gz" | sed -n '1p'
 
           retained_paths=(
             "$RUNNER_TEMP/$EXPERIMENT.tar.gz"

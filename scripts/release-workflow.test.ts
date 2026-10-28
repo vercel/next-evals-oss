@@ -45,6 +45,12 @@ test('repository write access starts only after sanitization', async () => {
   assert.match(publish, /assert-no-secrets\.mjs/);
 });
 
+test('result archive validation consumes the complete tar listing', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(workflow, /tar -tzf .* \| sed -n '1p'/);
+  assert.doesNotMatch(workflow, /tar -tzf .* \| head/);
+});
+
 test('the release agent accepts standalone workflow URLs', async () => {
   const schema = await readFile(notificationSchemaPath, 'utf8');
   assert.match(
