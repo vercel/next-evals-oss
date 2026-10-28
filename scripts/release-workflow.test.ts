@@ -15,7 +15,7 @@ test('release automation is standalone and restricted to merged main', async () 
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /schedule:/);
-  assert.match(workflow, /cron: "17 \* \* \* \*"/);
+  assert.match(workflow, /cron: "17 15 \* \* \*"/);
   assert.doesNotMatch(workflow, /cron: "43 7 \* \* \*"/);
   assert.match(
     workflow,
@@ -31,6 +31,14 @@ test('release automation is standalone and restricted to merged main', async () 
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/);
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
+});
+
+test('release measurements are single-flight', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(
+    workflow,
+    /concurrency:\n(?:  #[^\n]*\n)*  group: next-release-evals\n  cancel-in-progress: false/,
+  );
 });
 
 test('repository write access starts only after sanitization', async () => {

@@ -15,12 +15,22 @@ function job(workflow: string, name: string) {
 
 test('model registration automation is restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
-  assert.match(workflow, /schedule:/);
+  assert.match(workflow, /pull_request_review:/);
+  assert.match(workflow, /types: \[submitted\]/);
+  assert.doesNotMatch(workflow, /schedule:/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(
+    workflow,
+    /run-name: Measure models from PR \$\{\{ github\.event\.pull_request\.number \|\| inputs\.prNumber \|\| 'queue' \}\}/,
+  );
   assert.doesNotMatch(workflow, /pull_request(?:_target)?:/);
   assert.match(
     workflow,
-    /github\.repository == 'vercel\/next-evals-oss' && github\.ref == 'refs\/heads\/main'/,
+    /github\.event_name == 'pull_request_review'[\s\S]*github\.event\.review\.state == 'approved'[\s\S]*github\.event\.pull_request\.base\.ref == 'main'/,
+  );
+  assert.match(
+    workflow,
+    /PR_NUMBER: \$\{\{ inputs\.prNumber \|\| github\.event\.pull_request\.number \}\}/,
   );
   assert.match(workflow, /roboeve\[bot\]/);
   assert.match(workflow, /v\/register-/);
@@ -46,6 +56,15 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
+test('duplicate model PR measurements are single-flight', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(
+    workflow,
+    /group: model-pr-evals-\$\{\{ github\.event\.pull_request\.number \|\| inputs\.prNumber \|\| 'manual-queue' \}\}/,
+  );
+  assert.match(workflow, /cancel-in-progress: false/);
+});
+
 test('model notifications use short-lived OIDC and one durable Slack thread', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const notify = job(workflow, 'notify');
@@ -65,7 +84,8 @@ test('credentialed model jobs run main code plus only the new experiment files',
   const workflow = await readFile(workflowPath, 'utf8');
   const evaluate = job(workflow, 'evaluate');
   assert.match(evaluate, /id-token: write/);
-  assert.match(evaluate, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(evaluate, /ref: refs\/heads\/main/);
+  assert.doesNotMatch(evaluate, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(evaluate, /sparse-checkout: experiments/);
   assert.match(evaluate, /rm -rf registration-pr/);
   assert.doesNotMatch(evaluate, /head-ref/);
