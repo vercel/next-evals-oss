@@ -8,12 +8,97 @@ import test from 'node:test';
 import {
   type PullRequestFile,
   type PullRequestSnapshot,
+  checkGatewayModelAccess,
   findIncompleteResults,
+  gatewayModelId,
   hasRequiredModelApprovals,
   selectModelCandidate,
   selectModelExperiments,
   selectModelNotificationCandidate,
 } from './model-pr.js';
+
+test('normalizes harness model ids for the live Gateway probe', () => {
+  assert.equal(
+    gatewayModelId('vercel/meta/muse-wonder-1.0'),
+    'meta/muse-wonder-1.0',
+  );
+  assert.equal(
+    gatewayModelId('openai/gpt-6.1-terra?reasoningEffort=high'),
+    'openai/gpt-6.1-terra',
+  );
+  assert.equal(
+    gatewayModelId('claude-sonnet-5.5', 'vercel-ai-gateway/claude-code'),
+    'anthropic/claude-sonnet-5.5',
+  );
+});
+
+test('fails before the matrix when Gateway model access is denied', async () => {
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    assert.equal(
+      (init?.headers as Record<string, string>).authorization,
+      'Bearer test-key',
+    );
+    assert.deepEqual(JSON.parse(String(init?.body)), {
+      model: 'meta/muse-wonder-1.0',
+      max_tokens: 16,
+      messages: [{ role: 'user', content: 'ok' }],
+    });
+    return new Response(
+      JSON.stringify({
+        error: 'Your team has restricted access to this provider',
+      }),
+      { status: 403 },
+    );
+  };
+
+  await assert.rejects(
+    checkGatewayModelAccess(
+      'vercel/meta/muse-wonder-1.0',
+      'test-key',
+      fetchImpl,
+    ),
+    /rejected meta\/muse-wonder-1\.0 before the eval matrix started \(403\).*restricted access/,
+  );
+});
+
+test('accepts a successful live Gateway model probe', async () => {
+  const fetchImpl: typeof fetch = async () =>
+    new Response('{}', { status: 200 });
+  assert.equal(
+    await checkGatewayModelAccess(
+      'openai/gpt-6.1-terra?reasoningEffort=high',
+      'test-key',
+      fetchImpl,
+    ),
+    'openai/gpt-6.1-terra',
+  );
+});
+
+test('retries a transient Gateway failure before the matrix', async () => {
+  let requests = 0;
+  const fetchImpl: typeof fetch = async () => {
+    requests++;
+    return requests === 1
+      ? new Response('Service temporarily unavailable', { status: 503 })
+      : new Response('{}', { status: 200 });
+  };
+  const delays: number[] = [];
+
+  assert.equal(
+    await checkGatewayModelAccess(
+      'openai/gpt-6.1-terra',
+      'test-key',
+      fetchImpl,
+      undefined,
+      async (milliseconds) => {
+        delays.push(milliseconds);
+      },
+    ),
+    'openai/gpt-6.1-terra',
+  );
+  assert.equal(requests, 2);
+  assert.deepEqual(delays, [1_000]);
+});
 
 const pullRequest: PullRequestSnapshot = {
   number: 132,
