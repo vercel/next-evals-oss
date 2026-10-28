@@ -90,19 +90,33 @@ export async function checkGatewayModelAccess(
 ) {
   const gatewayModel = gatewayModelId(model, agent);
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const response = await fetchImpl(GATEWAY_URL, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        'content-type': 'application/json',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: gatewayModel,
-        max_tokens: 16,
-        messages: [{ role: 'user', content: 'ok' }],
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetchImpl(GATEWAY_URL, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: gatewayModel,
+          max_tokens: 16,
+          messages: [{ role: 'user', content: 'ok' }],
+        }),
+      });
+    } catch (error) {
+      if (attempt === 3) {
+        const detail = (error instanceof Error ? error.message : String(error))
+          .replace(/\s+/g, ' ')
+          .slice(0, 500);
+        throw new Error(
+          `AI Gateway access probe failed for ${gatewayModel} after ${attempt} attempts: ${detail}`,
+        );
+      }
+      await sleepImpl(attempt * 1_000);
+      continue;
+    }
     if (response.ok) return gatewayModel;
 
     const body = (await response.text()).replace(/\s+/g, ' ').slice(0, 500);

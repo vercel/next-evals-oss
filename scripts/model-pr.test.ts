@@ -100,6 +100,54 @@ test('retries a transient Gateway failure before the matrix', async () => {
   assert.deepEqual(delays, [1_000]);
 });
 
+test('retries a Gateway connection failure before the matrix', async () => {
+  let requests = 0;
+  const fetchImpl: typeof fetch = async () => {
+    requests++;
+    if (requests === 1) throw new Error('socket reset');
+    return new Response('{}', { status: 200 });
+  };
+  const delays: number[] = [];
+
+  assert.equal(
+    await checkGatewayModelAccess(
+      'openai/gpt-6.1-terra',
+      'test-key',
+      fetchImpl,
+      undefined,
+      async (milliseconds) => {
+        delays.push(milliseconds);
+      },
+    ),
+    'openai/gpt-6.1-terra',
+  );
+  assert.equal(requests, 2);
+  assert.deepEqual(delays, [1_000]);
+});
+
+test('reports a Gateway connection failure after the retry limit', async () => {
+  let requests = 0;
+  const delays: number[] = [];
+
+  await assert.rejects(
+    checkGatewayModelAccess(
+      'openai/gpt-6.1-terra',
+      'test-key',
+      async () => {
+        requests++;
+        throw new Error('socket reset\nwith extra detail');
+      },
+      undefined,
+      async (milliseconds) => {
+        delays.push(milliseconds);
+      },
+    ),
+    /failed for openai\/gpt-6\.1-terra after 3 attempts: socket reset with extra detail/,
+  );
+  assert.equal(requests, 3);
+  assert.deepEqual(delays, [1_000, 2_000]);
+});
+
 const pullRequest: PullRequestSnapshot = {
   number: 132,
   state: 'open',

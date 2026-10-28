@@ -13,6 +13,11 @@ on:
         description: Optional RoboEve model-registration pull request number
         required: false
         type: string
+      force:
+        description: Re-run a model PR that automation already measured
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   # Duplicate events for one PR are single-flight. Different model PRs can run
@@ -152,14 +157,42 @@ jobs:
       - name: Select the new model pairs
         id: registration
         env:
-          FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+          FORCE: ${{ inputs.force }}
           MODEL_PR_CANDIDATES_JSON: ${{ runner.temp }}/model-pr-candidates.json
         run: pnpm tsx scripts/model-pr.ts discover
+
+  redispatch:
+    name: Re-dispatch the model PR from main
+    needs: prepare
+    if: >-
+      github.event_name != 'workflow_dispatch' &&
+      needs.prepare.outputs.has-candidate == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the trusted main workflow
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'model-pr-evals.yml',
+              ref: 'main',
+              inputs: {
+                prNumber: process.env.PR_NUMBER,
+                force: 'false',
+              },
+            });
 
   notify:
     name: Open the model eval Slack thread
     needs: prepare
-    if: needs.prepare.outputs.has-candidate == 'true'
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      needs.prepare.outputs.has-candidate == 'true'
     runs-on: ubuntu-24.04
     permissions:
       checks: write

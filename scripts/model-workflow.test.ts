@@ -58,6 +58,12 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /measuredByAutomation/);
   assert.match(workflow, /Record model evaluation results/);
   assert.match(workflow, /Model eval Slack thread/);
+  assert.match(workflow, /Re-dispatch the model PR from main/);
+  assert.match(workflow, /createWorkflowDispatch/);
+  assert.match(workflow, /workflow_id: 'model-pr-evals\.yml'/);
+  assert.match(workflow, /ref: 'main'/);
+  assert.match(workflow, /force: 'false'/);
+  assert.match(workflow, /FORCE: \$\{\{ inputs\.force \}\}/);
   assert.match(workflow, /approval_required/);
   assert.match(workflow, /run_succeeded/);
   assert.match(workflow, /run_failed/);
@@ -80,9 +86,15 @@ test('duplicate model PR measurements are single-flight', async () => {
 
 test('model notifications use short-lived OIDC and one durable Slack thread', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
+  const redispatch = job(workflow, 'redispatch');
   const notify = job(workflow, 'notify');
   const report = job(workflow, 'report');
 
+  assert.match(redispatch, /github\.event_name != 'workflow_dispatch'/);
+  assert.match(redispatch, /actions: write/);
+  assert.doesNotMatch(redispatch, /id-token: write/);
+  assert.match(redispatch, /force: 'false'/);
+  assert.match(notify, /github\.event_name == 'workflow_dispatch'/);
   assert.match(notify, /id-token: write/);
   assert.match(notify, /core\.getIDToken\('https:\/\/github\.com\/vercel'\)/);
   assert.match(notify, /checks\.listForRef/);
