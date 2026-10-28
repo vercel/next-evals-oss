@@ -115,6 +115,8 @@ test('RoboEve branch detection opens a draft registration PR from main', async (
   assert.doesNotMatch(open, /actions\/checkout/);
   assert.match(open, /draft: true/);
   assert.match(open, /pulls\.create/);
+  assert.match(open, /body: \[/);
+  assert.match(open, /\]\.join\('\\n'\)/);
   assert.match(open, /createWorkflowDispatch/);
   assert.match(open, /workflow_id: 'model-pr-evals\.yml'/);
   assert.match(open, /force: 'false'/);
