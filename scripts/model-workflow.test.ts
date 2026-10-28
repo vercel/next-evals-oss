@@ -53,6 +53,14 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
+test('model measurements are single-flight', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(
+    workflow,
+    /concurrency:\n(?:  #[^\n]*\n)*  group: model-pr-evals\n  cancel-in-progress: false/,
+  );
+});
+
 test('model notifications use short-lived OIDC and one durable Slack thread', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const notify = job(workflow, 'notify');

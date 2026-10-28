@@ -33,6 +33,14 @@ test('release automation is standalone and restricted to merged main', async () 
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
+test('release measurements are single-flight', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(
+    workflow,
+    /concurrency:\n(?:  #[^\n]*\n)*  group: next-release-evals\n  cancel-in-progress: false/,
+  );
+});
+
 test('repository write access starts only after sanitization', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const [beforePublish, publish] = workflow.split('\n  publish:\n');
