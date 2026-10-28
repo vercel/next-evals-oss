@@ -198,12 +198,12 @@ editable metadata, so they are not used for authorization. The experiment files
 are code the credentialed job executes, so those reviews are the gate: approve
 the pull request once the two new experiment files look right, and any later push
 runs the workflow again only after two maintainers review the new head. The
-second qualifying approval dispatches the workflow immediately; a daily scan is
-the fallback if the review event is missed. The workflow then
-runs the oldest unmeasured eligible pull request's new base and AGENTS.md pairs
-sequentially against the pinned eval suite. A manual dispatch can select an
-eligible pull request by number but cannot skip the approval. It records normal
-pass@4 results against `next@canary`, regenerates
+second qualifying approval dispatches the workflow immediately. Different model
+pull requests can run in parallel, while duplicate events for the same pull
+request are serialized. The workflow runs that pull request's new base and
+AGENTS.md pairs sequentially against the pinned eval suite. A manual dispatch
+can select an eligible pull request by number but cannot skip the approval. It
+records normal pass@4 results against `next@canary`, regenerates
 `agent-results.json`, and pushes the sanitized output back to the draft pull
 request. A matrix counts as complete only when every eval has a fresh result
 that passes the release gate's validity rules: a classified model failure or a

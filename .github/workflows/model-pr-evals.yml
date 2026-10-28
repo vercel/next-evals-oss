@@ -1,12 +1,10 @@
 name: Evaluate a model registration PR
 
-run-name: Measure models from ${{ inputs.prNumber && format('PR #{0}', inputs.prNumber) || 'the RoboEve queue' }}
+run-name: Measure models from ${{ github.event.pull_request.number && format('PR #{0}', github.event.pull_request.number) || inputs.prNumber && format('PR #{0}', inputs.prNumber) || 'the RoboEve queue' }}
 
 on:
   pull_request_review:
     types: [submitted]
-  schedule:
-    - cron: "37 15 * * *"
   workflow_dispatch:
     inputs:
       prNumber:
@@ -15,9 +13,9 @@ on:
         type: string
 
 concurrency:
-  # Keep the costly model matrix single-flight. A later approval can queue a
-  # run, but it cannot overlap the run already measuring that model PR.
-  group: model-pr-evals
+  # Duplicate events for one PR are single-flight. Different model PRs can run
+  # in parallel.
+  group: model-pr-evals-${{ github.event.pull_request.number || inputs.prNumber || 'manual-queue' }}
   cancel-in-progress: false
 
 permissions: {}

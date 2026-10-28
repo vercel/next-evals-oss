@@ -17,8 +17,7 @@ test('model registration automation is restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /pull_request_review:/);
   assert.match(workflow, /types: \[submitted\]/);
-  assert.match(workflow, /schedule:/);
-  assert.match(workflow, /cron: "37 15 \* \* \*"/);
+  assert.doesNotMatch(workflow, /schedule:/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /pull_request(?:_target)?:/);
   assert.match(
@@ -53,12 +52,13 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
-test('model measurements are single-flight', async () => {
+test('duplicate model PR measurements are single-flight', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(
     workflow,
-    /concurrency:\n(?:  #[^\n]*\n)*  group: model-pr-evals\n  cancel-in-progress: false/,
+    /group: model-pr-evals-\$\{\{ github\.event\.pull_request\.number \|\| inputs\.prNumber \|\| 'manual-queue' \}\}/,
   );
+  assert.match(workflow, /cancel-in-progress: false/);
 });
 
 test('model notifications use short-lived OIDC and one durable Slack thread', async () => {
