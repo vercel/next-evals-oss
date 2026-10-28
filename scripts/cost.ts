@@ -84,6 +84,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // Base-context standard-service prices from AI Gateway, 2026-09-22.
   'gpt-6-sol-high': { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
   'gpt-6-luna-high': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
+  // AI Gateway catalog `openai/gpt-6.1-terra` base context tier, 2026-10-28;
+  // matches OpenAI's model page (30-minute cache-write retention). Over 272k
+  // context it doubles input/cache and 1.5x output; eval runs stay below that.
+  'gpt-6.1-terra-high': { input: 1, output: 5, cacheRead: 0.05, cacheWrite: 1.25 },
   'kimi-k2.5': { input: 0.6, output: 3, cacheRead: 0.1, cacheWrite: 0 },
   'kimi-k2.6': { input: 0.95, output: 4, cacheRead: 0.16, cacheWrite: 0 },
   'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },
