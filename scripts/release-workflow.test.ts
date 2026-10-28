@@ -14,6 +14,10 @@ const notificationSchemaPath = new URL(
 test('release automation is standalone and restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /sandboxSmokeOnly:/);
+  assert.match(workflow, /inputs\.sandboxSmokeOnly == true/);
+  assert.match(workflow, /inputs\.sandboxSmokeOnly != true/);
+  assert.match(workflow, /node scripts\/sandbox-smoke\.mjs/);
   assert.match(workflow, /schedule:/);
   assert.match(workflow, /cron: "17 \* \* \* \*"/);
   assert.doesNotMatch(workflow, /cron: "43 7 \* \* \*"/);
