@@ -1,9 +1,11 @@
 name: Open a model registration PR
 
-run-name: Open model registration PR for ${{ inputs.branch || github.event.ref }}
+run-name: Open model registration PR for ${{ inputs.branch || github.event.workflow_run.head_branch }}
 
 on:
-  create:
+  workflow_run:
+    workflows: [Detect a model registration branch]
+    types: [completed]
   workflow_dispatch:
     inputs:
       branch:
@@ -12,7 +14,7 @@ on:
         type: string
 
 concurrency:
-  group: open-model-registration-pr-${{ inputs.branch || github.event.ref }}
+  group: open-model-registration-pr-${{ inputs.branch || github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 permissions: {}
@@ -24,10 +26,12 @@ jobs:
       github.repository == 'vercel/next-evals-oss' &&
       (
         (
-          github.event_name == 'create' &&
-          github.event.ref_type == 'branch' &&
-          github.actor == 'roboeve[bot]' &&
-          startsWith(github.event.ref, 'v/register-')
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.actor.login == 'roboeve[bot]' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          startsWith(github.event.workflow_run.head_branch, 'v/register-')
         ) ||
         (
           github.event_name == 'workflow_dispatch' &&
@@ -43,7 +47,7 @@ jobs:
       - name: Open the draft PR and start its approval workflow
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          BRANCH: ${{ inputs.branch || github.event.ref }}
+          BRANCH: ${{ inputs.branch || github.event.workflow_run.head_branch }}
         with:
           script: |
             const branch = process.env.BRANCH;

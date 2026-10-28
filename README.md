@@ -194,7 +194,8 @@ RoboEve model-registration pull requests run through
 only same-repository branches under `v/register-*`. When RoboEve creates one of
 those branches without a pull request,
 [`open-model-registration-pr.yml`](.github/workflows/open-model-registration-pr.yml)
-opens a draft and dispatches the existing validation workflow. The opener runs
+opens a draft and dispatches the existing validation workflow. A no-permission
+branch workflow emits the event; the write-capable handler runs trusted code
 from `main` and has no model or Vercel credentials.
 
 The exact head commit needs approval from two distinct maintainers with write
