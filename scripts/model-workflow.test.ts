@@ -15,12 +15,19 @@ function job(workflow: string, name: string) {
 
 test('model registration automation is restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(workflow, /pull_request_review:/);
+  assert.match(workflow, /types: \[submitted\]/);
   assert.match(workflow, /schedule:/);
+  assert.match(workflow, /cron: "37 15 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /pull_request(?:_target)?:/);
   assert.match(
     workflow,
-    /github\.repository == 'vercel\/next-evals-oss' && github\.ref == 'refs\/heads\/main'/,
+    /github\.event_name == 'pull_request_review'[\s\S]*github\.event\.review\.state == 'approved'[\s\S]*github\.event\.pull_request\.base\.ref == 'main'/,
+  );
+  assert.match(
+    workflow,
+    /PR_NUMBER: \$\{\{ inputs\.prNumber \|\| github\.event\.pull_request\.number \}\}/,
   );
   assert.match(workflow, /roboeve\[bot\]/);
   assert.match(workflow, /v\/register-/);
@@ -65,7 +72,8 @@ test('credentialed model jobs run main code plus only the new experiment files',
   const workflow = await readFile(workflowPath, 'utf8');
   const evaluate = job(workflow, 'evaluate');
   assert.match(evaluate, /id-token: write/);
-  assert.match(evaluate, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(evaluate, /ref: refs\/heads\/main/);
+  assert.doesNotMatch(evaluate, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(evaluate, /sparse-checkout: experiments/);
   assert.match(evaluate, /rm -rf registration-pr/);
   assert.doesNotMatch(evaluate, /head-ref/);

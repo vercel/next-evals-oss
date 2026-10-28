@@ -15,7 +15,7 @@ test('release automation is standalone and restricted to merged main', async () 
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /schedule:/);
-  assert.match(workflow, /cron: "17 \* \* \* \*"/);
+  assert.match(workflow, /cron: "17 15 \* \* \*"/);
   assert.doesNotMatch(workflow, /cron: "43 7 \* \* \*"/);
   assert.match(
     workflow,
