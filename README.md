@@ -218,9 +218,12 @@ request's own export and cost scripts run in a separate job with no Vercel or
 model credential and no write access. The only job allowed to push receives the
 sanitized artifacts, rechecks them for credentials with `main`'s script, and
 commits them without installing or running anything from the pull request. The
-pull request still requires human review of the model configuration, complete
-results, tier, and recurring-release decision before merge. The Vercel CLI OIDC
-policy must allow this workflow on `main` as well as the release workflow.
+model job verifies live Gateway access before starting the matrix, so an
+unavailable or provider-restricted model fails without opening 124 sandboxes.
+The pull request still requires human review of the model configuration,
+complete results, tier, and recurring-release decision before merge. The Vercel
+CLI OIDC policy must allow this workflow on `main` as well as the release
+workflow.
 
 ### Reasoning effort
 

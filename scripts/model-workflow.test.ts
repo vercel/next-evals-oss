@@ -92,6 +92,15 @@ test('credentialed model jobs run main code plus only the new experiment files',
   assert.match(evaluate, /assert-no-secrets\.mjs/);
 });
 
+test('live model access is checked before the expensive matrix', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const evaluate = job(workflow, 'evaluate');
+  const probe = evaluate.indexOf('probe-model-access');
+  const matrix = evaluate.indexOf('Run the complete pass@4 matrices');
+  assert.ok(probe >= 0, 'missing live model access probe');
+  assert.ok(matrix > probe, 'model access must be checked before the matrix');
+});
+
 test('pull request code runs only without credentials or write access', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   const exportJob = job(workflow, 'export');

@@ -6,7 +6,8 @@ import {
   readdirSync,
   rmSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { findInvalidRunReason } from './release-automation.js';
 
@@ -53,12 +54,102 @@ const SAFE_SUPPORT_FILES = new Set([
   'scripts/export-results.ts',
 ]);
 
+const GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/messages';
+
+type Fetch = typeof globalThis.fetch;
+type Sleep = (milliseconds: number) => Promise<void>;
+
+const sleep: Sleep = (milliseconds) =>
+  new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
+
 function fail(message: string): never {
   throw new Error(`Model registration PR is not eligible: ${message}`);
 }
 
 export function hasRequiredModelApprovals(approvedBy: string[]) {
   return approvedBy.length >= 2;
+}
+
+export function gatewayModelId(model: string, agent?: string) {
+  const withoutProvider = model.startsWith('vercel/')
+    ? model.slice('vercel/'.length)
+    : model;
+  const withoutOptions = withoutProvider.split('?', 1)[0];
+  if (!withoutOptions.includes('/') && agent?.endsWith('/claude-code')) {
+    return `anthropic/${withoutOptions}`;
+  }
+  return withoutOptions;
+}
+
+export async function checkGatewayModelAccess(
+  model: string,
+  apiKey: string,
+  fetchImpl: Fetch = globalThis.fetch,
+  agent?: string,
+  sleepImpl: Sleep = sleep,
+) {
+  const gatewayModel = gatewayModelId(model, agent);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const response = await fetchImpl(GATEWAY_URL, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: gatewayModel,
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'ok' }],
+      }),
+    });
+    if (response.ok) return gatewayModel;
+
+    const body = (await response.text()).replace(/\s+/g, ' ').slice(0, 500);
+    const accessDenied = /restricted access|not allowed|provider allowlist/i.test(
+      body,
+    );
+    const retryable =
+      response.status === 408 ||
+      response.status === 429 ||
+      response.status >= 500;
+    if (accessDenied || !retryable || attempt === 3) {
+      throw new Error(
+        `AI Gateway rejected ${gatewayModel} before the eval matrix started (${response.status}): ${body}`,
+      );
+    }
+    await sleepImpl(attempt * 1_000);
+  }
+  throw new Error(`AI Gateway access probe did not finish for ${gatewayModel}`);
+}
+
+async function probeModelAccess(experiment: string) {
+  const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
+  if (!apiKey) throw new Error('AI_GATEWAY_API_KEY is required');
+
+  const experimentPath = resolve('experiments', `${experiment}.ts`);
+  if (!existsSync(experimentPath)) {
+    throw new Error(`Unknown experiment: ${experiment}`);
+  }
+  const imported = (await import(pathToFileURL(experimentPath).href)) as {
+    default?: { agent?: unknown; model?: unknown };
+  };
+  const model = imported.default?.model;
+  if (typeof model !== 'string' || model.length === 0) {
+    throw new Error(`${experiment} does not define a string model`);
+  }
+  const agent = imported.default?.agent;
+  if (typeof agent !== 'string' || !agent.startsWith('vercel-ai-gateway/')) {
+    throw new Error(`${experiment} does not use a Vercel AI Gateway agent`);
+  }
+
+  const gatewayModel = await checkGatewayModelAccess(
+    model,
+    apiKey,
+    globalThis.fetch,
+    agent,
+  );
+  console.log(`AI Gateway access confirmed for ${gatewayModel}`);
 }
 
 export function selectModelExperiments(
@@ -407,8 +498,13 @@ function validateResults(experiments: string[]) {
   const evalNames = listDirectories('evals').sort();
   if (evalNames.length === 0) throw new Error('The eval suite is empty');
 
+  const agentEval = resolve(
+    'node_modules',
+    '.bin',
+    process.platform === 'win32' ? 'agent-eval.cmd' : 'agent-eval',
+  );
   const status = JSON.parse(
-    execFileSync('pnpm', ['exec', 'agent-eval', 'status', '--json'], {
+    execFileSync(agentEval, ['status', '--json'], {
       encoding: 'utf8',
     }),
   ) as {
@@ -445,9 +541,16 @@ if (process.argv[1]?.endsWith('model-pr.ts')) {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'discover') discover();
   else if (command === 'validate-results') validateResults(args);
-  else {
+  else if (command === 'probe-model-access') {
+    if (args.length !== 1) {
+      throw new Error(
+        'Usage: model-pr.ts probe-model-access <base-experiment>',
+      );
+    }
+    await probeModelAccess(args[0]);
+  } else {
     throw new Error(
-      'Usage: model-pr.ts discover | validate-results <experiment...>',
+      'Usage: model-pr.ts discover | probe-model-access <base-experiment> | validate-results <experiment...>',
     );
   }
 }
