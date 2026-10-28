@@ -145,7 +145,10 @@ test('model notifications use short-lived OIDC and one durable Slack thread', as
   assert.match(notify, /id-token: write/);
   assert.match(notify, /core\.getIDToken\('https:\/\/github\.com\/vercel'\)/);
   assert.match(notify, /checks\.listForRef/);
+  assert.match(notify, /run\.details_url\?\.startsWith\('https:\/\/vercel\.slack\.com\/archives\/'\)/);
   assert.match(notify, /checks\.create/);
+  assert.match(notify, /Eve did not confirm Slack thread delivery/);
+  assert.match(notify, /details_url: result\.threadUrl/);
   assert.match(report, /id-token: write/);
   assert.match(report, /actions: read/);
   assert.match(report, /sessionId: process\.env\.SESSION_ID/);

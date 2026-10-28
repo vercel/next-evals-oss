@@ -43,8 +43,23 @@ export const modelPrNotificationSchema = z.discriminatedUnion("event", [
 
 export type ModelPrNotification = z.infer<typeof modelPrNotificationSchema>;
 
+export const modelPrThreadReady = "MODEL_EVAL_THREAD_READY";
+
 function models(payload: ModelPrNotification) {
   return payload.pairs.map((pair) => `\`${pair.base}\``).join(", ");
+}
+
+export function modelPrNotificationRoot(payload: ModelPrNotification) {
+  const pullRequest = `<${payload.prUrl}|Model registration PR #${payload.prNumber}>`;
+  const head = `\`${payload.headSha.slice(0, 7)}\``;
+
+  if (payload.event === "approval_required") {
+    return `${pullRequest} needs two maintainers to approve ${head} before credentialed evals can run. Models: ${models(payload)}.`;
+  }
+  if (payload.event === "run_started") {
+    return `${pullRequest} is approved and its model evals are starting for ${head}. Models: ${models(payload)}.`;
+  }
+  throw new Error("Only a new model eval thread has a root notification");
 }
 
 export function modelPrNotificationPrompt(payload: ModelPrNotification) {
@@ -56,10 +71,10 @@ export function modelPrNotificationPrompt(payload: ModelPrNotification) {
   ].join("\n");
 
   if (payload.event === "approval_required") {
-    return `Post one concise Slack message saying model registration PR #${payload.prNumber} needs two maintainers to review and approve that exact SHA before credentialed evals can run. Include the models and PR link. Do not add a heading, table, thread replies, or implementation detail.\n\n${shared}`;
+    return `The approval request is already visible in the Slack thread root. Respond with exactly ${modelPrThreadReady} and nothing else.`;
   }
   if (payload.event === "run_started") {
-    return `Post one concise Slack message saying model registration PR #${payload.prNumber} is approved and its model evals are starting. Include the models and PR link. Do not add a heading, table, thread replies, or implementation detail.\n\n${shared}`;
+    return `The model eval start is already visible in the Slack thread root. Respond with exactly ${modelPrThreadReady} and nothing else.`;
   }
   if (payload.event === "run_succeeded") {
     return `Reply concisely in this existing Slack thread that the model eval run finished successfully, the validated results were added to PR #${payload.prNumber}, and the PR is ready for human review and merge. Include the PR and workflow links. Do not repeat the original message or start a new report.\n\n${shared}`;

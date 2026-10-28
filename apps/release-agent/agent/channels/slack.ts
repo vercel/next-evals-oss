@@ -6,10 +6,28 @@ import {
   slackChannel,
 } from "eve/channels/slack";
 
+import { modelPrThreadReady } from "../lib/model-pr-notification";
 import { splitReleaseEvalSlackReport } from "../lib/release-report-message";
 
 export const measurementsChannelId = "C0C7VCBP4CA";
 export const vercelWorkspaceId = "T0CAQ00TU";
+export const slackCredentials = connectSlackCredentials(
+  "slack/next-evals-release-agent",
+);
+
+const modelEvalThread = defineSlackRenderer({
+  events: {
+    async "message.completed"(event, _channel, _ctx, next) {
+      if (
+        event.finishReason !== "tool-calls" &&
+        event.message?.trim() === modelPrThreadReady
+      ) {
+        return;
+      }
+      await next();
+    },
+  },
+});
 
 const releaseEvalThread = defineSlackRenderer({
   events: {
@@ -43,8 +61,8 @@ const releaseEvalThread = defineSlackRenderer({
 });
 
 export default slackChannel({
-  credentials: connectSlackCredentials("slack/next-evals-release-agent"),
-  renderers: [releaseEvalThread],
+  credentials: slackCredentials,
+  renderers: [modelEvalThread, releaseEvalThread],
   onAppMention(ctx, message) {
     if (message.channelId !== measurementsChannelId || message.author?.isBot) {
       return null;
