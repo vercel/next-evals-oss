@@ -19,6 +19,10 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /types: \[submitted\]/);
   assert.doesNotMatch(workflow, /schedule:/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(
+    workflow,
+    /run-name: Measure models from PR \$\{\{ github\.event\.pull_request\.number \|\| inputs\.prNumber \|\| 'queue' \}\}/,
+  );
   assert.doesNotMatch(workflow, /pull_request(?:_target)?:/);
   assert.match(
     workflow,
