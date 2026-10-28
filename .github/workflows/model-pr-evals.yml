@@ -224,7 +224,8 @@ jobs:
               per_page: 100,
             });
             const check = existing.data.check_runs.find((run) =>
-              run.external_id?.startsWith('eve-session:')
+              run.external_id?.startsWith('eve-session:') &&
+              run.details_url?.startsWith('https://vercel.slack.com/archives/')
             );
             if (check) {
               core.setOutput('check-run-id', String(check.id));
@@ -263,6 +264,12 @@ jobs:
             if (typeof result.sessionId !== 'string' || result.sessionId.length > 256) {
               throw new Error('Eve did not return a valid session ID');
             }
+            if (
+              typeof result.threadUrl !== 'string' ||
+              !result.threadUrl.startsWith('https://vercel.slack.com/archives/')
+            ) {
+              throw new Error('Eve did not confirm Slack thread delivery');
+            }
 
             const created = await github.rest.checks.create({
               owner,
@@ -272,12 +279,12 @@ jobs:
               status: 'completed',
               conclusion: 'neutral',
               external_id: `eve-session:${result.sessionId}`,
-              details_url: workflowUrl,
+              details_url: result.threadUrl,
               output: {
                 title: process.env.APPROVAL_NEEDED === 'true'
                   ? 'Waiting for exact-SHA approval'
                   : 'Model evals started',
-                summary: 'Operational updates for this exact PR head are kept in one Slack thread.',
+                summary: `Operational updates for this exact PR head are kept in [one Slack thread](${result.threadUrl}).`,
               },
             });
             core.setOutput('check-run-id', String(created.data.id));

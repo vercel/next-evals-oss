@@ -4,8 +4,10 @@ import {
   extractBearerToken,
   verifyOidc,
 } from "eve/channels/auth";
+import { callSlackApi } from "eve/channels/slack";
 
 import {
+  modelPrNotificationRoot,
   modelPrNotificationPrompt,
   modelPrNotificationSchema,
 } from "../lib/model-pr-notification";
@@ -15,6 +17,7 @@ import {
 } from "../lib/release-notification";
 import slack, {
   measurementsChannelId,
+  slackCredentials,
   vercelWorkspaceId,
 } from "./slack";
 
@@ -112,14 +115,45 @@ export default defineChannel({
         return Response.json({ accepted: true }, { status: 202 });
       }
 
-      const session = await ctx
-        .to(slack, {
-          channelId: measurementsChannelId,
-          installationTeamId: vercelWorkspaceId,
-        })
-        .send(prompt, { auth });
+      const posted = await callSlackApi({
+        botToken: slackCredentials.botToken,
+        context: { teamId: vercelWorkspaceId },
+        operation: "chat.postMessage",
+        body: {
+          channel: measurementsChannelId,
+          text: modelPrNotificationRoot(parsed.data),
+          unfurl_links: false,
+          unfurl_media: false,
+        },
+      });
+      if (!posted.ok || typeof posted.ts !== "string") {
+        throw new Error(
+          `Slack rejected the model notification: ${String(posted.error ?? "missing_ts")}`,
+        );
+      }
+
+      let session;
+      try {
+        session = await ctx
+          .to(slack, {
+            channelId: measurementsChannelId,
+            installationTeamId: vercelWorkspaceId,
+            threadTs: posted.ts,
+          })
+          .send(prompt, { auth });
+      } catch (error) {
+        await callSlackApi({
+          botToken: slackCredentials.botToken,
+          context: { teamId: vercelWorkspaceId },
+          operation: "chat.delete",
+          body: { channel: measurementsChannelId, ts: posted.ts },
+        }).catch(() => undefined);
+        throw error;
+      }
+
+      const threadUrl = `https://vercel.slack.com/archives/${measurementsChannelId}/p${posted.ts.replace(".", "")}`;
       return Response.json(
-        { accepted: true, sessionId: session.id },
+        { accepted: true, sessionId: session.id, threadUrl },
         { status: 202 },
       );
     }),
