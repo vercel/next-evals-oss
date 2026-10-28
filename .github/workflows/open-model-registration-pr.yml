@@ -1,0 +1,97 @@
+name: Open a model registration PR
+
+run-name: Open model registration PR for ${{ inputs.branch || github.event.workflow_run.head_branch }}
+
+on:
+  workflow_run:
+    workflows: [Detect a model registration branch]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Existing v/register-* branch to backfill
+        required: true
+        type: string
+
+concurrency:
+  group: open-model-registration-pr-${{ inputs.branch || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  open:
+    name: Open the draft registration PR
+    if: >-
+      github.repository == 'vercel/next-evals-oss' &&
+      (
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.actor.login == 'roboeve[bot]' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          startsWith(github.event.workflow_run.head_branch, 'v/register-')
+        ) ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main'
+        )
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Open the draft PR and start its approval workflow
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          BRANCH: ${{ inputs.branch || github.event.workflow_run.head_branch }}
+        with:
+          script: |
+            const branch = process.env.BRANCH;
+            if (!/^v\/register-[a-z0-9][a-z0-9.-]*$/.test(branch)) {
+              throw new Error(`Invalid model registration branch: ${branch}`);
+            }
+
+            const { owner, repo } = context.repo;
+            const existing = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:${branch}`,
+              per_page: 10,
+            });
+            let prNumber = existing.data[0]?.number;
+            if (!prNumber) {
+              const commit = await github.rest.repos.getCommit({ owner, repo, ref: branch });
+              const created = await github.rest.pulls.create({
+                owner,
+                repo,
+                base: 'main',
+                head: branch,
+                title: commit.data.commit.message.split('\n', 1)[0].slice(0, 120),
+                draft: true,
+                body: `## Summary
+
+RoboEve detected model registration changes on \`${branch}\`. Repository automation opened this draft for human review before any credentialed eval runs.
+
+Two maintainers must approve the current head SHA. Any later push clears that approval gate.
+
+## Results
+
+Pending model evaluation.
+
+<!-- NEXT_JS_LLM -->`,
+              });
+              prNumber = created.data.number;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'model-pr-evals.yml',
+              ref: 'main',
+              inputs: { prNumber: String(prNumber), force: 'false' },
+            });

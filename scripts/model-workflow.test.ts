@@ -6,6 +6,14 @@ const workflowPath = new URL(
   '../.github/workflows/model-pr-evals.yml',
   import.meta.url,
 );
+const openerWorkflowPath = new URL(
+  '../.github/workflows/open-model-registration-pr.yml',
+  import.meta.url,
+);
+const detectorWorkflowPath = new URL(
+  '../.github/workflows/detect-model-registration-branch.yml',
+  import.meta.url,
+);
 const notificationPath = new URL(
   '../apps/release-agent/agent/lib/model-pr-notification.ts',
   import.meta.url,
@@ -35,7 +43,7 @@ test('model registration automation is restricted to merged main', async () => {
   );
   assert.match(
     workflow,
-    /github\.event\.pull_request\.user\.login == 'roboeve\[bot\]'[\s\S]*startsWith\(github\.event\.pull_request\.head\.ref, 'v\/register-'\)/,
+    /contains\(fromJSON\('\["roboeve\[bot\]", "github-actions\[bot\]"\]'\), github\.event\.pull_request\.user\.login\)[\s\S]*startsWith\(github\.event\.pull_request\.head\.ref, 'v\/register-'\)/,
   );
   assert.match(
     workflow,
@@ -73,6 +81,43 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/);
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
+});
+
+test('RoboEve branch detection is unprivileged', async () => {
+  const workflow = await readFile(detectorWorkflowPath, 'utf8');
+
+  assert.match(workflow, /push:\n    branches:\n      - v\/register-\*/);
+  assert.match(workflow, /permissions: \{\}/);
+  assert.doesNotMatch(workflow, /actions\/checkout/);
+  assert.doesNotMatch(workflow, /id-token: write/);
+  assert.doesNotMatch(workflow, /pull-requests: write/);
+});
+
+test('RoboEve branch detection opens a draft registration PR from main', async () => {
+  const workflow = await readFile(openerWorkflowPath, 'utf8');
+  const open = job(workflow, 'open');
+
+  assert.match(workflow, /workflow_run:/);
+  assert.match(workflow, /workflows: \[Detect a model registration branch\]/);
+  assert.match(workflow, /types: \[completed\]/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /schedule:/);
+  assert.match(open, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(open, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(open, /github\.event\.workflow_run\.actor\.login == 'roboeve\[bot\]'/);
+  assert.match(open, /github\.event\.workflow_run\.head_repository\.full_name == github\.repository/);
+  assert.match(open, /startsWith\(github\.event\.workflow_run\.head_branch, 'v\/register-'\)/);
+  assert.match(open, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(open, /actions: write/);
+  assert.match(open, /pull-requests: write/);
+  assert.doesNotMatch(open, /id-token: write/);
+  assert.doesNotMatch(open, /AI_GATEWAY_API_KEY/);
+  assert.doesNotMatch(open, /actions\/checkout/);
+  assert.match(open, /draft: true/);
+  assert.match(open, /pulls\.create/);
+  assert.match(open, /createWorkflowDispatch/);
+  assert.match(open, /workflow_id: 'model-pr-evals\.yml'/);
+  assert.match(open, /force: 'false'/);
 });
 
 test('duplicate model PR measurements are single-flight', async () => {

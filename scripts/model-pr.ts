@@ -174,8 +174,11 @@ export function selectModelExperiments(
   options: { requireApproval?: boolean } = {},
 ) {
   if (pullRequest.state !== 'open') fail('the pull request is not open');
-  if (pullRequest.user.login !== 'roboeve[bot]') {
-    fail('only RoboEve-authored pull requests run automatically');
+  if (
+    pullRequest.user.login !== 'roboeve[bot]' &&
+    pullRequest.user.login !== 'github-actions[bot]'
+  ) {
+    fail('only automation-authored pull requests run automatically');
   }
   if (pullRequest.base.ref !== 'main') fail('the base branch must be main');
   if (pullRequest.head.repo?.full_name !== repository) {

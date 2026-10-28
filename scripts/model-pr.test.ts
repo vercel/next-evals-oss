@@ -223,7 +223,7 @@ test('rejects non-bot and cross-repository pull requests', () => {
         'vercel/next-evals-oss',
         review,
       ),
-    /only RoboEve-authored/,
+    /only automation-authored/,
   );
   assert.throws(
     () =>
@@ -241,6 +241,16 @@ test('rejects non-bot and cross-repository pull requests', () => {
       ),
     /head branch must belong/,
   );
+});
+
+test('accepts registration PRs opened by the repository workflow', () => {
+  const selection = selectModelExperiments(
+    { ...pullRequest, user: { login: 'github-actions[bot]' } },
+    files,
+    'vercel/next-evals-oss',
+    review,
+  );
+  assert.equal(selection.number, pullRequest.number);
 });
 
 test('rejects changes outside model-registration paths', () => {
