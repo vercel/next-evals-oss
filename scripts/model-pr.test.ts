@@ -15,6 +15,7 @@ import {
   selectModelCandidate,
   selectModelExperiments,
   selectModelNotificationCandidate,
+  validateModelRegistrationBranch,
 } from './model-pr.js';
 
 test('normalizes harness model ids for the live Gateway probe', () => {
@@ -223,7 +224,7 @@ test('rejects non-bot and cross-repository pull requests', () => {
         'vercel/next-evals-oss',
         review,
       ),
-    /only RoboEve-authored/,
+    /only automation-authored/,
   );
   assert.throws(
     () =>
@@ -240,6 +241,35 @@ test('rejects non-bot and cross-repository pull requests', () => {
         review,
       ),
     /head branch must belong/,
+  );
+});
+
+test('accepts registration PRs opened by the repository workflow', () => {
+  const selection = selectModelExperiments(
+    { ...pullRequest, user: { login: 'github-actions[bot]' } },
+    files,
+    'vercel/next-evals-oss',
+    review,
+  );
+  assert.equal(selection.number, pullRequest.number);
+});
+
+test('validates orphan registration branches with the PR path rules', () => {
+  assert.deepEqual(
+    validateModelRegistrationBranch(pullRequest.head.ref, files),
+    [
+      {
+        base: 'gpt-6.1-sol-high',
+        experiments: [
+          'gpt-6.1-sol-high',
+          'gpt-6.1-sol-high--agents-md',
+        ],
+      },
+    ],
+  );
+  assert.throws(
+    () => validateModelRegistrationBranch('feature/not-registration', files),
+    /must start with v\/register-/,
   );
 });
 

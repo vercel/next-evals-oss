@@ -191,9 +191,15 @@ real re-runs.
 
 RoboEve model-registration pull requests run through
 [`model-pr-evals.yml`](.github/workflows/model-pr-evals.yml). The workflow accepts
-only same-repository branches created by `roboeve[bot]` under `v/register-*` whose
-exact head commit two distinct maintainers with write or admin access have
-approved in pull request reviews. Git author and committer identities are
+only same-repository branches under `v/register-*`. RoboEve can open the draft
+directly, and [`open-model-registration-pr.yml`](.github/workflows/open-model-registration-pr.yml)
+opens one when it pushes a valid registration branch without a pull request.
+The opener has no model or Vercel credentials. It applies the same paired-model
+and changed-path validation as the eval workflow, then dispatches the trusted
+`main` workflow so GitHub-authored PRs do not depend on their own events.
+
+The exact head commit needs approval from two distinct maintainers with write
+or admin access before model jobs run. Git author and committer identities are
 editable metadata, so they are not used for authorization. The experiment files
 are code the credentialed job executes, so those reviews are the gate: approve
 the pull request once the two new experiment files look right, and any later push

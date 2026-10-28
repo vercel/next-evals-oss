@@ -1,0 +1,139 @@
+name: Open a model registration PR
+
+run-name: Open model registration PR for ${{ inputs.branch || github.ref_name }}
+
+on:
+  push:
+    branches:
+      - v/register-*
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Existing v/register-* branch to backfill
+        required: true
+        type: string
+
+concurrency:
+  group: open-model-registration-pr-${{ inputs.branch || github.ref_name }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  open:
+    name: Open the draft registration PR
+    if: >-
+      github.repository == 'vercel/next-evals-oss' &&
+      (
+        (github.event_name == 'push' && github.actor == 'roboeve[bot]') ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      )
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Inspect the registration branch
+        id: inspect
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          BRANCH: ${{ inputs.branch || github.ref_name }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const branch = process.env.BRANCH;
+            if (!/^v\/register-[a-z0-9][a-z0-9.-]*$/.test(branch)) {
+              throw new Error(`Invalid model registration branch: ${branch}`);
+            }
+
+            const comparison = await github.rest.repos.compareCommitsWithBasehead({
+              ...context.repo,
+              basehead: `main...${branch}`,
+              per_page: 100,
+            });
+            if (comparison.data.ahead_by < 1) {
+              throw new Error(`${branch} has no commits ahead of main`);
+            }
+            if (!comparison.data.files || comparison.data.files.length >= 100) {
+              throw new Error(`${branch} has no complete, bounded file diff`);
+            }
+            fs.writeFileSync(
+              `${process.env.RUNNER_TEMP}/model-registration-files.json`,
+              JSON.stringify(comparison.data.files),
+            );
+
+            const commit = await github.rest.repos.getCommit({
+              ...context.repo,
+              ref: comparison.data.head_commit.sha,
+            });
+            core.setOutput(
+              'title',
+              commit.data.commit.message.split('\n', 1)[0].slice(0, 120),
+            );
+
+            const pulls = await github.rest.pulls.list({
+              ...context.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branch}`,
+              per_page: 10,
+            });
+            core.setOutput('pr-number', pulls.data[0]?.number ?? '');
+
+      - name: Validate the model pairs and changed paths
+        env:
+          MODEL_REGISTRATION_BRANCH: ${{ inputs.branch || github.ref_name }}
+          MODEL_REGISTRATION_FILES_JSON: ${{ runner.temp }}/model-registration-files.json
+        run: pnpm tsx scripts/model-pr.ts validate-branch
+
+      - name: Open the draft PR and start its approval workflow
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          BRANCH: ${{ inputs.branch || github.ref_name }}
+          EXISTING_PR_NUMBER: ${{ steps.inspect.outputs.pr-number }}
+          TITLE: ${{ steps.inspect.outputs.title }}
+        with:
+          script: |
+            let prNumber = Number(process.env.EXISTING_PR_NUMBER || 0);
+            if (!prNumber) {
+              const created = await github.rest.pulls.create({
+                ...context.repo,
+                base: 'main',
+                head: process.env.BRANCH,
+                title: process.env.TITLE,
+                draft: true,
+                body: `## Summary
+
+RoboEve detected model registration changes on \`${process.env.BRANCH}\`. Repository automation opened this draft so maintainers can review the exact model configs before any credentialed eval runs.
+
+Two maintainers must approve the current head SHA. Any later push clears that approval gate. Validated results are added to this branch for human review before merge.
+
+## Results
+
+Pending model evaluation.
+
+<!-- NEXT_JS_LLM -->`,
+              });
+              prNumber = created.data.number;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'model-pr-evals.yml',
+              ref: 'main',
+              inputs: { prNumber: String(prNumber), force: 'false' },
+            });
