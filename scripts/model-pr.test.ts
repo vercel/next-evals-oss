@@ -15,7 +15,6 @@ import {
   selectModelCandidate,
   selectModelExperiments,
   selectModelNotificationCandidate,
-  validateModelRegistrationBranch,
 } from './model-pr.js';
 
 test('normalizes harness model ids for the live Gateway probe', () => {
@@ -252,25 +251,6 @@ test('accepts registration PRs opened by the repository workflow', () => {
     review,
   );
   assert.equal(selection.number, pullRequest.number);
-});
-
-test('validates orphan registration branches with the PR path rules', () => {
-  assert.deepEqual(
-    validateModelRegistrationBranch(pullRequest.head.ref, files),
-    [
-      {
-        base: 'gpt-6.1-sol-high',
-        experiments: [
-          'gpt-6.1-sol-high',
-          'gpt-6.1-sol-high--agents-md',
-        ],
-      },
-    ],
-  );
-  assert.throws(
-    () => validateModelRegistrationBranch('feature/not-registration', files),
-    /must start with v\/register-/,
-  );
 });
 
 test('rejects changes outside model-registration paths', () => {

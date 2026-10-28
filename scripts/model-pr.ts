@@ -70,8 +70,6 @@ export function hasRequiredModelApprovals(approvedBy: string[]) {
   return approvedBy.length >= 2;
 }
 
-const MODEL_PR_AUTHORS = new Set(['roboeve[bot]', 'github-actions[bot]']);
-
 export function gatewayModelId(model: string, agent?: string) {
   const withoutProvider = model.startsWith('vercel/')
     ? model.slice('vercel/'.length)
@@ -139,7 +137,81 @@ export async function checkGatewayModelAccess(
   throw new Error(`AI Gateway access probe did not finish for ${gatewayModel}`);
 }
 
-export function selectModelRegistrationPairs(files: PullRequestFile[]) {
+async function probeModelAccess(experiment: string) {
+  const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
+  if (!apiKey) throw new Error('AI_GATEWAY_API_KEY is required');
+
+  const experimentPath = resolve('experiments', `${experiment}.ts`);
+  if (!existsSync(experimentPath)) {
+    throw new Error(`Unknown experiment: ${experiment}`);
+  }
+  const imported = (await import(pathToFileURL(experimentPath).href)) as {
+    default?: { agent?: unknown; model?: unknown };
+  };
+  const model = imported.default?.model;
+  if (typeof model !== 'string' || model.length === 0) {
+    throw new Error(`${experiment} does not define a string model`);
+  }
+  const agent = imported.default?.agent;
+  if (typeof agent !== 'string' || !agent.startsWith('vercel-ai-gateway/')) {
+    throw new Error(`${experiment} does not use a Vercel AI Gateway agent`);
+  }
+
+  const gatewayModel = await checkGatewayModelAccess(
+    model,
+    apiKey,
+    globalThis.fetch,
+    agent,
+  );
+  console.log(`AI Gateway access confirmed for ${gatewayModel}`);
+}
+
+export function selectModelExperiments(
+  pullRequest: PullRequestSnapshot,
+  files: PullRequestFile[],
+  repository: string,
+  review: PullRequestReview,
+  options: { requireApproval?: boolean } = {},
+) {
+  if (pullRequest.state !== 'open') fail('the pull request is not open');
+  if (
+    pullRequest.user.login !== 'roboeve[bot]' &&
+    pullRequest.user.login !== 'github-actions[bot]'
+  ) {
+    fail('only automation-authored pull requests run automatically');
+  }
+  if (pullRequest.base.ref !== 'main') fail('the base branch must be main');
+  if (pullRequest.head.repo?.full_name !== repository) {
+    fail('the head branch must belong to this repository');
+  }
+  if (!pullRequest.head.ref.startsWith('v/register-')) {
+    fail('the head branch must start with v/register-');
+  }
+  if (!/^[a-f0-9]{40}$/.test(pullRequest.head.sha)) {
+    fail('the head SHA is invalid');
+  }
+
+  // The experiment files are TypeScript that the credentialed job executes.
+  // Git author and committer identities are editable metadata, so require two
+  // distinct maintainers to approve exactly this head SHA. Any later push
+  // drops both approvals until the new head is reviewed.
+  const approvedBy = [
+    ...new Set(
+      review.approvals
+        .filter(
+          (approval) =>
+            approval.permission === 'admin' || approval.permission === 'write',
+        )
+        .map((approval) => approval.login),
+    ),
+  ].sort();
+  if (
+    options.requireApproval !== false &&
+    !hasRequiredModelApprovals(approvedBy)
+  ) {
+    fail('the head commit needs approving reviews from two maintainers');
+  }
+
   const added = new Set<string>();
   for (const file of files) {
     const match = file.filename.match(EXPERIMENT);
@@ -186,98 +258,15 @@ export function selectModelRegistrationPairs(files: PullRequestFile[]) {
     fail(`unexpected changed path ${file.filename}`);
   }
 
-  return bases.map((base) => ({
-    base,
-    experiments: [base, `${base}--agents-md`],
-  }));
-}
-
-export function validateModelRegistrationBranch(
-  branch: string,
-  files: PullRequestFile[],
-) {
-  if (!branch.startsWith('v/register-')) {
-    fail('the head branch must start with v/register-');
-  }
-  return selectModelRegistrationPairs(files);
-}
-
-async function probeModelAccess(experiment: string) {
-  const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
-  if (!apiKey) throw new Error('AI_GATEWAY_API_KEY is required');
-
-  const experimentPath = resolve('experiments', `${experiment}.ts`);
-  if (!existsSync(experimentPath)) {
-    throw new Error(`Unknown experiment: ${experiment}`);
-  }
-  const imported = (await import(pathToFileURL(experimentPath).href)) as {
-    default?: { agent?: unknown; model?: unknown };
-  };
-  const model = imported.default?.model;
-  if (typeof model !== 'string' || model.length === 0) {
-    throw new Error(`${experiment} does not define a string model`);
-  }
-  const agent = imported.default?.agent;
-  if (typeof agent !== 'string' || !agent.startsWith('vercel-ai-gateway/')) {
-    throw new Error(`${experiment} does not use a Vercel AI Gateway agent`);
-  }
-
-  const gatewayModel = await checkGatewayModelAccess(
-    model,
-    apiKey,
-    globalThis.fetch,
-    agent,
-  );
-  console.log(`AI Gateway access confirmed for ${gatewayModel}`);
-}
-
-export function selectModelExperiments(
-  pullRequest: PullRequestSnapshot,
-  files: PullRequestFile[],
-  repository: string,
-  review: PullRequestReview,
-  options: { requireApproval?: boolean } = {},
-) {
-  if (pullRequest.state !== 'open') fail('the pull request is not open');
-  if (!MODEL_PR_AUTHORS.has(pullRequest.user.login)) {
-    fail('only automation-authored pull requests run automatically');
-  }
-  if (pullRequest.base.ref !== 'main') fail('the base branch must be main');
-  if (pullRequest.head.repo?.full_name !== repository) {
-    fail('the head branch must belong to this repository');
-  }
-  const pairs = validateModelRegistrationBranch(pullRequest.head.ref, files);
-  if (!/^[a-f0-9]{40}$/.test(pullRequest.head.sha)) {
-    fail('the head SHA is invalid');
-  }
-
-  // The experiment files are TypeScript that the credentialed job executes.
-  // Git author and committer identities are editable metadata, so require two
-  // distinct maintainers to approve exactly this head SHA. Any later push
-  // drops both approvals until the new head is reviewed.
-  const approvedBy = [
-    ...new Set(
-      review.approvals
-        .filter(
-          (approval) =>
-            approval.permission === 'admin' || approval.permission === 'write',
-        )
-        .map((approval) => approval.login),
-    ),
-  ].sort();
-  if (
-    options.requireApproval !== false &&
-    !hasRequiredModelApprovals(approvedBy)
-  ) {
-    fail('the head commit needs approving reviews from two maintainers');
-  }
-
   return {
     number: pullRequest.number,
     headRef: pullRequest.head.ref,
     headSha: pullRequest.head.sha,
     approvedBy,
-    pairs,
+    pairs: bases.map((base) => ({
+      base,
+      experiments: [base, `${base}--agents-md`],
+    })),
   };
 }
 
@@ -392,23 +381,6 @@ function discover() {
     `Measuring PR #${candidate.number} at ${candidate.headSha}, approved by ${candidate.approvedBy.join(', ')}`,
   );
   writeOutput('should-run', 'true');
-}
-
-function validateBranch() {
-  const branch = process.env.MODEL_REGISTRATION_BRANCH;
-  const filesPath = process.env.MODEL_REGISTRATION_FILES_JSON;
-  if (!branch || !filesPath) {
-    throw new Error(
-      'MODEL_REGISTRATION_BRANCH and MODEL_REGISTRATION_FILES_JSON are required',
-    );
-  }
-  const files = JSON.parse(
-    readFileSync(filesPath, 'utf8'),
-  ) as PullRequestFile[];
-  const pairs = validateModelRegistrationBranch(branch, files);
-  console.log(
-    `Validated ${branch}: ${pairs.map((pair) => pair.base).join(', ')}`,
-  );
 }
 
 interface Summary {
@@ -585,7 +557,6 @@ function validateResults(experiments: string[]) {
 if (process.argv[1]?.endsWith('model-pr.ts')) {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'discover') discover();
-  else if (command === 'validate-branch') validateBranch();
   else if (command === 'validate-results') validateResults(args);
   else if (command === 'probe-model-access') {
     if (args.length !== 1) {
@@ -596,7 +567,7 @@ if (process.argv[1]?.endsWith('model-pr.ts')) {
     await probeModelAccess(args[0]);
   } else {
     throw new Error(
-      'Usage: model-pr.ts discover | validate-branch | probe-model-access <base-experiment> | validate-results <experiment...>',
+      'Usage: model-pr.ts discover | probe-model-access <base-experiment> | validate-results <experiment...>',
     );
   }
 }

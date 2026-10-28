@@ -191,12 +191,11 @@ real re-runs.
 
 RoboEve model-registration pull requests run through
 [`model-pr-evals.yml`](.github/workflows/model-pr-evals.yml). The workflow accepts
-only same-repository branches under `v/register-*`. RoboEve can open the draft
-directly, and [`open-model-registration-pr.yml`](.github/workflows/open-model-registration-pr.yml)
-opens one when it pushes a valid registration branch without a pull request.
-The opener has no model or Vercel credentials. It applies the same paired-model
-and changed-path validation as the eval workflow, then dispatches the trusted
-`main` workflow so GitHub-authored PRs do not depend on their own events.
+only same-repository branches under `v/register-*`. When RoboEve creates one of
+those branches without a pull request,
+[`open-model-registration-pr.yml`](.github/workflows/open-model-registration-pr.yml)
+opens a draft and dispatches the existing validation workflow. The opener runs
+from `main` and has no model or Vercel credentials.
 
 The exact head commit needs approval from two distinct maintainers with write
 or admin access before model jobs run. Git author and committer identities are

@@ -79,21 +79,22 @@ test('model registration automation is restricted to merged main', async () => {
   assert.match(workflow, /pnpm\/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6\.1\.0/);
 });
 
-test('RoboEve branches open validated draft registration PRs', async () => {
+test('RoboEve branch creation opens a draft registration PR', async () => {
   const workflow = await readFile(openerWorkflowPath, 'utf8');
   const open = job(workflow, 'open');
 
-  assert.match(workflow, /push:\n    branches:\n      - v\/register-\*/);
+  assert.match(workflow, /create:/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /schedule:/);
+  assert.match(open, /github\.event\.ref_type == 'branch'/);
   assert.match(open, /github\.actor == 'roboeve\[bot\]'/);
+  assert.match(open, /startsWith\(github\.event\.ref, 'v\/register-'\)/);
   assert.match(open, /github\.ref == 'refs\/heads\/main'/);
   assert.match(open, /actions: write/);
   assert.match(open, /pull-requests: write/);
   assert.doesNotMatch(open, /id-token: write/);
   assert.doesNotMatch(open, /AI_GATEWAY_API_KEY/);
-  assert.match(open, /ref: refs\/heads\/main/);
-  assert.match(open, /model-pr\.ts validate-branch/);
+  assert.doesNotMatch(open, /actions\/checkout/);
   assert.match(open, /draft: true/);
   assert.match(open, /pulls\.create/);
   assert.match(open, /createWorkflowDispatch/);
