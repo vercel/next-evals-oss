@@ -1,13 +1,16 @@
+import { appendFileSync, closeSync, constants, openSync } from "node:fs";
+
 // Both initial authentication and long-running Sandbox requests use the same
 // GitHub identity and scoped token exchange. No refresh token is stored.
 export async function exchangeCiToken({
   env = process.env,
   fetchImpl = globalThis.fetch,
   now = Date.now,
-  mask = (value) => console.log(`::add-mask::${value}`),
+  mask = (value) => maskCiCredential(value, env),
 } = {}) {
   const requestedAt = now();
   const oidcResponse = await fetchImpl(env.ACTIONS_ID_TOKEN_REQUEST_URL, {
+    redirect: "error",
     headers: {
       authorization: `bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`,
     },
@@ -30,6 +33,7 @@ export async function exchangeCiToken({
     "https://api.vercel.com/login/oauth/token",
     {
       method: "POST",
+      redirect: "error",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -65,4 +69,20 @@ export async function exchangeCiToken({
     githubOidcToken,
     expiresAt: requestedAt + expiresIn * 1000,
   };
+}
+
+function maskCiCredential(value, env) {
+  console.log(`::add-mask::${value}`);
+  if (env.EVAL_REDACTION_FILE) {
+    // Do not silently recreate a deleted history or follow a replacement link.
+    const fd = openSync(
+      env.EVAL_REDACTION_FILE,
+      constants.O_WRONLY | constants.O_APPEND | constants.O_NOFOLLOW,
+    );
+    try {
+      appendFileSync(fd, `${value}\n`);
+    } finally {
+      closeSync(fd);
+    }
+  }
 }

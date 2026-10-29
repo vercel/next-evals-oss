@@ -342,7 +342,9 @@ They exchange the GitHub Actions identity for a short-lived, project-scoped
 Vercel access token. That token and the non-secret team and project IDs
 authenticate Vercel Sandbox. During evals, the runner exchanges a fresh GitHub
 identity before the access token expires, including for existing Sandbox
-instances and confirmation runs. The AI Gateway key is unchanged. The same
+instances and confirmation runs. Issued credentials are masked in logs and
+recorded in a private runner-temporary file for the artifact leak check. This
+file is never uploaded. The AI Gateway key is unchanged. The same
 fresh GitHub identity authenticates the
 release agent's intake route. Restrict the Vercel CLI policy to this workflow
 on `vercel/next-evals-oss@main`. For the scoped project, allow `vc sandbox
