@@ -32,6 +32,7 @@ async function createFixture(
   await writeFile(
     mockFetch,
     `import assert from 'node:assert/strict'
+Date.now = () => 1_000_000
 globalThis.fetch = async (url, init = {}) => {
   if (url === process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
     assert.equal(init.headers.authorization, 'bearer test-request-token')
@@ -44,7 +45,7 @@ globalThis.fetch = async (url, init = {}) => {
     assert.equal(params.get('client_id'), 'test-client-id')
     assert.equal(params.get('subject_token'), 'test.github.oidc')
     assert.equal(params.get('team_id_or_slug'), 'team_test')
-    return new Response(JSON.stringify({ access_token: 'test-access-token' }))
+    return new Response(JSON.stringify({ access_token: 'test-access-token', expires_in: 600 }))
   }
   assert.equal(
     url.toString(),
@@ -85,6 +86,9 @@ test("exports short-lived Sandbox and workflow credentials", async (t) => {
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_TOKEN=test-access-token\n" +
+      "VERCEL_TOKEN_EXPIRES_AT=1600000\n" +
+      "VERCEL_CLI_CLIENT_ID=test-client-id\n" +
+      "VERCEL_ORG_ID=team_test\n" +
       "VERCEL_TEAM_ID=team_test\n" +
       "VERCEL_PROJECT_ID=test-project\n" +
       "RELEASE_WORKFLOW_OIDC_TOKEN=test.github.oidc\n",
@@ -101,6 +105,9 @@ test("normalizes surrounding whitespace in the Gateway credential", async (t) =>
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_TOKEN=test-access-token\n" +
+      "VERCEL_TOKEN_EXPIRES_AT=1600000\n" +
+      "VERCEL_CLI_CLIENT_ID=test-client-id\n" +
+      "VERCEL_ORG_ID=team_test\n" +
       "VERCEL_TEAM_ID=team_test\n" +
       "VERCEL_PROJECT_ID=test-project\n" +
       "RELEASE_WORKFLOW_OIDC_TOKEN=test.github.oidc\n" +
@@ -117,6 +124,9 @@ test("exports the budgeted Gateway key when a job runs models", async (t) => {
   assert.equal(
     await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_TOKEN=test-access-token\n" +
+      "VERCEL_TOKEN_EXPIRES_AT=1600000\n" +
+      "VERCEL_CLI_CLIENT_ID=test-client-id\n" +
+      "VERCEL_ORG_ID=team_test\n" +
       "VERCEL_TEAM_ID=team_test\n" +
       "VERCEL_PROJECT_ID=test-project\n" +
       "RELEASE_WORKFLOW_OIDC_TOKEN=test.github.oidc\n" +

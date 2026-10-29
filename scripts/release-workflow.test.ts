@@ -11,6 +11,14 @@ const notificationSchemaPath = new URL(
   import.meta.url,
 );
 
+test('release scoring and confirmations both load the Sandbox refresh hook', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  for (const step of ['Run all evals against the release package', 'Confirm first-attempt model failures']) {
+    const body = workflow.split(`- name: ${step}\n`)[1].split('\n      - name:')[0];
+    assert.match(body, /NODE_OPTIONS: --import=\$\{\{ github\.workspace \}\}\/scripts\/ci-sandbox-auth\.mjs/);
+  }
+});
+
 test('release automation is standalone and restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /workflow_dispatch:/);

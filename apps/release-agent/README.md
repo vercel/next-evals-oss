@@ -1,7 +1,7 @@
 # Next.js release evals agent
 
-This Eve agent receives validated standalone release, backport, and canary
-reports from the reusable GitHub Actions workflow. It writes a decision-focused
+This Eve agent receives validated release, backport, and canary reports
+from the standalone GitHub Actions workflow. It writes a decision-focused
 report in
 `team-agent-measurements`, follows it with detailed task, agent, and failure
 replies, and answers questions from the compact pass@1 report carried in that
@@ -22,9 +22,14 @@ inspect transcripts, evaluator output, and command logs. The agent's
 `query_evals` tool continues to answer separate questions about the currently
 published `nextjs.org/evals` data.
 
-The intake route accepts only a Vercel OIDC token minted for the
-`vercel-labs/next.js` project in its Development environment. Slack credentials
-and inbound webhook verification are managed by the
+The intake route accepts only GitHub Actions OIDC tokens for
+`vercel/next-evals-oss` on `main`. Model PR outcomes are posted directly to the
+saved Slack parent message and acknowledged only after Slack accepts the reply.
+Eve remains available for questions in that thread. Older checks without a
+parent timestamp are recovered from the bot's original message for that PR and
+commit. If it cannot be found, reporting fails instead of creating a new root.
+
+Slack credentials and inbound webhook verification are managed by the
 `slack/next-evals-release-agent` Vercel Connect connector; there is no Slack
 token or webhook URL in GitHub.
 

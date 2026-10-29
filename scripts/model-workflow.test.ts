@@ -146,6 +146,7 @@ test('model notifications use short-lived OIDC and one durable Slack thread', as
   assert.match(notify, /core\.getIDToken\('https:\/\/github\.com\/vercel'\)/);
   assert.match(notify, /checks\.listForRef/);
   assert.match(notify, /confirmedPrefix = 'eve-slack-session:';/);
+  assert.match(notify, /threadPrefix = 'eve-slack-thread:';/);
   assert.match(notify, /legacyThreadLink = '\[one Slack thread\]\(https:\/\/vercel\.slack\.com\/archives\/'/);
   assert.doesNotMatch(notify, /run\.details_url\?\.startsWith/);
   assert.match(notify, /checks\.create/);
@@ -154,10 +155,61 @@ test('model notifications use short-lived OIDC and one durable Slack thread', as
   assert.match(report, /id-token: write/);
   assert.match(report, /actions: read/);
   assert.match(report, /sessionId: process\.env\.SESSION_ID/);
+  assert.match(report, /threadTs: process\.env\.THREAD_TS/);
   assert.match(report, /actions\.listJobsForWorkflowRun/);
   assert.match(report, /failure/);
   assert.match(report, /checks\.update/);
   assert.doesNotMatch(workflow, /SLACK_BOT_TOKEN/);
+});
+
+test('a rerun reuses the Slack parent saved by the outcome step', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const script = (name: string) => job(workflow, name).split('          script: |\n')[1]
+    .split('\n').map((line) => line.slice(12)).join('\n');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const outputs: Record<string, string> = {};
+  let check: Record<string, unknown> | undefined;
+  let notifications = 0;
+  const threadTs = '1793203626.792579';
+  const threadUrl = 'https://vercel.slack.com/archives/C0C7VCBP4CA/p1793203626792579';
+  const env = {
+    RELEASE_AGENT_URL: 'https://agent.example.test',
+    PR_NUMBER: '161', HEAD_SHA: 'a'.repeat(40), PAIRS_JSON: '[]',
+    SESSION_ID: 'wrun_test', THREAD_TS: threadTs, CHECK_RUN_ID: '42',
+    EXPORT_RESULT: 'success', UPDATE_RESULT: 'success',
+  };
+  const core = {
+    getIDToken: async () => 'test-oidc', setSecret() {},
+    setOutput: (name: string, value: string) => { outputs[name] = value; },
+  };
+  const github = { rest: { checks: {
+    update: async (value: Record<string, unknown>) => { check = { ...value, id: 42 }; },
+    listForRef: async () => ({ data: { check_runs: [check] } }),
+  } } };
+  const context = { repo: { owner: 'vercel', repo: 'next-evals-oss' }, serverUrl: 'https://github.com', runId: 123 };
+  const fetch = async (_url: string, init: RequestInit) => {
+    notifications++;
+    const payload = JSON.parse(String(init.body));
+    assert.equal(payload.threadTs, threadTs);
+    assert.equal(payload.event, 'run_succeeded');
+    return Response.json({ accepted: true, threadTs, threadUrl });
+  };
+  await new AsyncFunction('github', 'core', 'context', 'fetch', 'process', script('report'))(
+    github, core, context, fetch, { env },
+  );
+  assert.equal(check?.external_id, `eve-slack-thread:${threadTs}:wrun_test`);
+  await new AsyncFunction('github', 'core', 'context', 'fetch', 'process', script('notify'))(
+    github, core, context, fetch, { env },
+  );
+  assert.equal(notifications, 1);
+  assert.equal(outputs['thread-ts'], threadTs);
+  assert.equal(outputs['session-id'], 'wrun_test');
+  assert.equal(outputs['check-run-id'], '42');
+});
+
+test('long-running model evals load the Sandbox refresh hook', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  assert.match(job(workflow, 'evaluate'), /NODE_OPTIONS: --import=\$\{\{ github\.workspace \}\}\/scripts\/ci-sandbox-auth\.mjs/);
 });
 
 test('model failure notifications are classified without raw logs', async () => {
@@ -165,8 +217,8 @@ test('model failure notifications are classified without raw logs', async () => 
   assert.match(notification, /event: z\.literal\("run_failed"\)/);
   assert.match(notification, /stage: z\.string\(\)\.min\(1\)\.max\(80\)/);
   assert.match(notification, /summary: z\.string\(\)\.min\(1\)\.max\(240\)/);
-  assert.match(notification, /without adding speculation/);
-  assert.match(notification, /Do not quote raw logs/);
+  assert.match(notification, /export function modelPrOutcomeText/);
+  assert.doesNotMatch(notification, /Reply concisely in this existing Slack thread/);
 });
 
 test('credentialed model jobs run main code plus only the new experiment files', async () => {

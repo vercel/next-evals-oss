@@ -26,11 +26,19 @@ export const modelPrNotificationSchema = z.discriminatedUnion("event", [
   z.object({
     event: z.literal("run_succeeded"),
     sessionId: z.string().min(1).max(256),
+    threadTs: z
+      .string()
+      .regex(/^\d+\.\d{6}$/)
+      .optional(),
     ...common,
   }),
   z.object({
     event: z.literal("run_failed"),
     sessionId: z.string().min(1).max(256),
+    threadTs: z
+      .string()
+      .regex(/^\d+\.\d{6}$/)
+      .optional(),
     failure: z
       .object({
         stage: z.string().min(1).max(80),
@@ -44,6 +52,25 @@ export const modelPrNotificationSchema = z.discriminatedUnion("event", [
 export type ModelPrNotification = z.infer<typeof modelPrNotificationSchema>;
 
 export const modelPrThreadReady = "MODEL_EVAL_THREAD_READY";
+
+export type ModelPrOutcome = Extract<
+  ModelPrNotification,
+  {
+    event: "run_succeeded" | "run_failed";
+  }
+>;
+
+export function modelPrOutcomeText(payload: ModelPrOutcome) {
+  const pr = `<${payload.prUrl}|PR #${payload.prNumber}>`;
+  const run = `<${payload.workflowUrl}|Workflow>`;
+  if (payload.event === "run_succeeded") {
+    return `Model evals finished. Validated results were added to ${pr} for review and merge. ${run}`;
+  }
+  if (payload.failure) {
+    return `Model evals for ${pr} failed during ${payload.failure.stage}: ${payload.failure.summary} ${run}`;
+  }
+  return `Model evals for ${pr} failed and need attention. ${run}`;
+}
 
 function models(payload: ModelPrNotification) {
   return payload.pairs.map((pair) => `\`${pair.base}\``).join(", ");
@@ -62,25 +89,15 @@ export function modelPrNotificationRoot(payload: ModelPrNotification) {
   throw new Error("Only a new model eval thread has a root notification");
 }
 
-export function modelPrNotificationPrompt(payload: ModelPrNotification) {
-  const shared = [
-    `Pull request: ${payload.prUrl}`,
-    `Exact head SHA: ${payload.headSha}`,
-    `Models: ${models(payload)}`,
-    `Workflow: ${payload.workflowUrl}`,
-  ].join("\n");
-
-  if (payload.event === "approval_required") {
-    return `The approval request is already visible in the Slack thread root. Respond with exactly ${modelPrThreadReady} and nothing else.`;
-  }
-  if (payload.event === "run_started") {
-    return `The model eval start is already visible in the Slack thread root. Respond with exactly ${modelPrThreadReady} and nothing else.`;
-  }
-  if (payload.event === "run_succeeded") {
-    return `Reply concisely in this existing Slack thread that the model eval run finished successfully, the validated results were added to PR #${payload.prNumber}, and the PR is ready for human review and merge. Include the PR and workflow links. Do not repeat the original message or start a new report.\n\n${shared}`;
-  }
-  if (payload.event === "run_failed" && payload.failure) {
-    return `Reply concisely in this existing Slack thread that the model eval run failed during ${payload.failure.stage}. Use this exact failure description without adding speculation: ${payload.failure.summary} Include PR #${payload.prNumber} and the workflow link. Do not quote raw logs, repeat the original message, or start a new report.\n\n${shared}`;
-  }
-  return `Reply concisely in this existing Slack thread that the model eval run failed and needs attention. Include PR #${payload.prNumber} and the workflow link. Do not repeat the original message or start a new report.\n\n${shared}`;
+export function modelPrNotificationPrompt(
+  payload: Extract<
+    ModelPrNotification,
+    { event: "approval_required" | "run_started" }
+  >,
+) {
+  const subject =
+    payload.event === "approval_required"
+      ? "approval request"
+      : "model eval start";
+  return `The ${subject} is already visible in the Slack thread root. Respond with exactly ${modelPrThreadReady} and nothing else.`;
 }

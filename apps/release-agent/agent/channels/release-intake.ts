@@ -11,6 +11,7 @@ import {
   modelPrNotificationPrompt,
   modelPrNotificationSchema,
 } from "../lib/model-pr-notification";
+import { modelThreadUrl, postModelPrOutcome } from "../lib/model-pr-slack";
 import {
   releaseNotificationSchema,
   releaseSummaryPrompt,
@@ -22,8 +23,7 @@ import slack, {
 } from "./slack";
 
 const maxPayloadBytes = 512 * 1024;
-const releaseWorkflowSubject =
-  "repo:vercel/next-evals-oss:ref:refs/heads/main";
+const releaseWorkflowSubject = "repo:vercel/next-evals-oss:ref:refs/heads/main";
 const releaseWorkflowIssuer = "https://token.actions.githubusercontent.com";
 const releaseWorkflowAudience = "https://github.com/vercel";
 
@@ -39,7 +39,9 @@ export default defineChannel({
         },
       );
       if (!authResult.ok) {
-        return createUnauthorizedResponse({ challenges: [{ scheme: "Bearer" }] });
+        return createUnauthorizedResponse({
+          challenges: [{ scheme: "Bearer" }],
+        });
       }
       const auth = authResult.sessionAuth;
 
@@ -83,7 +85,9 @@ export default defineChannel({
         },
       );
       if (!authResult.ok) {
-        return createUnauthorizedResponse({ challenges: [{ scheme: "Bearer" }] });
+        return createUnauthorizedResponse({
+          challenges: [{ scheme: "Bearer" }],
+        });
       }
       const auth = authResult.sessionAuth;
 
@@ -104,15 +108,22 @@ export default defineChannel({
         return Response.json({ error: "invalid_payload" }, { status: 400 });
       }
 
-      const prompt = modelPrNotificationPrompt(parsed.data);
       if (
         parsed.data.event === "run_succeeded" ||
         parsed.data.event === "run_failed"
       ) {
-        ctx.waitUntil(
-          ctx.attachSession(parsed.data.sessionId).send(prompt, { auth }),
+        const thread = await postModelPrOutcome(
+          parsed.data,
+          measurementsChannelId,
+          (operation, body) =>
+            callSlackApi({
+              botToken: slackCredentials.botToken,
+              context: { teamId: vercelWorkspaceId },
+              operation,
+              body,
+            }),
         );
-        return Response.json({ accepted: true }, { status: 202 });
+        return Response.json({ accepted: true, ...thread });
       }
 
       const posted = await callSlackApi({
@@ -140,7 +151,7 @@ export default defineChannel({
             installationTeamId: vercelWorkspaceId,
             threadTs: posted.ts,
           })
-          .send(prompt, { auth });
+          .send(modelPrNotificationPrompt(parsed.data), { auth });
       } catch (error) {
         await callSlackApi({
           botToken: slackCredentials.botToken,
@@ -151,9 +162,14 @@ export default defineChannel({
         throw error;
       }
 
-      const threadUrl = `https://vercel.slack.com/archives/${measurementsChannelId}/p${posted.ts.replace(".", "")}`;
+      const threadUrl = modelThreadUrl(measurementsChannelId, posted.ts);
       return Response.json(
-        { accepted: true, sessionId: session.id, threadUrl },
+        {
+          accepted: true,
+          sessionId: session.id,
+          threadTs: posted.ts,
+          threadUrl,
+        },
         { status: 202 },
       );
     }),
