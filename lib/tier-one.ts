@@ -2,9 +2,8 @@
  * Experiments kept fresh for the public board.
  *
  * Keep the retention rationale in README.md's "Model retention policy" in
- * sync when this list changes. Release automation uses the AI Gateway subset
- * below so direct agents can remain on the public board without requiring
- * provider-specific credentials in CI.
+ * sync when this list changes. Release automation uses a separate selection
+ * below to control recurring spend without changing the public board.
  */
 export const TIER_ONE_EXPERIMENTS = [
   // Fable 5.1 shipped at least 84 days after Fable 5, outside the
@@ -33,14 +32,13 @@ export const TIER_ONE_EXPERIMENTS = [
   'pixel-canary',
 ] as const;
 
-const RELEASE_EXCLUDED_EXPERIMENTS = new Set<string>([
-  // Cursor is a direct agent and is no longer a model we want to measure on
-  // every Next.js release. Keep its existing results on the public board.
-  'cursor-composer-2.5',
+const RELEASE_SELECTED_EXPERIMENTS = new Set<string>([
+  // Temporarily use one inexpensive AI Gateway model to limit recurring spend.
+  'gpt-6-luna-high',
 ]);
 
 export const TIER_ONE_RELEASE_EXPERIMENTS = TIER_ONE_EXPERIMENTS.filter(
-  (name) => !RELEASE_EXCLUDED_EXPERIMENTS.has(name),
+  (name) => RELEASE_SELECTED_EXPERIMENTS.has(name),
 );
 
 export const TIER_ONE_RELEASE_MATRIX = TIER_ONE_RELEASE_EXPERIMENTS.flatMap(

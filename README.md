@@ -290,8 +290,12 @@ build-and-deploy run, and source branch before any model job starts. Existing
 verified automation-authored measurement pull requests are skipped unless a
 maintainer explicitly requests a forced manual rerun.
 
-The workflow runs every tier-1 model both with and without AGENTS.md against a
-fixed eval suite. Existing Next.js fixtures install the exact published package,
+To limit recurring spend, scheduled and manual release runs temporarily use only
+GPT-6 Luna (high), with and without AGENTS.md, against the full fixed eval suite.
+The selection is in `RELEASE_SELECTED_EXPERIMENTS` in
+[`lib/tier-one.ts`](lib/tier-one.ts); expand it when broader runs are needed.
+New-model PR runs and the public board's tier-1 list are unchanged.
+Existing Next.js fixtures install the exact published package,
 so agents read the documentation bundled in that release from
 `node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
 the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
