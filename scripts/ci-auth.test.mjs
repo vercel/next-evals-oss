@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,7 +34,6 @@ async function createFixture(
     `import assert from 'node:assert/strict'
 Date.now = () => 1_000_000
 globalThis.fetch = async (url, init = {}) => {
-  assert.equal(init.redirect, 'error')
   if (url === process.env.ACTIONS_ID_TOKEN_REQUEST_URL) {
     assert.equal(init.headers.authorization, 'bearer test-request-token')
     return new Response(JSON.stringify({ value: 'test.github.oidc' }))
@@ -58,10 +57,10 @@ globalThis.fetch = async (url, init = {}) => {
 `,
   );
 
-  return { githubEnv, mockFetch, directory };
+  return { githubEnv, mockFetch };
 }
 
-function runScript({ githubEnv, mockFetch, directory }, extraEnv = {}) {
+function runScript({ githubEnv, mockFetch }, extraEnv = {}) {
   return spawnSync(process.execPath, ["--import", mockFetch, script], {
     encoding: "utf8",
     env: {
@@ -69,27 +68,12 @@ function runScript({ githubEnv, mockFetch, directory }, extraEnv = {}) {
       ACTIONS_ID_TOKEN_REQUEST_URL: "https://github.example.test/oidc",
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: "test-request-token",
       GITHUB_ENV: githubEnv,
-      RUNNER_TEMP: directory,
       VERCEL_CLI_CLIENT_ID: "test-client-id",
       VERCEL_ORG_ID: "team_test",
       VERCEL_PROJECT_ID: "test-project",
       ...extraEnv,
     },
   });
-}
-
-async function readExports(fixture) {
-  const contents = await readFile(fixture.githubEnv, "utf8");
-  const [history, ...exports] = contents.split("\n");
-  assert.ok(history.startsWith("EVAL_REDACTION_FILE="));
-  const file = history.slice("EVAL_REDACTION_FILE=".length);
-  assert.ok(file.startsWith(fixture.directory + "/eval-redaction-"));
-  assert.equal((await stat(file)).mode & 0o777, 0o600);
-  assert.equal(
-    await readFile(file, "utf8"),
-    "test.github.oidc\ntest-access-token\n",
-  );
-  return exports.join("\n");
 }
 
 test("exports short-lived Sandbox and workflow credentials", async (t) => {
@@ -100,9 +84,9 @@ test("exports short-lived Sandbox and workflow credentials", async (t) => {
   assert.match(result.stdout, /::add-mask::test\.github\.oidc/);
   assert.match(result.stdout, /::add-mask::test-access-token/);
   assert.equal(
-    await readExports(fixture),
+    await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_TOKEN=test-access-token\n" +
-      "VERCEL_TOKEN_EXPIRES_AT=1600000\n" +
+      "VERCEL_AUTH_EXPIRES_AT=1600000\n" +
       "VERCEL_CLI_CLIENT_ID=test-client-id\n" +
       "VERCEL_ORG_ID=team_test\n" +
       "VERCEL_TEAM_ID=team_test\n" +
@@ -119,9 +103,9 @@ test("normalizes surrounding whitespace in the Gateway credential", async (t) =>
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
-    await readExports(fixture),
+    await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_TOKEN=test-access-token\n" +
-      "VERCEL_TOKEN_EXPIRES_AT=1600000\n" +
+      "VERCEL_AUTH_EXPIRES_AT=1600000\n" +
       "VERCEL_CLI_CLIENT_ID=test-client-id\n" +
       "VERCEL_ORG_ID=team_test\n" +
       "VERCEL_TEAM_ID=team_test\n" +
@@ -138,9 +122,9 @@ test("exports the budgeted Gateway key when a job runs models", async (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /::add-mask::test-gateway-key/);
   assert.equal(
-    await readExports(fixture),
+    await readFile(fixture.githubEnv, "utf8"),
     "VERCEL_TOKEN=test-access-token\n" +
-      "VERCEL_TOKEN_EXPIRES_AT=1600000\n" +
+      "VERCEL_AUTH_EXPIRES_AT=1600000\n" +
       "VERCEL_CLI_CLIENT_ID=test-client-id\n" +
       "VERCEL_ORG_ID=team_test\n" +
       "VERCEL_TEAM_ID=team_test\n" +

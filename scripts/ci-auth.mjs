@@ -1,5 +1,4 @@
-import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync } from "node:fs";
 import { exchangeCiToken } from "./ci-token.mjs";
 
 const required = [
@@ -9,20 +8,11 @@ const required = [
   "VERCEL_ORG_ID",
   "VERCEL_PROJECT_ID",
   "GITHUB_ENV",
-  "RUNNER_TEMP",
 ];
 const missing = required.filter((name) => !process.env[name]);
 if (missing.length > 0) {
   throw new Error(`Missing CI authentication values: ${missing.join(", ")}`);
 }
-// Kept outside every result/artifact tree. Later steps need all issued values
-// for leak detection, including credentials refreshed in runner subprocesses.
-const redactionFile = join(
-  mkdtempSync(join(process.env.RUNNER_TEMP, "eval-redaction-")),
-  "credentials.txt",
-);
-writeFileSync(redactionFile, "", { flag: "wx", mode: 0o600 });
-process.env.EVAL_REDACTION_FILE = redactionFile;
 const { accessToken, githubOidcToken, expiresAt } = await exchangeCiToken();
 
 let gatewayCredential = "";
@@ -61,5 +51,5 @@ if (process.env.REQUIRE_AI_GATEWAY_API_KEY === "1") {
 // credential is persisted in GitHub.
 appendFileSync(
   process.env.GITHUB_ENV,
-  `EVAL_REDACTION_FILE=${redactionFile}\nVERCEL_TOKEN=${accessToken}\nVERCEL_TOKEN_EXPIRES_AT=${expiresAt}\nVERCEL_CLI_CLIENT_ID=${process.env.VERCEL_CLI_CLIENT_ID}\nVERCEL_ORG_ID=${process.env.VERCEL_ORG_ID}\nVERCEL_TEAM_ID=${process.env.VERCEL_ORG_ID}\nVERCEL_PROJECT_ID=${process.env.VERCEL_PROJECT_ID}\nRELEASE_WORKFLOW_OIDC_TOKEN=${githubOidcToken}\n${gatewayCredential}`,
+  `VERCEL_TOKEN=${accessToken}\nVERCEL_AUTH_EXPIRES_AT=${expiresAt}\nVERCEL_CLI_CLIENT_ID=${process.env.VERCEL_CLI_CLIENT_ID}\nVERCEL_ORG_ID=${process.env.VERCEL_ORG_ID}\nVERCEL_TEAM_ID=${process.env.VERCEL_ORG_ID}\nVERCEL_PROJECT_ID=${process.env.VERCEL_PROJECT_ID}\nRELEASE_WORKFLOW_OIDC_TOKEN=${githubOidcToken}\n${gatewayCredential}`,
 );

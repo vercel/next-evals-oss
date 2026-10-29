@@ -3,12 +3,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 
 const sensitiveName = /(TOKEN|SECRET|PASSWORD|PRIVATE_KEY|API_KEY|CREDENTIAL)/i;
-const ignoredNames = new Set([
-  "GPG_KEY",
-  "VERCEL_ORG_ID",
-  "VERCEL_PROJECT_ID",
-  "VERCEL_TOKEN_EXPIRES_AT",
-]);
+const ignoredNames = new Set(["GPG_KEY", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID"]);
 
 export function sensitiveEnvironment(env = process.env) {
   return Object.entries(env).filter(
@@ -35,14 +30,6 @@ function readableBytes(path) {
 
 export function findSecretLeaks(paths, env = process.env) {
   const secrets = sensitiveEnvironment(env);
-  if (env.EVAL_REDACTION_FILE) {
-    // The runner records rotations here because child process env changes do
-    // not reach this later CI step. Missing history must fail the artifact gate.
-    const issued = readFileSync(env.EVAL_REDACTION_FILE, "utf8").split("\n");
-    for (const value of new Set(issued.filter(Boolean))) {
-      secrets.push(["issued CI credential", value]);
-    }
-  }
   return paths.flatMap((path) =>
     filesAt(path).flatMap((file) => {
       const contents = readableBytes(file);

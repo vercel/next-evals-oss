@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { appendFileSync } from "node:fs";
 import { exchangeCiToken } from "./ci-token.mjs";
 
 // agent-eval passes a fixed token to the Sandbox SDK. Refresh at its transport
@@ -9,7 +11,7 @@ export function createCiSandboxFetch({
   exchange = () => exchangeCiToken({ env, fetchImpl, now }),
 } = {}) {
   let token = env.VERCEL_TOKEN;
-  let expiresAt = Number(env.VERCEL_TOKEN_EXPIRES_AT);
+  let expiresAt = Number(env.VERCEL_AUTH_EXPIRES_AT);
   if (!token || !Number.isFinite(expiresAt) || expiresAt <= 0) {
     throw new Error(
       "Run ci-auth.mjs before enabling Sandbox credential refresh",
@@ -25,11 +27,21 @@ export function createCiSandboxFetch({
     if (!refreshing) {
       refreshing = exchange()
         .then((credentials) => {
+          if (env.GITHUB_ENV) {
+            // Preserve each rotation for the existing artifact scanner in later
+            // steps. These stay in this job, not in repository secret settings.
+            const id = randomUUID().replaceAll("-", "");
+            appendFileSync(
+              env.GITHUB_ENV,
+              `EVAL_REFRESHED_TOKEN_${id}=${credentials.accessToken}\n` +
+                `EVAL_REFRESHED_OIDC_TOKEN_${id}=${credentials.githubOidcToken}\n`,
+            );
+          }
           token = credentials.accessToken;
           expiresAt = credentials.expiresAt;
           issuedTokens.add(token);
           env.VERCEL_TOKEN = token;
-          env.VERCEL_TOKEN_EXPIRES_AT = String(expiresAt);
+          env.VERCEL_AUTH_EXPIRES_AT = String(expiresAt);
           return token;
         })
         .finally(() => {

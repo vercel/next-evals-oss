@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { dirname } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { findSecretLeaks } from "./assert-no-secrets.mjs";
 import { createCiSandboxFetch } from "./ci-sandbox-fetch.mjs";
 import { exchangeCiToken } from "./ci-token.mjs";
 
@@ -13,7 +16,7 @@ function fixture(fetchImpl = async () => new Response("{}")) {
   let exchanges = 0;
   const env = {
     VERCEL_TOKEN: initialToken,
-    VERCEL_TOKEN_EXPIRES_AT: String(time + 600_000),
+    VERCEL_AUTH_EXPIRES_AT: String(time + 600_000),
   };
   const fetch = createCiSandboxFetch({
     env,
@@ -37,6 +40,74 @@ function fixture(fetchImpl = async () => new Response("{}")) {
   };
 }
 const auth = { authorization: `Bearer ${initialToken}` };
+
+test("the existing artifact scanner sees every refreshed credential in later steps", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "eval-refresh-env-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const githubEnv = join(directory, "github-env");
+  let clock = 1_000_000;
+  let issued = 0;
+  const fetch = createCiSandboxFetch({
+    env: {
+      VERCEL_TOKEN: initialToken,
+      VERCEL_AUTH_EXPIRES_AT: "1",
+      GITHUB_ENV: githubEnv,
+    },
+    now: () => clock,
+    exchange: async () => {
+      issued++;
+      return {
+        accessToken: `test-rotated-${issued}`,
+        githubOidcToken: `test.identity.${issued}`,
+        expiresAt: clock + 600_000,
+      };
+    },
+    fetchImpl: async () => Response.json({}),
+  });
+  await fetch(sandboxUrl, { headers: auth });
+  clock += 600_000;
+  await fetch(sandboxUrl, { headers: auth });
+  // GitHub loads this file into the next step, independent of the eval process.
+  const nextStepEnv = Object.fromEntries(
+    (await readFile(githubEnv, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => line.split("=")),
+  );
+  assert.equal(Object.keys(nextStepEnv).length, 4);
+  assert.equal(nextStepEnv.VERCEL_TOKEN, undefined);
+  const output = join(directory, "result.json");
+  for (const credential of [
+    "test-rotated-1",
+    "test.identity.1",
+    "test-rotated-2",
+    "test.identity.2",
+  ]) {
+    await writeFile(output, JSON.stringify({ output: credential }));
+    const leaks = findSecretLeaks([output], nextStepEnv);
+    assert.equal(leaks.length, 1);
+    assert.match(leaks[0].name, /^EVAL_REFRESHED_(OIDC_)?TOKEN_/);
+  }
+});
+
+test("a failed environment write blocks using an unregistered refreshed token", async () => {
+  const fetch = createCiSandboxFetch({
+    env: {
+      VERCEL_TOKEN: initialToken,
+      VERCEL_AUTH_EXPIRES_AT: "1",
+      GITHUB_ENV: "/nonexistent-evals-dir/github-env",
+    },
+    exchange: async () => ({
+      accessToken: "test-new-token",
+      githubOidcToken: "test.identity.1",
+      expiresAt: Date.now() + 600_000,
+    }),
+    fetchImpl: async () => {
+      throw new Error("must not send an unregistered token");
+    },
+  });
+  await assert.rejects(fetch(sandboxUrl, { headers: auth }), /ENOENT/);
+});
 
 test("renews before expiry, sharing one exchange across concurrent Sandbox requests", async () => {
   const received = [];
@@ -112,7 +183,7 @@ test("fails closed on exchange failure and never replays a denied command", asyn
   assert.equal(sends, 1);
   assert.equal(f.exchanges(), 0);
   const expired = createCiSandboxFetch({
-    env: { VERCEL_TOKEN: initialToken, VERCEL_TOKEN_EXPIRES_AT: "1" },
+    env: { VERCEL_TOKEN: initialToken, VERCEL_AUTH_EXPIRES_AT: "1" },
     exchange: async () => {
       throw new Error("Token exchange denied");
     },
