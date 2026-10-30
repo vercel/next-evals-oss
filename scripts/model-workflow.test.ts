@@ -304,19 +304,12 @@ test('a retry recovers the original parent behind newer failed and duplicate che
 });
 
 
-test('Slack questions require a mention, even in a subscribed thread', async () => {
+test('Slack input is ignored while automated report rendering remains enabled', async () => {
   const source = await readFile(new URL('../apps/release-agent/agent/channels/slack.ts', import.meta.url), 'utf8');
-  const body = source.split('  onMessage(ctx, message) {\n')[1].split('\n  },')[0];
-  const handler = new Function('ctx', 'message', 'measurementsChannelId', 'defaultSlackAuth', body);
-  const channel = 'C0C7VCBP4CA';
-  const message = { channelId: channel, author: { isBot: false } };
-  const auth = () => 'auth';
-  const ctx = (mentioned: boolean) => ({
-    isBotMentioned: () => mentioned,
-    isSubscribed: () => { throw new Error('Thread subscription must not enable replies'); },
-  });
-  assert.equal(handler(ctx(false), message, channel, auth), null);
-  assert.deepEqual(handler(ctx(true), message, channel, auth), { auth: 'auth' });
-  assert.equal(handler(ctx(true), { ...message, author: { isBot: true } }, channel, auth), null);
-  assert.equal(handler(ctx(true), { ...message, channelId: 'other' }, channel, auth), null);
+  for (const name of ['onAppMention', 'onDirectMessage', 'onMessage']) {
+    const body = source.split(`  ${name}() {\n`)[1].split('\n  },')[0];
+    const handler = new Function(body);
+    assert.equal(handler(), null, name);
+  }
+  assert.match(source, /renderers: \[modelEvalThread, releaseEvalThread\]/);
 });

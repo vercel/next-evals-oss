@@ -1,6 +1,5 @@
 import { connectSlackCredentials } from "@vercel/connect/eve";
 import {
-  defaultSlackAuth,
   defineSlackRenderer,
   postCompletedSlackReply,
   slackChannel,
@@ -47,7 +46,7 @@ const releaseEvalThread = defineSlackRenderer({
         console.error("Failed to post release eval detail thread", error);
         try {
           await channel.thread.post(
-            "I could not post every detailed result. Ask me in this thread for the missing breakdown.",
+            "I could not post every detailed result.",
           );
         } catch (fallbackError) {
           console.error(
@@ -63,23 +62,14 @@ const releaseEvalThread = defineSlackRenderer({
 export default slackChannel({
   credentials: slackCredentials,
   renderers: [modelEvalThread, releaseEvalThread],
-  onAppMention(ctx, message) {
-    if (message.channelId !== measurementsChannelId || message.author?.isBot) {
-      return null;
-    }
-    return {
-      auth: defaultSlackAuth(message, ctx),
-      title: "Next.js evals question",
-    };
+  // Slack is an output channel. Only authenticated workflow events start turns.
+  onAppMention() {
+    return null;
   },
   onDirectMessage() {
     return null;
   },
-  onMessage(ctx, message) {
-    if (message.channelId !== measurementsChannelId || message.author?.isBot) {
-      return null;
-    }
-    if (!ctx.isBotMentioned()) return null;
-    return { auth: defaultSlackAuth(message, ctx) };
+  onMessage() {
+    return null;
   },
 });
