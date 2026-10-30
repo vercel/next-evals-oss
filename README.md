@@ -232,6 +232,9 @@ request's own export and cost scripts run in a separate job with no Vercel or
 model credential and no write access. The only job allowed to push receives the
 sanitized artifacts, rechecks them for credentials with `main`'s script, and
 commits them without installing or running anything from the pull request. The
+results commit is created and signed by GitHub using the workflow token, with
+no stored signing key. Publishing fails if the signature is unverified or the
+branch changed during the run. The
 model job verifies live Gateway access before starting the matrix, so an
 unavailable or provider-restricted model fails without opening 124 sandboxes.
 The pull request still requires human review of the model configuration,

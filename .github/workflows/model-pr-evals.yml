@@ -528,7 +528,7 @@ jobs:
           ref: ${{ needs.prepare.outputs.head-ref }}
           token: ${{ github.token }}
           path: registration-pr
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Commit results to the registration PR
         env:
@@ -536,6 +536,7 @@ jobs:
           HEAD_REF: ${{ needs.prepare.outputs.head-ref }}
           PAIRS_JSON: ${{ needs.prepare.outputs.pairs }}
           REGISTRATION: ${{ github.workspace }}/registration-pr
+          GH_TOKEN: ${{ github.token }}
         run: |
           mapfile -t experiments < <(node -e 'for (const pair of JSON.parse(process.env.PAIRS_JSON)) for (const value of pair.experiments) console.log(value)')
 
@@ -561,10 +562,8 @@ jobs:
           fi
           # Preserve captured logs verbatim, including terminal whitespace.
           git diff --cached --check -- agent-results.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Record model evaluation results"
-          git push origin "HEAD:$HEAD_REF"
+          node "$GITHUB_WORKSPACE/scripts/commit-results.mjs" "$HEAD_REF" \
+            "Record model evaluation results" agent-results.json "${experiments[@]/#/results/}"
 
   report:
     name: Reply with the model eval outcome
