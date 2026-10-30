@@ -200,6 +200,7 @@ jobs:
     outputs:
       check-run-id: ${{ steps.thread.outputs.check-run-id }}
       session-id: ${{ steps.thread.outputs.session-id }}
+      thread-ts: ${{ steps.thread.outputs.thread-ts }}
     steps:
       - name: Reuse or open the model PR thread
         id: thread
@@ -214,6 +215,7 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const checkName = 'Model eval Slack thread';
+            const threadPrefix = 'eve-slack-thread:';
             const confirmedPrefix = 'eve-slack-session:';
             const legacyPrefix = 'eve-session:';
             const legacyThreadLink = '[one Slack thread](https://vercel.slack.com/archives/';
@@ -230,16 +232,26 @@ jobs:
             // external_id is the durable marker for confirmed Slack delivery.
             // The summary fallback migrates checks created before that marker.
             const check = existing.data.check_runs.find((run) => {
+              if (run.external_id?.startsWith(threadPrefix)) return true;
               if (run.external_id?.startsWith(confirmedPrefix)) return true;
               return run.external_id?.startsWith(legacyPrefix) &&
                 run.output?.summary?.includes(legacyThreadLink);
             });
             if (check) {
-              const prefix = check.external_id.startsWith(confirmedPrefix)
-                ? confirmedPrefix
-                : legacyPrefix;
               core.setOutput('check-run-id', String(check.id));
-              core.setOutput('session-id', check.external_id.slice(prefix.length));
+              if (check.external_id.startsWith(threadPrefix)) {
+                const [threadTs, ...session] = check.external_id.slice(threadPrefix.length).split(':');
+                if (!/^\d+\.\d{6}$/.test(threadTs) || !session.join(':')) {
+                  throw new Error('Invalid saved Slack thread');
+                }
+                core.setOutput('thread-ts', threadTs);
+                core.setOutput('session-id', session.join(':'));
+              } else {
+                const prefix = check.external_id.startsWith(confirmedPrefix) ? confirmedPrefix : legacyPrefix;
+                core.setOutput('session-id', check.external_id.slice(prefix.length));
+                // The endpoint recovers the bot's original PR/head root for
+                // checks written before we saved its timestamp.
+              }
               return;
             }
 
@@ -275,6 +287,8 @@ jobs:
               throw new Error('Eve did not return a valid session ID');
             }
             if (
+              typeof result.threadTs !== 'string' ||
+              !/^\d+\.\d{6}$/.test(result.threadTs) ||
               typeof result.threadUrl !== 'string' ||
               !result.threadUrl.startsWith('https://vercel.slack.com/archives/')
             ) {
@@ -288,7 +302,7 @@ jobs:
               head_sha: headSha,
               status: 'completed',
               conclusion: 'neutral',
-              external_id: `${confirmedPrefix}${result.sessionId}`,
+              external_id: `${threadPrefix}${result.threadTs}:${result.sessionId}`,
               details_url: result.threadUrl,
               output: {
                 title: process.env.APPROVAL_NEEDED === 'true'
@@ -299,6 +313,7 @@ jobs:
             });
             core.setOutput('check-run-id', String(created.data.id));
             core.setOutput('session-id', result.sessionId);
+            core.setOutput('thread-ts', result.threadTs);
 
   evaluate:
     name: ${{ matrix.pair.base }}
@@ -377,6 +392,7 @@ jobs:
 
       - name: Run the complete pass@4 matrices
         env:
+          NODE_OPTIONS: --import=${{ github.workspace }}/scripts/ci-sandbox-auth.mjs
           EXPERIMENTS_JSON: ${{ toJSON(matrix.pair.experiments) }}
         run: |
           mapfile -t experiments < <(node -e 'for (const value of JSON.parse(process.env.EXPERIMENTS_JSON)) console.log(value)')
@@ -566,6 +582,7 @@ jobs:
           PR_NUMBER: ${{ needs.prepare.outputs.pr-number }}
           RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
           SESSION_ID: ${{ needs.notify.outputs.session-id }}
+          THREAD_TS: ${{ needs.notify.outputs.thread-ts }}
           EXPORT_RESULT: ${{ needs.export.result }}
           UPDATE_RESULT: ${{ needs.update.result }}
         with:
@@ -640,6 +657,7 @@ jobs:
               body: JSON.stringify({
                 event: succeeded ? 'run_succeeded' : 'run_failed',
                 sessionId: process.env.SESSION_ID,
+                ...(process.env.THREAD_TS ? { threadTs: process.env.THREAD_TS } : {}),
                 prNumber,
                 prUrl: `${context.serverUrl}/${owner}/${repo}/pull/${prNumber}`,
                 headSha: process.env.HEAD_SHA,
@@ -652,17 +670,22 @@ jobs:
               throw new Error(`Eve rejected the model outcome with status ${response.status}`);
             }
 
+            const result = await response.json();
+            if (!/^\d+\.\d{6}$/.test(result.threadTs ?? '') ||
+                !result.threadUrl?.startsWith('https://vercel.slack.com/archives/')) {
+              throw new Error('Eve did not confirm the Slack thread reply');
+            }
+
             await github.rest.checks.update({
               owner,
               repo,
               check_run_id: Number(process.env.CHECK_RUN_ID),
               status: 'completed',
               conclusion: succeeded ? 'success' : 'failure',
-              details_url: workflowUrl,
+              external_id: `eve-slack-thread:${result.threadTs}:${process.env.SESSION_ID}`,
+              details_url: result.threadUrl,
               output: {
                 title: succeeded ? 'Model evals finished' : 'Model evals failed',
-                summary: succeeded
-                  ? 'Validated results were added to the registration PR. Review and merge it manually.'
-                  : 'The workflow failed. The existing Slack thread links to this run.',
+                summary: `${succeeded ? 'Validated results were added to the registration PR. Review and merge it manually.' : 'The workflow failed.'} [Slack thread](${result.threadUrl}) | [Workflow](${workflowUrl})`,
               },
             });

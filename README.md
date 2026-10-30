@@ -209,8 +209,10 @@ events first validate without credentials, then re-dispatch the merged `main`
 workflow; only that trusted run can mint OIDC, post to Slack, or run models.
 Different model pull requests can run in parallel, while duplicate events for
 the same pull request are serialized. Opening a registration PR creates one
-Slack thread asking for those approvals. The same thread receives the final
-success or a classified, sanitized failure without raw logs. The workflow then runs that
+Slack thread asking for those approvals. Its parent message ID is saved in the
+PR check, and outcome delivery is confirmed by Slack. The same thread receives
+the final success or a classified, sanitized failure without raw logs. The
+workflow then runs that
 pull request's new base and AGENTS.md pairs sequentially against the pinned eval
 suite. A manual dispatch can select an eligible pull request by number and
 request a forced rerun of an already measured pull request, but it cannot skip
@@ -342,8 +344,12 @@ Scheduled and manual runs are accepted only from this repository's `main`
 branch. Model jobs receive read-only repository access and `id-token: write`.
 They exchange the GitHub Actions identity for a short-lived, project-scoped
 Vercel access token. That token and the non-secret team and project IDs
-authenticate Vercel Sandbox. The same fresh GitHub identity authenticates the
-release agent's intake route. Restrict the Vercel CLI policy to this workflow
+authenticate Vercel Sandbox. During evals, the runner exchanges a fresh GitHub
+identity before the access token expires, including for existing Sandbox
+instances and confirmation runs. Refreshed credentials are masked and registered
+in the job environment so the existing artifact scanner checks every rotation.
+The AI Gateway key is unchanged. The same fresh GitHub identity authenticates
+the release agent's intake route. Restrict the Vercel CLI policy to this workflow
 on `vercel/next-evals-oss@main`. For the scoped project, allow `vc sandbox
 create` and non-production `vc env` commands.
 Model-running jobs also receive the project's separately budgeted
