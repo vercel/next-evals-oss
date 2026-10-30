@@ -405,7 +405,7 @@ export function buildReleaseReport(
     failures,
     comparison: {
       available: false,
-      note: 'This standalone run does not replace or compare with the published pass@4 board.',
+      note: 'No comparable previous pass@1 measurement is included, so release-to-release regressions cannot be determined from this report. The published pass@4 board is not a comparable baseline.',
     },
   };
 }

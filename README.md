@@ -336,11 +336,12 @@ agent's reasoning. It never writes to the publishable `results/` tree or
 anything to `nextjs.org/evals`.
 
 After the draft pull request is opened, the workflow sends a compact validated
-report to the [Eve release agent](apps/release-agent). Eve writes one concise message to
-`team-agent-measurements` with the release path, pass@1 totals with and without
-AGENTS.md, and meaningful model/task failures. The summary identifies the
-measurement as separate from the public pass@4 board. The agent posts automated updates only and ignores Slack
-messages, mentions, and DMs.
+report to [Next.js Evals](apps/release-agent). The Slack summary in
+`team-adx-science` links the measurement PR and highlights regressions supported
+by comparison evidence and suspected eval problems. Full task and model results
+follow in a thread. Without a comparable previous run, the summary says
+regressions could not be determined. The agent posts automated updates only
+and ignores Slack messages, mentions, and DMs.
 
 Scheduled and manual runs are accepted only from this repository's `main`
 branch. Model jobs receive read-only repository access and `id-token: write`.
