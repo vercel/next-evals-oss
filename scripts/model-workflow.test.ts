@@ -182,7 +182,7 @@ test('a rerun reuses the Slack parent saved by the outcome step', async () => {
     getIDToken: async () => 'test-oidc', setSecret() {},
     setOutput: (name: string, value: string) => { outputs[name] = value; },
   };
-  const github = { rest: { checks: {
+  const github = { paginate: async () => [check], rest: { checks: {
     update: async (value: Record<string, unknown>) => { check = { ...value, id: 42 }; },
     listForRef: async () => ({ data: { check_runs: [check] } }),
   } } };
@@ -265,4 +265,40 @@ test('only the credential-free update job can write results', async () => {
   // The write job never installs or runs anything from the pull request.
   assert.doesNotMatch(update, /pnpm/);
   assert.match(update, /rev-parse HEAD/);
+});
+
+
+test('a retry recovers the original parent behind newer failed and duplicate checks', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const script = job(workflow, 'notify').split('          script: |\n')[1]
+    .split('\n').map((line) => line.slice(12)).join('\n');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const outputs: Record<string, string> = {};
+  const listForRef = () => {};
+  const github = {
+    rest: { checks: { listForRef } },
+    paginate: async (method: unknown, options: Record<string, unknown>) => {
+      assert.equal(method, listForRef);
+      assert.equal(options.filter, 'all');
+      assert.equal(options.ref, 'a'.repeat(40));
+      assert.equal(options.check_name, 'Model eval Slack thread');
+      return [
+        { id: 4, external_id: 'eve-slack-thread:1793374731.463709:wrun_duplicate' },
+        { id: 3, external_id: 'eve-session:wrun_failed', output: { summary: 'The workflow failed. The existing Slack thread links to this run.' } },
+        { id: 2, external_id: 'eve-session:wrun_original', output: { summary: 'Operational updates are kept in [one Slack thread](https://vercel.slack.com/archives/C0C7VCBP4CA/p1793203664141409).' } },
+        // Session creation without confirmed Slack delivery is not a parent.
+        { id: 1, external_id: 'eve-session:wrun_unconfirmed', output: { summary: 'Session created.' } },
+      ];
+    },
+  };
+  await new AsyncFunction('github', 'core', 'context', 'fetch', 'process', script)(
+    github,
+    { setOutput: (name: string, value: string) => { outputs[name] = value; } },
+    { repo: { owner: 'vercel', repo: 'next-evals-oss' } },
+    () => { throw new Error('Must not create another Slack parent'); },
+    { env: { HEAD_SHA: 'a'.repeat(40) } },
+  );
+  assert.deepEqual(outputs, {
+    'check-run-id': '2', 'session-id': 'wrun_original', 'thread-ts': '1793203664.141409',
+  });
 });

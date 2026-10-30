@@ -31,6 +31,11 @@ test("success and failure post to the saved Slack parent and confirm delivery", 
       { ...outcome, event, threadTs },
       channel,
       async (operation, body) => {
+        if (operation === "conversations.history") {
+          assert.equal(body.oldest, threadTs);
+          assert.equal(body.latest, threadTs);
+          return { ok: true, messages: [{ ts: threadTs }] };
+        }
         assert.equal(operation, "chat.postMessage");
         calls.push(body);
         return { ok: true, ts: "1793203999.000001" };
@@ -51,10 +56,11 @@ test("success and failure post to the saved Slack parent and confirm delivery", 
 
 test("a rejected Slack reply is a reporting failure, not an accepted Eve session", async () => {
   await assert.rejects(
-    postModelPrOutcome({ ...outcome, threadTs }, channel, async () => ({
-      ok: false,
-      error: "thread_not_found",
-    })),
+    postModelPrOutcome({ ...outcome, threadTs }, channel, async (operation) =>
+      operation === "conversations.history"
+        ? { ok: true, messages: [{ ts: threadTs }] }
+        : { ok: false, error: "thread_not_found" },
+    ),
     /Slack rejected.*thread_not_found/,
   );
 });
@@ -123,4 +129,23 @@ test("does not create a replacement root when an old thread cannot be recovered"
     }),
     /refusing to post a new root/,
   );
+});
+
+
+test("recovers the original thread when a saved duplicate has been deleted", async () => {
+  const deletedTs = "1793374731.463709";
+  const root = modelPrNotificationRoot({ ...outcome, event: "approval_required" });
+  const result = await postModelPrOutcome(
+    { ...outcome, threadTs: deletedTs }, channel, async (operation, body) => {
+      if (operation === "auth.test") return { ok: true, user_id: "Ubot" };
+      if (operation === "conversations.history") {
+        if (body.oldest === deletedTs) return { ok: true, messages: [] };
+        return { ok: true, messages: [{ user: "Ubot", ts: threadTs, text: root }] };
+      }
+      assert.equal(operation, "chat.postMessage");
+      assert.equal(body.thread_ts, threadTs);
+      return { ok: true, ts: "1793375999.000001" };
+    },
+  );
+  assert.equal(result.threadTs, threadTs);
 });
