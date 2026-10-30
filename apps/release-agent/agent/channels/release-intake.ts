@@ -7,11 +7,14 @@ import {
 import { callSlackApi } from "eve/channels/slack";
 
 import {
-  modelPrNotificationRoot,
   modelPrNotificationPrompt,
   modelPrNotificationSchema,
 } from "../lib/model-pr-notification";
-import { modelThreadUrl, postModelPrOutcome } from "../lib/model-pr-slack";
+import {
+  modelThreadUrl,
+  postModelPrOutcome,
+  postModelPrNotification,
+} from "../lib/model-pr-slack";
 import {
   releaseNotificationSchema,
   releaseSummaryPrompt,
@@ -126,22 +129,17 @@ export default defineChannel({
         return Response.json({ accepted: true, ...thread });
       }
 
-      const posted = await callSlackApi({
-        botToken: slackCredentials.botToken,
-        context: { teamId: vercelWorkspaceId },
-        operation: "chat.postMessage",
-        body: {
-          channel: measurementsChannelId,
-          text: modelPrNotificationRoot(parsed.data),
-          unfurl_links: false,
-          unfurl_media: false,
-        },
-      });
-      if (!posted.ok || typeof posted.ts !== "string") {
-        throw new Error(
-          `Slack rejected the model notification: ${String(posted.error ?? "missing_ts")}`,
-        );
-      }
+      const posted = await postModelPrNotification(
+        parsed.data,
+        measurementsChannelId,
+        (operation, body) =>
+          callSlackApi({
+            botToken: slackCredentials.botToken,
+            context: { teamId: vercelWorkspaceId },
+            operation,
+            body,
+          }),
+      );
 
       let session;
       try {
@@ -149,25 +147,26 @@ export default defineChannel({
           .to(slack, {
             channelId: measurementsChannelId,
             installationTeamId: vercelWorkspaceId,
-            threadTs: posted.ts,
+            threadTs: posted.threadTs,
           })
           .send(modelPrNotificationPrompt(parsed.data), { auth });
       } catch (error) {
-        await callSlackApi({
-          botToken: slackCredentials.botToken,
-          context: { teamId: vercelWorkspaceId },
-          operation: "chat.delete",
-          body: { channel: measurementsChannelId, ts: posted.ts },
-        }).catch(() => undefined);
+        if (posted.created)
+          await callSlackApi({
+            botToken: slackCredentials.botToken,
+            context: { teamId: vercelWorkspaceId },
+            operation: "chat.delete",
+            body: { channel: measurementsChannelId, ts: posted.messageTs },
+          }).catch(() => undefined);
         throw error;
       }
 
-      const threadUrl = modelThreadUrl(measurementsChannelId, posted.ts);
+      const threadUrl = modelThreadUrl(measurementsChannelId, posted.threadTs);
       return Response.json(
         {
           accepted: true,
           sessionId: session.id,
-          threadTs: posted.ts,
+          threadTs: posted.threadTs,
           threadUrl,
         },
         { status: 202 },
