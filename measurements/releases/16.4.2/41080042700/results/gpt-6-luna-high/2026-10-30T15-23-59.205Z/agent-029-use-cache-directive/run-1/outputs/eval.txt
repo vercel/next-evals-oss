@@ -1,0 +1,248 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 7ms
+   × Catalog is cached, tagged, and revalidated by the sync action 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  15:26:44
+   Duration  240ms (transform 47ms, setup 20ms, collect 27ms, tests 7ms, environment 0ms, prepare 63ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product catalog | Mercury Admin',
+  description: 'Manage your store product catalog.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { getCachedProducts } from '../lib/products'
+
+const money = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+export default async function Page() {
+  const products = await getCachedProducts()
+
+  return (
+    <main className=\"app-shell\">
+      <aside className=\"sidebar\" aria-label=\"Main navigation\">
+        <a className=\"brand\" href=\"#catalog\" aria-label=\"Mercury home\">
+          <span className=\"brand-mark\">m</span>
+          <span>mercury</span>
+        </a>
+        <div className=\"workspace-label\">WORKSPACE</div>
+        <nav className=\"nav-list\">
+          <a href=\"#overview\" className=\"nav-item\"><span className=\"nav-icon\">◫</span>Overview</a>
+          <a href=\"#orders\" className=\"nav-item\"><span className=\"nav-icon\">▤</span>Orders</a>
+          <a href=\"#catalog\" className=\"nav-item active\" aria-current=\"page\"><span className=\"nav-icon\">▦</span>Catalog</a>
+          <a href=\"#customers\" className=\"nav-item\"><span className=\"nav-icon\">♙</span>Customers</a>
+          <a href=\"#analytics\" className=\"nav-item\"><span className=\"nav-icon\">⌁</span>Analytics</a>
+        </nav>
+        <div className=\"sidebar-bottom\">
+          <a href=\"#settings\" className=\"nav-item\"><span className=\"nav-icon\">⚙</span>Settings</a>
+          <div className=\"user-card\">
+            <div className=\"avatar\">JD</div>
+            <div className=\"user-info\"><strong>Jordan Davis</strong><span>Store admin</span></div>
+            <span className=\"more\">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <section className=\"main-panel\" id=\"catalog\">
+        <header className=\"topbar\">
+          <div className=\"breadcrumb\"><span>Workspace</span><span className=\"crumb-separator\">/</span><strong>Catalog</strong></div>
+          <div className=\"topbar-actions\">
+            <button className=\"icon-button\" type=\"button\" aria-label=\"Help\">?</button>
+            <button className=\"icon-button notification\" type=\"button\" aria-label=\"Notifications\">♧<i /></button>
+            <div className=\"top-avatar\">JD</div>
+          </div>
+        </header>
+
+        <div className=\"content\">
+          <div className=\"page-heading\">
+            <div>
+              <div className=\"eyebrow\">STORE MANAGEMENT <span>•</span> PRODUCTS</div>
+              <h1>Product catalog</h1>
+              <p className=\"subtitle\">Manage your products, pricing, and availability in one place.</p>
+            </div>
+            <div className=\"heading-actions\">
+              <form action={async () => {
+                'use server'
+                revalidateTag('products', 'max')
+              }}>
+                <button className=\"button button-secondary\" type=\"submit\">
+                  <span className=\"sync-icon\" aria-hidden=\"true\">↻</span>
+                  Sync latest catalog
+                </button>
+              </form>
+              <button className=\"button button-primary\" type=\"button\"><span aria-hidden=\"true\">＋</span> Add product</button>
+            </div>
+          </div>
+
+          <div className=\"sync-note\"><span className=\"note-icon\">↗</span><span>Catalog sync refreshes product data in the background. You can keep working while updates roll out across the workspace.</span></div>
+
+          <div className=\"summary-grid\">
+            <article className=\"summary-card\">
+              <div className=\"summary-top\"><span>Total products</span><span className=\"summary-icon purple\">▦</span></div>
+              <div className=\"summary-value\">{products.length.toLocaleString()}</div>
+              <div className=\"summary-foot\"><span className=\"trend\">↗ 8.2%</span> <span>vs. last month</span></div>
+            </article>
+            <article className=\"summary-card\">
+              <div className=\"summary-top\"><span>Active products</span><span className=\"summary-icon green\">✓</span></div>
+              <div className=\"summary-value\">{products.length.toLocaleString()}</div>
+              <div className=\"summary-foot\"><span className=\"status-dot\" />All products are available</div>
+            </article>
+            <article className=\"summary-card\">
+              <div className=\"summary-top\"><span>Low stock</span><span className=\"summary-icon amber\">⌁</span></div>
+              <div className=\"summary-value\">12</div>
+              <div className=\"summary-foot\"><span className=\"attention\">Needs attention</span> <span>across 4 categories</span></div>
+            </article>
+            <article className=\"summary-card\">
+              <div className=\"summary-top\"><span>Catalog value</span><span className=\"summary-icon blue\">＄</span></div>
+              <div className=\"summary-value\">$24,580</div>
+              <div className=\"summary-foot\"><span>Across active inventory</span></div>
+            </article>
+          </div>
+
+          <section className=\"catalog-card\" aria-labelledby=\"all-products-title\">
+            <div className=\"catalog-heading\">
+              <div>
+                <h2 id=\"all-products-title\">All products <span className=\"count-badge\">{products.length}</span></h2>
+                <p>A complete list of products in your store.</p>
+              </div>
+              <div className=\"catalog-tools\">
+                <label className=\"search-box\"><span aria-hidden=\"true\">⌕</span><input type=\"search\" placeholder=\"Search products...\" aria-label=\"Search products\" /></label>
+                <button className=\"button button-filter\" type=\"button\"><span aria-hidden=\"true\">☷</span> Filters</button>
+                <button className=\"square-button\" type=\"button\" aria-label=\"More product options\">···</button>
+              </div>
+            </div>
+            <div className=\"table-wrap\">
+              <table>
+                <thead><tr>
+                  <th className=\"check-cell\"><input type=\"checkbox\" aria-label=\"Select all products\" /></th>
+                  <th>PRODUCT <span className=\"sort-mark\">↕</span></th>
+                  <th>SKU</th>
+                  <th>PRICE <span className=\"sort-mark\">↕</span></th>
+                  <th>INVENTORY</th>
+                  <th>STATUS</th>
+                  <th aria-label=\"Actions\" />
+                </tr></thead>
+                <tbody>
+                  {products.map((product, index) => {
+                    const sku = `SKU-${String(product.id).padStart(4, '0')}`
+                    const stock = [48, 32, 19, 7, 26][index % 5]
+                    const swatches = ['laptop', 'phone', 'tablet', 'headphones', 'watch']
+                    return <tr key={product.id}>
+                      <td className=\"check-cell\"><input type=\"checkbox\" aria-label={`Select ${product.name}`} /></td>
+                      <td><div className=\"product-cell\"><div className={`product-thumb ${swatches[index % swatches.length]}`}><span>{['▭', '▯', '▱', '◖', '◷'][index % 5]}</span></div><div className=\"product-name\"><strong>{product.name}</strong><span>{['Electronics', 'Mobile', 'Electronics', 'Audio', 'Accessories'][index % 5]}</span></div></div></td>
+                      <td className=\"sku\">{sku}</td>
+                      <td className=\"price\">{money.format(product.price)}</td>
+                      <td><span className={stock < 10 ? 'inventory low' : 'inventory'}><i />{stock} in stock</span></td>
+                      <td><span className=\"pill active-pill\"><i />Active</span></td>
+                      <td><button className=\"row-more\" type=\"button\" aria-label={`More actions for ${product.name}`}>···</button></td>
+                    </tr>
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <footer className=\"table-footer\">
+              <span>Showing <strong>1–{products.length}</strong> of <strong>{products.length}</strong> products</span>
+              <div className=\"pagination\"><button type=\"button\" disabled>← Previous</button><button type=\"button\" disabled>Next →</button></div>
+            </footer>
+          </section>
+          <div className=\"page-footnote\">Product information syncs from your connected ERP/PIM system.</div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export async function getAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Laptop', price: 999 },
+    { id: 2, name: 'Phone', price: 699 },
+    { id: 3, name: 'Tablet', price: 499 },
+    { id: 4, name: 'Headphones', price: 199 },
+    { id: 5, name: 'Watch', price: 299 },
+  ]
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db.js'
+
+// Keep the catalog warm between requests and give every catalog view the same
+// invalidation key. A sync marks this entry stale; the next read can serve the
+// current value while Next refreshes it in the background.
+export const getCachedProducts = unstable_cache(
+  async () => getAllProducts(),
+  ['products'],
+  { tags: ['products'] },
+)
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
