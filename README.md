@@ -30,7 +30,7 @@ pnpm only: the lockfile and `packageManager` pin are pnpm, and CI installs froze
 ### 2. Sync the eval fixtures — required
 
 ```bash
-pnpm sync-evals          # from vercel/next.js@canary
+pnpm sync-evals          # reviewed version in eval-suite-ref.txt
 pnpm sync-evals <ref>    # ...or a branch, tag, or commit SHA
 ```
 
@@ -51,10 +51,11 @@ recorded, so it usually reports evals as changed:
 N result(s) have a changed eval and were left stale — run them to refresh.
 ```
 
-That is expected, not a problem — it is the incremental workflow telling you what
-`pnpm status` will now list as work. To match CI instead, pass the SHA that
-[`.github/workflows/eval-cache-check.yml`](.github/workflows/eval-cache-check.yml)
-pins.
+`pnpm status` lists those changes as work. The default sync uses
+[`eval-suite-ref.txt`](eval-suite-ref.txt), matching CI.
+[`eval-grader-overrides.json`](eval-grader-overrides.json) imports reviewed
+`EVAL.ts` files from newer commits without changing this cohort's prompts, apps,
+or task list. Overrides apply only to their specified suite pin.
 
 ### 3. Provide credentials
 
@@ -174,7 +175,7 @@ here — `evals/` in this repo is a synced copy and is git-ignored, so anything 
 add to it locally is overwritten by the next `pnpm sync-evals`.
 
 1. Add the eval upstream, under `evals/evals/` in `vercel/next.js`.
-2. Here: `pnpm sync-evals` to pull it in.
+2. Here: update `eval-suite-ref.txt` in a PR, then `pnpm sync-evals` to pull it in.
 3. `pnpm status` — it shows up as `new` for every experiment.
 4. `pnpm eval:run <experiment>` to record results.
 
@@ -454,6 +455,19 @@ Infrastructure failures (rate limits, sandbox faults, missing transcripts, and
 evaluator startup failures) are invalid data: the release workflow discards and
 retries them and does not report an incomplete measurement.
 
+**Grader corrections are reviewed separately from new runs.** When saved source
+and grader output establish a false negative, a results PR can correct that
+attempt and its summary. A `grading-review.json` beside the summary records the
+original outcome, evidence, and corrected checks. Original transcripts, grader
+logs, fingerprints, costs, and durations stay intact. These are saved-output
+reviews, not new agent or judge runs. See the
+[prefetch grader review](result-reviews/2026-10-30-prefetch-graders.md).
+
+For that grader-only update, `grader-result-retention.json` lets CI retain
+existing measurements without marking them fresh. Retention requires the exact
+reviewed fixture and saved summary bytes. Another task edit or a newer result
+invalidates it. Normal eval runs still see the changed fingerprints.
+
 **Costs use provider-reported token counts.** Each run's usage (input, output,
 cache read/write) comes from the token counts the model's own API reported in
 the transcript, priced at the list rates in `scripts/cost.ts` (snapshotted
@@ -465,8 +479,8 @@ excluded from cost averages.
 
 ## Current evals
 
-As synced from `vercel/next.js@canary`. Upstream is the source of truth — after a
-sync, `ls evals/` is authoritative.
+Synced from the reviewed Next.js revision in `eval-suite-ref.txt`, with any
+explicit grader overrides. After a sync, `ls evals/` is authoritative.
 
 | Eval | Tests |
 |------|-------|
