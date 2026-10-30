@@ -26,8 +26,8 @@ The intake route accepts only GitHub Actions OIDC tokens for
 `vercel/next-evals-oss` on `main`. Model PR outcomes are posted directly to the
 saved Slack parent message and acknowledged only after Slack accepts the reply.
 Eve remains available for questions in that thread. Older checks without a
-parent timestamp are recovered from the bot's original message for that PR and
-commit. If it cannot be found, reporting fails instead of creating a new root.
+parent timestamp, or a deleted duplicate parent, are recovered from the bot's
+original message for that PR and commit. If it cannot be found, reporting fails instead of creating a new root.
 
 Slack credentials and inbound webhook verification are managed by the
 `slack/next-evals-release-agent` Vercel Connect connector; there is no Slack
@@ -46,4 +46,5 @@ token or webhook URL in GitHub.
    `vercel/next-evals-oss`.
 
 The bot is limited to channel `C0C7VCBP4CA`. Automated summaries start a thread;
-teammates can continue in that thread or mention the bot in the channel.
+teammates must mention the bot to ask a question, including inside a thread.
+Automated workflow updates do not need a mention.

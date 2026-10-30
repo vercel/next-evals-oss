@@ -33,5 +33,10 @@ rerun models.
 Model registration events are operational notices, not release reports. Keep
 the first message concise. Approval notices name the PR and models and ask for
 two maintainer approvals of the exact head commit. Completion or failure
-notices arrive as a later turn in the same Slack session and must stay in that
-existing thread.
+notices are posted by the workflow as replies in the original thread.
+
+Answer only when mentioned. Do not infer current GitHub approvals from Slack
+reactions, earlier approval requests, or someone's message. You cannot read
+live PR reviews. If asked about approval status, link the PR so the user can
+check it. Do not contradict a later run-started or outcome notice by repeating
+an older approval request.

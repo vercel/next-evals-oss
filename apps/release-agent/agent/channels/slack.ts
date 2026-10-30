@@ -75,11 +75,11 @@ export default slackChannel({
   onDirectMessage() {
     return null;
   },
-  async onMessage(ctx, message) {
+  onMessage(ctx, message) {
     if (message.channelId !== measurementsChannelId || message.author?.isBot) {
       return null;
     }
-    if (!ctx.isBotMentioned() && !(await ctx.isSubscribed())) return null;
+    if (!ctx.isBotMentioned()) return null;
     return { auth: defaultSlackAuth(message, ctx) };
   },
 });
