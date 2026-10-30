@@ -1,0 +1,132 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 10ms
+   ✓ Page is an async server component with parallel data fetching 2ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 6ms
+     → expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  15:25:36
+   Duration  315ms (transform 64ms, setup 25ms, collect 35ms, tests 10ms, environment 0ms, prepare 92ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+const endpoints = {
+  analytics: '/api/analytics',
+  notifications: '/api/notifications',
+  settings: '/api/settings',
+} as const
+
+type ApiKey = keyof typeof endpoints
+type ApiData = Partial<Record<ApiKey, unknown>>
+type ApiErrors = Partial<Record<ApiKey, string>>
+
+async function fetchJson(url: string, signal: AbortSignal): Promise<unknown> {
+  const response = await fetch(url, { signal })
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`)
+  }
+
+  return response.json()
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<ApiData>({})
+  const [errors, setErrors] = useState<ApiErrors>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let active = true
+
+    async function loadData() {
+      const results = await Promise.all(
+        (Object.entries(endpoints) as [ApiKey, string][]).map(
+          async ([key, url]) => {
+            try {
+              return { key, data: await fetchJson(url, controller.signal) }
+            } catch (error) {
+              return {
+                key,
+                error:
+                  error instanceof Error ? error.message : 'Unable to load data',
+              }
+            }
+          },
+        ),
+      )
+
+      if (!active) return
+
+      const nextData: ApiData = {}
+      const nextErrors: ApiErrors = {}
+
+      for (const result of results) {
+        if ('error' in result) {
+          nextErrors[result.key] = result.error
+        } else {
+          nextData[result.key] = result.data
+        }
+      }
+
+      setData(nextData)
+      setErrors(nextErrors)
+      setLoading(false)
+    }
+
+    void loadData()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [])
+
+  return (
+    <div aria-busy={loading}>
+      <h2>Dashboard Content</h2>
+      {(Object.keys(endpoints) as ApiKey[]).map((key) => (
+        <section key={key}>
+          <h3>{key[0].toUpperCase() + key.slice(1)}</h3>
+          {loading ? (
+            <p>Loading {key}…</p>
+          ) : errors[key] ? (
+            <p role=\"alert\">Unable to load {key}: {errors[key]}</p>
+          ) : (
+            <pre>{JSON.stringify(data[key], null, 2)}</pre>
+          )}
+        </section>
+      ))}
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:68:32
+     66| 
+     67|   // Should NOT have 'use client' directive
+     68|   expect(dashboardContent).not.toMatch(/['"]use client['"];?/)
+       |                                ^
+     69| })
+     70| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
