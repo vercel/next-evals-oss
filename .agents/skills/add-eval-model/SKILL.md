@@ -29,7 +29,11 @@ is missing, or the gateway refuses the model id.
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm sync-evals 071a2343c509751585cd9f77ae66e8c30daf2ea8   # the SHA .github/workflows/eval-cache-check.yml pins
+# Sync at the SHA .github/workflows/eval-cache-check.yml pins, read from the
+# workflow rather than pasted — a literal here rots silently the next time the
+# pin is bumped, and syncing the wrong fixture set gives a wrong staleness
+# picture from `pnpm status` and `check-stale.mjs`.
+pnpm sync-evals "$(grep -oE 'sync-evals [0-9a-f]{40}' .github/workflows/eval-cache-check.yml | awk '{print $2}')"
 pnpm preflight
 ```
 
