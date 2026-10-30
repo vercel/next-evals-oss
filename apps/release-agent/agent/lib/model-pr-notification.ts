@@ -10,6 +10,25 @@ const modelPair = z.object({
   experiments: z.array(z.string().min(1).max(160)).min(2).max(2),
 });
 
+const taskNames = z.array(z.string().min(1).max(160)).max(1000);
+const modelResult = z
+  .object({
+    experiment: z.string().min(1).max(120),
+    model: z.string().min(1).max(120),
+    tier: z.union([z.literal(1), z.literal(2)]),
+    total: z.number().int().positive(),
+    basePassed: z.number().int().nonnegative(),
+    agentsMdPassed: z.number().int().nonnegative(),
+    newlyPassed: taskNames,
+    newlyFailed: taskNames,
+    failedBoth: taskNames,
+  })
+  .refine(
+    (result) =>
+      result.basePassed <= result.total &&
+      result.agentsMdPassed <= result.total,
+  );
+
 const common = {
   prNumber: z.number().int().positive(),
   prUrl: githubUrl,
@@ -25,6 +44,8 @@ export const modelPrNotificationSchema = z.discriminatedUnion("event", [
   }),
   z.object({
     event: z.literal("run_succeeded"),
+    // Optional while the workflow and the separately deployed app roll out.
+    results: z.array(modelResult).min(1).max(20).optional(),
     sessionId: z.string().min(1).max(256),
     threadTs: z
       .string()
@@ -64,12 +85,70 @@ export function modelPrOutcomeText(payload: ModelPrOutcome) {
   const pr = `<${payload.prUrl}|PR #${payload.prNumber}>`;
   const run = `<${payload.workflowUrl}|Workflow>`;
   if (payload.event === "run_succeeded") {
-    return `Model evals finished. Results were added to ${pr}. Review the scores and resolve any flagged eval issues, then merge to publish to nextjs.org/evals. ${run}`;
+    const selected = new Set(payload.pairs.map((pair) => pair.base));
+    if (
+      payload.results &&
+      (payload.results.length !== selected.size ||
+        new Set(payload.results.map((result) => result.experiment)).size !==
+          selected.size ||
+        payload.results.some((result) => !selected.has(result.experiment)))
+    ) {
+      throw new Error("Model summary does not match the measured model pairs");
+    }
+    const summaries = payload.results
+      ?.map((result) => {
+        const score = (passed: number) =>
+          `${passed}/${result.total} · ${((100 * passed) / result.total).toFixed(1)}%`;
+        const tasks = (names: string[]) => {
+          const shown = names
+            .slice(0, 6)
+            .map(
+              (name) =>
+                `\`${slackText(name.replace(/^agent-/, "")).slice(0, 80)}\``,
+            );
+          return (
+            shown.join(", ") +
+            (names.length > shown.length
+              ? ` (+${names.length - shown.length} more in the PR)`
+              : "")
+          );
+        };
+        return [
+          `*${slackText(result.model)} · results ready for review*`,
+          `• *Base:* ${score(result.basePassed)}`,
+          `• *AGENTS.md:* ${score(result.agentsMdPassed)}`,
+          ...(result.newlyPassed.length
+            ? [`• Passed only with AGENTS.md: ${tasks(result.newlyPassed)}`]
+            : []),
+          ...(result.newlyFailed.length
+            ? [`• Passed only in Base: ${tasks(result.newlyFailed)}`]
+            : []),
+          ...(result.failedBoth.length
+            ? [`• Failed in both: ${tasks(result.failedBoth)}`]
+            : []),
+          `Public-board tier: ${result.tier}. Confirm this during review.`,
+        ].join("\n");
+      })
+      .join("\n\n");
+    return [
+      summaries ??
+        "*Model evals finished*\nScores are unavailable in this reply. Open the PR to review the results.",
+      `${pr} · ${run}`,
+      "Review the failed attempts and graders, then merge the PR to publish to <https://nextjs.org/evals|nextjs.org/evals>. These are Base/AGENTS.md results, not release regressions.",
+    ].join("\n\n");
   }
   if (payload.failure) {
     return `Model evals for ${pr} failed during ${payload.failure.stage}: ${payload.failure.summary} ${run}`;
   }
   return `Model evals for ${pr} failed and need attention. ${run}`;
+}
+
+function slackText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[*_`\r\n]/g, " ");
 }
 
 function models(payload: ModelPrNotification) {

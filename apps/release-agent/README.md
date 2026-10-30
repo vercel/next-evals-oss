@@ -20,8 +20,13 @@ The intake route accepts only GitHub Actions OIDC tokens for
 saved Slack parent message and acknowledged only after Slack accepts the reply.
 Older checks without a parent timestamp, or a deleted duplicate parent, are
 recovered from the bot's original message for that PR, including earlier commits.
-Model completion replies ask maintainers to review scores and resolve flagged
-eval issues before merging to publish to `nextjs.org/evals`. New approval
+Model completion replies show each measured model's Base and AGENTS.md counts,
+percentages, condition differences, and failures from the completed export.
+They link the PR and ask maintainers to review the failed attempts, graders,
+and public-board tier before merging to publish to `nextjs.org/evals`.
+These condition differences are not release regressions. If score extraction
+fails, the reply links the PR and the reporting job fails rather than guessing
+scores or hiding the completed run. New approval
 requests and run-start notices also reuse this thread. If it cannot
 be found, reporting fails instead of creating a new root.
 
