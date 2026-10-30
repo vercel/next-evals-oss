@@ -64,7 +64,7 @@ export function modelPrOutcomeText(payload: ModelPrOutcome) {
   const pr = `<${payload.prUrl}|PR #${payload.prNumber}>`;
   const run = `<${payload.workflowUrl}|Workflow>`;
   if (payload.event === "run_succeeded") {
-    return `Model evals finished. Validated results were added to ${pr} for review and merge. ${run}`;
+    return `Model evals finished. Results were added to ${pr}. Review the scores and resolve any flagged eval issues, then merge to publish to nextjs.org/evals. ${run}`;
   }
   if (payload.failure) {
     return `Model evals for ${pr} failed during ${payload.failure.stage}: ${payload.failure.summary} ${run}`;

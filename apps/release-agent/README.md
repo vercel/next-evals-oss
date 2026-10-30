@@ -1,36 +1,40 @@
-# Next.js release evals agent
+# Next.js Evals
 
-This Eve agent receives validated release, backport, and canary reports
-from the standalone GitHub Actions workflow. It writes a decision-focused
-report in
-`team-agent-measurements`, followed by detailed task, agent, and failure replies.
-It posts automated updates only and ignores incoming Slack messages, mentions,
-and DMs.
+This Eve agent posts release, backport, canary, and model-registration updates in
+`team-adx-science`. It ignores incoming Slack messages, mentions, and DMs.
 
-The `release-eval-report` skill gives automated summaries a fixed Slack
-structure focused on saturation candidates, audit candidates, reproducible
-failures, and unstable first attempts. A Slack renderer turns the agent's four
-report sections into one root post and three replies containing the full task
-and model breakdowns.
+The `release-eval-report` skill highlights regressions supported by comparison
+evidence and suspected eval problems. The root message links the measurement PR.
+The summary asks maintainers to review and merge the PR to retain the run.
+Three thread replies contain findings to investigate, full task results, and
+model results. Without a comparable previous run, the report says regressions
+could not be determined. The current notification payload has no previous-run
+comparison. Routine infrastructure retries stay out of the summary.
 
-The release pipeline does not create a publishable results pull request and does
-not update the pass@4 leaderboard. It opens a separate draft measurement pull
-request containing the exported pass@1 aggregate, release provenance, and
-failure confirmations, along with the complete sanitized scored and confirmation
-output. The final Slack thread reply links that pull request so maintainers can
-inspect transcripts, evaluator output, and command logs.
+Release measurements are separate from the public pass@4 leaderboard. Their
+draft PRs retain pass@1 scores, release provenance, failure confirmations, and
+sanitized transcripts, evaluator output, and command logs.
 
 The intake route accepts only GitHub Actions OIDC tokens for
 `vercel/next-evals-oss` on `main`. Model PR outcomes are posted directly to the
 saved Slack parent message and acknowledged only after Slack accepts the reply.
 Older checks without a parent timestamp, or a deleted duplicate parent, are
 recovered from the bot's original message for that PR, including earlier commits.
-New approval requests and run-start notices also reuse this thread. If it cannot
+Model completion replies ask maintainers to review scores and resolve flagged
+eval issues before merging to publish to `nextjs.org/evals`. New approval
+requests and run-start notices also reuse this thread. If it cannot
 be found, reporting fails instead of creating a new root.
 
 Slack credentials and inbound webhook verification are managed by the
 `slack/next-evals-release-agent` Vercel Connect connector; there is no Slack
 token or webhook URL in GitHub.
+
+## Slack display
+
+Use **Next.js Evals** as the app name and bot display name, with
+[`assets/slack-icon.png`](assets/slack-icon.png) as the app icon. The editable
+source is [`assets/slack-icon.svg`](assets/slack-icon.svg). Keep the existing
+connector UID when changing the display name.
 
 ## Deploy
 
