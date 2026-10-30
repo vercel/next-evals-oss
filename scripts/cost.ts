@@ -71,6 +71,9 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   // AI Gateway catalog, 2026-10-15. Caching is implicit, so there is no
   // separately billed cache-write rate.
   'muse-spark-open': { input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 0 },
+  // Mistral's GA pricing (mistral.ai, 2026-10-29) and the AI Gateway catalog
+  // `mistral/mistral-large-4` agree on 0.70/2.10/0.07. No cache-write rate.
+  'mistral-large-4': { input: 0.7, output: 2.1, cacheRead: 0.07, cacheWrite: 0 },
   'gpt-5.2-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.3-codex-xhigh': { input: 1.75, output: 14, cacheRead: 0.175, cacheWrite: 0 },
   'gpt-5.4-xhigh': { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 },

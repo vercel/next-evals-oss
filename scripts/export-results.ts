@@ -76,6 +76,7 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
   'gemini-3.8-flash--agents-md': 'gemini-3.8-flash',
   'gemini-4-argon--agents-md': 'gemini-4-argon',
   'muse-spark-open--agents-md': 'muse-spark-open',
+  'mistral-large-4--agents-md': 'mistral-large-4',
   'gpt-5.2-codex-xhigh--agents-md': 'gpt-5.2-codex-xhigh',
   'gpt-5.3-codex-xhigh--agents-md': 'gpt-5.3-codex-xhigh',
   'gpt-5.4-xhigh--agents-md': 'gpt-5.4-xhigh',
@@ -243,6 +244,9 @@ const MODEL_NAMES: Record<string, string> = {
   // comment in experiments/muse-spark-open.ts.
   'muse-spark-open': 'Muse Spark Open',
   'muse-spark-open--agents-md': 'Muse Spark Open + AGENTS.md',
+  // No effort suffix, for the same OpenCode reason as Muse Spark Open.
+  'mistral-large-4': 'Mistral Large 4',
+  'mistral-large-4--agents-md': 'Mistral Large 4 + AGENTS.md',
   'gpt-5.2-codex-xhigh': 'GPT 5.2 Codex (xhigh)',
   'gpt-5.2-codex-xhigh--agents-md': 'GPT 5.2 Codex (xhigh) + AGENTS.md',
   'gpt-5.3-codex-xhigh': 'GPT 5.3 Codex (xhigh)',
