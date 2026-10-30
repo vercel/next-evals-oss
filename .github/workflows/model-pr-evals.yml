@@ -220,18 +220,19 @@ jobs:
             const legacyPrefix = 'eve-session:';
             const legacyThreadLink = '[one Slack thread](https://vercel.slack.com/archives/';
             const headSha = process.env.HEAD_SHA;
-            const existing = await github.rest.checks.listForRef({
+            const existing = await github.paginate(github.rest.checks.listForRef, {
               owner,
               repo,
               ref: headSha,
               check_name: checkName,
-              filter: 'latest',
+              filter: 'all',
               per_page: 100,
             });
             // GitHub Actions rewrites a check's details_url to the job URL, so
             // external_id is the durable marker for confirmed Slack delivery.
-            // The summary fallback migrates checks created before that marker.
-            const check = existing.data.check_runs.find((run) => {
+            // Search all runs: an older failure may have replaced the latest
+            // legacy summary. Prefer the first confirmed parent over duplicates.
+            const check = existing.sort((a, b) => a.id - b.id).find((run) => {
               if (run.external_id?.startsWith(threadPrefix)) return true;
               if (run.external_id?.startsWith(confirmedPrefix)) return true;
               return run.external_id?.startsWith(legacyPrefix) &&
@@ -249,8 +250,9 @@ jobs:
               } else {
                 const prefix = check.external_id.startsWith(confirmedPrefix) ? confirmedPrefix : legacyPrefix;
                 core.setOutput('session-id', check.external_id.slice(prefix.length));
-                // The endpoint recovers the bot's original PR/head root for
-                // checks written before we saved its timestamp.
+                const savedLink = check.output?.summary?.match(/https:\/\/vercel\.slack\.com\/archives\/C0C7VCBP4CA\/p(\d+)(\d{6})/);
+                if (savedLink) core.setOutput('thread-ts', `${savedLink[1]}.${savedLink[2]}`);
+                // Without a saved link, the endpoint recovers the original root.
               }
               return;
             }

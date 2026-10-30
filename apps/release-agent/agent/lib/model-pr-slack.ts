@@ -62,8 +62,19 @@ export async function postModelPrOutcome(
   channel: string,
   api: SlackApi,
 ) {
-  const threadTs =
-    payload.threadTs ?? (await findLegacyParent(payload, channel, api));
+  let threadTs = payload.threadTs;
+  if (threadTs) {
+    const history = await api("conversations.history", {
+      channel, oldest: threadTs, latest: threadTs, inclusive: true, limit: 1,
+    });
+    if (!history.ok || !Array.isArray(history.messages)) {
+      throw new Error("Could not verify the saved model eval Slack thread");
+    }
+    if (!history.messages.some((message) => message.ts === threadTs)) {
+      threadTs = undefined;
+    }
+  }
+  threadTs ??= await findLegacyParent(payload, channel, api);
   const posted = await api("chat.postMessage", {
     channel,
     thread_ts: threadTs,
