@@ -39,7 +39,8 @@ The renderer removes the separators and posts the replies under the root.
   run. This records evidence without publishing to the public leaderboard.
   Keep unresolved findings visible rather than implying the results are final.
 - Omit overall score tables, saturation rankings, unchanged passes, and metric
-  explanations. Use short bullets with bold labels and keep the root under
+  explanations from the root. Put scores in the model-results reply. Use short
+  bullets with bold labels and keep the root under
   1,500 characters. Use real line breaks between findings.
 
 Example structure (omit empty findings):
@@ -89,6 +90,24 @@ reasons or confirmation details from reply 1.
 Include every model and harness with Base and AGENTS.md pass counts and
 percentages side by side. Label any difference between these conditions as an
 AGENTS.md difference, not a release-to-release change.
+
+For a single model, use this compact layout:
+
+```text
+**<Model> · <Harness>**
+
+**Base:** <passed>/<total> · <percentage>%
+**AGENTS.md:** <passed>/<total> · <percentage>%
+**Difference:** <signed pass difference> passes with AGENTS.md
+
+- Passed only with AGENTS.md: <task names>
+- Passed only in Base: <task names>
+```
+
+Omit empty difference lists. With several models, keep each model's two scores
+on one line and list condition differences below. Use explicit Slack links for
+URLs, especially nextjs.org/evals, so automatic linking does not absorb bold
+formatting.
 
 State which earlier measurement was used and any changes in the model, harness,
 eval, or grader versions. When no comparison is available, repeat the supplied

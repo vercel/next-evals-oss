@@ -211,7 +211,10 @@ Different model pull requests can run in parallel, while duplicate events for
 the same pull request are serialized. Opening a registration PR creates one
 Slack thread asking for those approvals. Its parent message ID is saved in the
 PR check, and outcome delivery is confirmed by Slack. The same thread receives
-the final success or a classified, sanitized failure without raw logs. The
+the final Base and AGENTS.md scores for every measured model, or a classified,
+sanitized failure without raw logs. Completed-run replies link the results PR
+and ask reviewers to check failed attempts, graders, and the public-board tier
+before merging to publish. These scores do not establish release regressions. The
 workflow then runs that
 pull request's new base and AGENTS.md pairs sequentially against the pinned eval
 suite. A manual dispatch can select an eligible pull request by number and

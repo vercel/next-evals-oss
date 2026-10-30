@@ -214,12 +214,16 @@ test('a rerun reuses the Slack parent saved by the outcome step', async () => {
   const threadUrl = 'https://vercel.slack.com/archives/C0C7VCBP4CA/p1793203626792579';
   const env = {
     RELEASE_AGENT_URL: 'https://agent.example.test',
-    PR_NUMBER: '161', HEAD_SHA: 'a'.repeat(40), PAIRS_JSON: '[]',
+    PR_NUMBER: '161', HEAD_SHA: 'a'.repeat(40),
+    PAIRS_JSON: JSON.stringify([{ base: 'test-model', experiments: ['test-model', 'test-model--agents-md'] }]),
     SESSION_ID: 'wrun_test', THREAD_TS: threadTs, CHECK_RUN_ID: '42',
     EXPORT_RESULT: 'success', UPDATE_RESULT: 'success',
+    SCORES_RESULT: 'success', GITHUB_WORKSPACE: new URL('..', import.meta.url).pathname,
+    RUNNER_TEMP: '/tmp/model-summary-test',
   };
   const core = {
     getIDToken: async () => 'test-oidc', setSecret() {},
+    warning() {}, setFailed(message: string) { assert.fail(message); },
     setOutput: (name: string, value: string) => { outputs[name] = value; },
   };
   const github = { paginate: async () => [check], rest: { checks: {
@@ -232,10 +236,22 @@ test('a rerun reuses the Slack parent saved by the outcome step', async () => {
     const payload = JSON.parse(String(init.body));
     assert.equal(payload.threadTs, threadTs);
     assert.equal(payload.event, 'run_succeeded');
+    assert.deepEqual(payload.results, [{
+      experiment: 'test-model', model: 'Test Model', tier: 2, total: 2,
+      basePassed: 1, agentsMdPassed: 2, newlyPassed: ['task-b'], newlyFailed: [], failedBoth: [],
+    }]);
     return Response.json({ accepted: true, threadTs, threadUrl });
   };
-  await new AsyncFunction('github', 'core', 'context', 'fetch', 'process', script('report'))(
-    github, core, context, fetch, { env },
+  const require = () => ({ readFile: async (path: string) => {
+    assert.equal(path, '/tmp/model-summary-test/model-summary/agent-results.json');
+    return JSON.stringify({
+      metadata: { experiments: [{ name: 'test-model', modelName: 'Test Model', tier: 2,
+        docsImpact: { baseSuccessRate: 50, docsSuccessRate: 100, newlyPassed: ['task-b'], newlyFailed: [] } }] },
+      results: { 'test-model': ['task-a', 'task-b'].map((evalPath) => ({ evalPath, result: { success: true } })) },
+    });
+  } });
+  await new AsyncFunction('github', 'core', 'context', 'fetch', 'process', 'require', script('report'))(
+    github, core, context, fetch, { env }, require,
   );
   assert.equal(check?.external_id, `eve-slack-thread:${threadTs}:wrun_test`);
   await new AsyncFunction('github', 'core', 'context', 'fetch', 'process', script('notify'))(
@@ -245,6 +261,18 @@ test('a rerun reuses the Slack parent saved by the outcome step', async () => {
   assert.equal(outputs['thread-ts'], threadTs);
   assert.equal(outputs['session-id'], 'wrun_test');
   assert.equal(outputs['check-run-id'], '42');
+});
+
+test('score reporting reads only exported JSON with main code', async () => {
+  const report = job(await readFile(workflowPath, 'utf8'), 'report');
+  assert.match(report, /contents: read/);
+  assert.match(report, /ref: refs\/heads\/main/);
+  assert.match(report, /name: model-export/);
+  assert.match(report, /model-summary\/agent-results.json/);
+  assert.match(report, /summarizeModelResults\(dataset, JSON.parse\(process.env.PAIRS_JSON\)\)/);
+  assert.match(report, /results \? \{ results \} : \{\}/);
+  assert.match(report, /if \(succeeded && !results\) core.setFailed/);
+  assert.doesNotMatch(report, /pnpm|contents: write|needs.prepare.outputs.head-ref/);
 });
 
 test('long-running model evals load the Sandbox refresh hook', async () => {

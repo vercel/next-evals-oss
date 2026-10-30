@@ -572,9 +572,23 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       actions: read
+      contents: read
       checks: write
       id-token: write
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: needs.update.result == 'success'
+        id: scores
+        continue-on-error: true
+        with:
+          name: model-export
+          path: ${{ runner.temp }}/model-summary
+
       - name: Post the outcome in the existing Slack thread
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
@@ -587,6 +601,7 @@ jobs:
           THREAD_TS: ${{ needs.notify.outputs.thread-ts }}
           EXPORT_RESULT: ${{ needs.export.result }}
           UPDATE_RESULT: ${{ needs.update.result }}
+          SCORES_RESULT: ${{ steps.scores.outcome }}
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -595,6 +610,18 @@ jobs:
             const succeeded = process.env.UPDATE_RESULT === 'success';
             const prNumber = Number(process.env.PR_NUMBER);
             const workflowUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            let results;
+            if (succeeded) {
+              try {
+                if (process.env.SCORES_RESULT !== 'success') throw new Error('Scores artifact unavailable');
+                const { readFile } = require('node:fs/promises');
+                const { summarizeModelResults } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/model-result-summary.mjs`);
+                const dataset = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/model-summary/agent-results.json`, 'utf8'));
+                results = summarizeModelResults(dataset, JSON.parse(process.env.PAIRS_JSON));
+              } catch {
+                core.warning('Could not summarize the completed results. The Slack reply will link the PR for review.');
+              }
+            }
             let failure;
             if (!succeeded) {
               const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
@@ -665,6 +692,7 @@ jobs:
                 headSha: process.env.HEAD_SHA,
                 pairs: JSON.parse(process.env.PAIRS_JSON),
                 workflowUrl,
+                ...(results ? { results } : {}),
                 ...(failure ? { failure } : {}),
               }),
             });
@@ -691,3 +719,4 @@ jobs:
                 summary: `${succeeded ? 'Validated results were added to the registration PR. Review and merge it manually.' : 'The workflow failed.'} [Slack thread](${result.threadUrl}) | [Workflow](${workflowUrl})`,
               },
             });
+            if (succeeded && !results) core.setFailed('Results were added to the PR, but the Slack score summary needs repair.');
