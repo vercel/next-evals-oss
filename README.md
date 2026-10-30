@@ -410,6 +410,11 @@ The published board is two tiers:
 - **Tier 2 (previously measured)**: every other model keeps its last measured
   results for historical reference, clearly dated, and is not rerun.
 
+GPT 6.1 Terra is a current sibling of Astra, Sol, and Luna. It joins tier 1
+with its complete Base and AGENTS.md measurements; it does not replace another
+measured Terra version. Recurring release measurements use the separate
+selection in `lib/tier-one.ts`.
+
 A model can also be *registered but unmeasured*: an experiment config, a
 display name and a list price exist, but no run does. It is in neither tier and
 does not reach the board at all, because `export-results` only exports
