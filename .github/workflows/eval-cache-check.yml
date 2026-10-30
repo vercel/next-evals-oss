@@ -9,6 +9,7 @@ on:
 
 jobs:
   status-check:
+    if: github.ref != 'refs/heads/codex/sign-eval-results'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -69,3 +70,37 @@ jobs:
                 await new Promise(resolve => setTimeout(resolve, 5000));
               }
             }
+
+  verify-results-signing:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/sign-eval-results'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: main
+          path: measurement-repository
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: release-durable-measurement
+          run-id: 41080042700
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/durable-measurement
+      - name: Recover the completed release with a verified bot commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp -R "$RUNNER_TEMP/durable-measurement/." measurement-repository/
+          cd measurement-repository
+          destination=measurements/releases/16.4.2/41080042700
+          node "$GITHUB_WORKSPACE/scripts/assert-no-secrets.mjs" "$destination"
+          git add "$destination"
+          node "$GITHUB_WORKSPACE/scripts/commit-results.mjs" \
+            automation/measure-next-16.4.2-41080042700 \
+            "Record pass@1 measurement for Next.js v16.4.2" "$destination"

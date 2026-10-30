@@ -57,6 +57,14 @@ test('publishing preserves log whitespace while checking the exported dataset', 
   }
 });
 
+test('model publishing uses the trusted signed-commit helper', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const update = job(workflow, 'update');
+  assert.match(update, /\$GITHUB_WORKSPACE\/scripts\/commit-results\.mjs/);
+  assert.match(update, /GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.doesNotMatch(update, /git commit|git push/);
+});
+
 test('model registration automation is restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(workflow, /pull_request:\n    types: \[opened, reopened, synchronize\]/);

@@ -59,6 +59,8 @@ test('repository write access starts only after sanitization', async () => {
   assert.match(publish, /contents: write/);
   assert.match(publish, /pull-requests: write/);
   assert.match(publish, /assert-no-secrets\.mjs/);
+  assert.match(publish, /\$GITHUB_WORKSPACE\/scripts\/commit-results\.mjs/);
+  assert.doesNotMatch(publish, /git commit|git push/);
 });
 
 test('result archive validation consumes the complete tar listing', async () => {
