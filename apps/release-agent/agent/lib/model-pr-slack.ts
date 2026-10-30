@@ -56,6 +56,9 @@ export async function findModelPrParent(
     cursor = history.response_metadata?.next_cursor;
     if (!cursor) return oldest;
   }
+  // A verified parent is sufficient to reply. Incomplete history only prevents
+  // creating a root when we have not found a thread for this PR.
+  if (oldest) return oldest;
   throw new Error(
     "Model eval Slack history is incomplete; refusing to create a duplicate thread",
   );

@@ -221,6 +221,41 @@ test("a first registration creates a root only after checking the channel", asyn
   assert.equal(result.created, true);
 });
 
+for (const event of ["approval_required", "run_started"] as const) {
+  test(`${event} reuses a verified parent when history exceeds the page limit`, async () => {
+    const parent = {
+      user: "Ubot",
+      ts: threadTs,
+      text: modelPrNotificationRoot({ ...outcome, event: "approval_required" }),
+    };
+    let pages = 0;
+    const result = await postModelPrNotification(
+      { ...outcome, event, headSha: "7".repeat(40) },
+      channel,
+      async (operation, body) => {
+        if (operation === "auth.test") return { ok: true, user_id: "Ubot" };
+        if (operation === "conversations.history") {
+          pages++;
+          return {
+            ok: true,
+            messages: pages === 1 ? [parent] : [],
+            response_metadata: { next_cursor: `page-${pages}` },
+          };
+        }
+        if (operation === "conversations.replies")
+          return { ok: true, messages: [parent] };
+        assert.equal(operation, "chat.postMessage");
+        assert.equal(body.thread_ts, threadTs);
+        assert.equal(body.reply_broadcast, false);
+        return { ok: true, ts: "1793373999.000001" };
+      },
+    );
+    assert.equal(pages, 10);
+    assert.equal(result.threadTs, threadTs);
+    assert.equal(result.created, true);
+  });
+}
+
 test("does not create a root if channel history cannot be read completely", async () => {
   await assert.rejects(
     postModelPrNotification(
