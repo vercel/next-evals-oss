@@ -1,0 +1,131 @@
+{
+  "status": "passed",
+  "duration": 162.079,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 42,
+    "outputTokens": 5128,
+    "cacheReadTokens": 250361,
+    "cacheWriteTokens": 25157,
+    "reasoningTokens": 1781,
+    "totalTokens": 280688
+  },
+  "model": "openai/gpt-6.1-terra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc 'ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'src/**' -g 'app/**' -g 'pages/**' -g 'components/**' -g 'README*' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"for f in app/*.tsx package.json tsconfig.json next.config.ts; do printf '\\\\n--- %s ---\\\\n' \\\"\"'$f\"; cat \"$f\"; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g '\"'!node_modules/**'\"' -g '\"'!package-lock.json'\"' -g '\"'!__agent_eval__/**'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"find .. -name AGENTS.md -print && git status --short && rg -n 'fetch\\\\(|axios|useEffect|profile|UserProfile' --glob '\"'!package-lock.json'\"' --glob '\"'!node_modules/**'\"' .\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la __agent_eval__ && cat node_modules/next/AGENTS.md'"
+      },
+      {
+        "command": "/bin/bash -lc \"git log -1 --format='%s' && git diff -- package.json && git ls-files\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'headers\\\\(\\\\)|NEXT_PUBLIC|BASE_URL|API_URL|users/profile' app next.config.ts package.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"find node_modules/next/dist/docs -iname '*fetch*' -o -iname '*headers*'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'headers\\\\(\\\\)|absolute URL|server component.*fetch|forward.*cookie' node_modules/next/dist/docs/01-app -g '*.md' | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- tsconfig.json && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > /tmp/user-profile-check.mjs <<'EOF'\nimport http from 'node:http'\nimport { spawn } from 'node:child_process'\nimport assert from 'node:assert/strict'\n\nconst requests = []\nconst api = http.createServer((req, res) => {\n  requests.push({ url: req.url, cookie: req.headers.cookie, authorization: req.headers.authorization })\n  if (req.headers.cookie === 'scenario=error') {\n    res.writeHead(500).end()\n  } else if (req.headers.cookie === 'scenario=invalid') {\n    res.writeHead(200, { 'content-type': 'application/json' }).end('{\\\"name\\\":\\\"Invalid\\\"}')\n  } else {\n    const isSecond = req.headers.cookie === 'session=second'\n    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({\n      name: isSecond ? 'Second User' : 'First User',\n      email: isSecond ? 'second@example.com' : 'first@example.com',\n    }))\n  }\n})\nawait new Promise(resolve => api.listen(0, '127.0.0.1', resolve))\nconst appPort = 34571\nconst app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-p', String(appPort)], {\n  cwd: '/workspace',\n  env: { ...process.env, APP_ORIGIN: \"'`http://127.0.0.1:${api.address().port}` },\n  stdio: ['\"'ignore', 'pipe', 'pipe'],\n})\nlet output = ''\napp.stdout.on('data', chunk => { output += chunk })\napp.stderr.on('data', chunk => { output += chunk })\ntry {\n  for (let attempts = 0; \"'!output.includes('\"'Ready'); attempts++) {\n    if (attempts >= 100 || app.exitCode \"'!== null) throw new Error(`App failed to start: ${output}`)\n    await new Promise(resolve => setTimeout(resolve, 100))\n  }\n  const getPage = async cookie => (await fetch(`http://127.0.0.1:${appPort}`, {\n    headers: { cookie, authorization: '\"'Bearer test-token', host: 'attacker.invalid' },\n  })).text()\n  const first = await getPage('session=first')\n  assert.match(first, /First User/)\n  assert.match(first, /first@example\\\\.com/)\n  const second = await getPage('session=second')\n  assert.match(second, /Second User/)\n  assert.match(second, /second@example\\\\.com/)\n  assert.doesNotMatch(second, /First User/)\n  assert.match(await getPage('scenario=error'), /Unable to load user profile/)\n  assert.match(await getPage('scenario=invalid'), /Unable to load user profile/)\n  assert.deepEqual(requests.map(request => request.url), Array(4).fill('/api/users/profile'))\n  assert.equal(requests[0].cookie, 'session=first')\n  assert.equal(requests[0].authorization, 'Bearer test-token')\n  console.log('Profile integration checks passed: rendering, per-user data, credentials, failures, and trusted origin.')\n} finally {\n  app.kill()\n  api.close()\n}\nEOF\nnode /tmp/user-profile-check.mjs\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git show HEAD:tsconfig.json > tsconfig.json\npython3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nshutil.rmtree('/workspace/.next')\nPath('/workspace/next-env.d.ts').unlink()\nPath('/tmp/user-profile-check.mjs').unlink()\nPY\ngit diff --check\ngit status --short\ngit diff -- app/UserProfile.tsx\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 42,
+      "outputTokens": 5128,
+      "cacheReadTokens": 250361,
+      "cacheWriteTokens": 25157,
+      "reasoningTokens": 1781,
+      "totalTokens": 280688
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "status": "passed",
+  "duration": 230.811,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 45,
+    "outputTokens": 6451,
+    "cacheReadTokens": 247696,
+    "cacheWriteTokens": 23475,
+    "reasoningTokens": 2520,
+    "totalTokens": 277667
+  },
+  "model": "openai/gpt-6.1-terra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc 'git status --short && ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'pages/**' -g 'README*' -g 'pnpm-lock.yaml' -g 'yarn.lock' -g 'package-lock.json' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"for f in app/* next.config.ts package.json tsconfig.json; do printf '\\\\n--- %s ---\\\\n' \\\"\"'$f\"; cat \"$f\"; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find .. -name AGENTS.md -print && git diff -- package.json && git log -1 --oneline && ls -la __agent_eval__'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'cacheComponents|Suspense|partial prerender|Partial Prerender' node_modules/next/dist/docs/01-app/03-guides/partial-prerendering* node_modules/next/dist/docs/01-app -g '*.mdx' | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > app/page.tsx <<'EOF'\nimport { cache, Suspense } from 'react'\nimport { RevenueChart } from './RevenueChart'\nimport { LatestInvoices } from './LatestInvoices'\nimport { CardStats } from './CardStats'\nimport {\n  CardStatsSkeleton,\n  LatestInvoicesSkeleton,\n  RevenueChartSkeleton,\n} from './skeletons'\n\ntype DashboardData = {\n  totalRevenue: number\n  totalInvoices: number\n  revenue: { month: string; amount: number }[]\n  invoices: { id: string; name: string; amount: number }[]\n}\n\n// All three sections use the same response. React shares this request for the\n// current render, while no-store keeps dashboard data fresh on each request.\nconst getDashboardData = cache(async (): Promise<DashboardData> => {\n  const res = await fetch('https://api.example.com/dashboard', {\n    cache: 'no-store',\n  })\n  if (\"'!res.ok) {\n    throw new Error(`Failed to load dashboard data (${res.status})`)\n  }\n  return res.json()\n})\n\nasync function DashboardStats() {\n  const data = await getDashboardData()\n  return (\n    <CardStats\n      totalRevenue={data.totalRevenue}\n      totalInvoices={data.totalInvoices}\n    />\n  )\n}\n\nasync function DashboardRevenue() {\n  const data = await getDashboardData()\n  return <RevenueChart revenue={data.revenue} />\n}\n\nasync function DashboardInvoices() {\n  const data = await getDashboardData()\n  return <LatestInvoices invoices={data.invoices} />\n}\n\nexport default function Page() {\n  return (\n    <main>\n      <h1>Dashboard</h1>\n      <Suspense fallback={<CardStatsSkeleton />}>\n        <DashboardStats />\n      </Suspense>\n      <Suspense fallback={<RevenueChartSkeleton />}>\n        <DashboardRevenue />\n      </Suspense>\n      <Suspense fallback={<LatestInvoicesSkeleton />}>\n        <DashboardInvoices />\n      </Suspense>\n    </main>\n  )\n}\nEOF\ncat > app/skeletons.tsx <<'\"'EOF'\nexport function CardStatsSkeleton() {\n  return (\n    <div className=\\\"dashboard-stats\\\" aria-busy=\\\"true\\\">\n      <div className=\\\"card\\\">\n        <h2>Total Revenue</h2>\n        <p><span className=\\\"skeleton-line\\\" aria-hidden=\\\"true\\\" /><span className=\\\"sr-only\\\">Loading total revenue</span></p>\n      </div>\n      <div className=\\\"card\\\">\n        <h2>Total Invoices</h2>\n        <p><span className=\\\"skeleton-line\\\" aria-hidden=\\\"true\\\" /><span className=\\\"sr-only\\\">Loading total invoices</span></p>\n      </div>\n    </div>\n  )\n}\n\nexport function RevenueChartSkeleton() {\n  return (\n    <div className=\\\"chart\\\" aria-busy=\\\"true\\\">\n      <h2>Revenue</h2>\n      <span className=\\\"sr-only\\\">Loading revenue</span>\n      <ul aria-hidden=\\\"true\\\">\n        {[0, 1, 2, 3].map((line) => <li key={line}><span className=\\\"skeleton-line\\\" /></li>)}\n      </ul>\n    </div>\n  )\n}\n\nexport function LatestInvoicesSkeleton() {\n  return (\n    <div className=\\\"invoices\\\" aria-busy=\\\"true\\\">\n      <h2>Latest Invoices</h2>\n      <span className=\\\"sr-only\\\">Loading latest invoices</span>\n      <ul aria-hidden=\\\"true\\\">\n        {[0, 1, 2, 3].map((line) => <li key={line}><span className=\\\"skeleton-line\\\" /></li>)}\n      </ul>\n    </div>\n  )\n}\n\nexport function DashboardSkeleton() {\n  return (\n    <main>\n      <h1>Dashboard</h1>\n      <CardStatsSkeleton />\n      <RevenueChartSkeleton />\n      <LatestInvoicesSkeleton />\n    </main>\n  )\n}\nEOF\ncat > app/loading.tsx <<'EOF'\nimport { DashboardSkeleton } from './skeletons'\n\nexport default function Loading() {\n  return <DashboardSkeleton />\n}\nEOF\ncat > app/globals.css <<'EOF'\n.dashboard-stats {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));\n  gap: 1rem;\n}\n\n.skeleton-line {\n  display: inline-block;\n  width: min(12rem, 80%);\n  height: 1em;\n  border-radius: 0.25rem;\n  background: #e5e7eb;\n  vertical-align: middle;\n}\n\n.sr-only {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  padding: 0;\n  margin: -1px;\n  overflow: hidden;\n  clip: rect(0, 0, 0, 0);\n  white-space: nowrap;\n  border: 0;\n}\nEOF\npython3 - <<'PY'\nfrom pathlib import Path\np = Path('app/CardStats.tsx')\ns = p.read_text().replace('className=\\\"grid grid-cols-2 gap-4\\\"', 'className=\\\"dashboard-stats\\\"')\np.write_text(s)\np = Path('app/layout.tsx')\ns = p.read_text().replace(\\\"import type { Metadata } from 'next'\\\", \\\"import type { Metadata } from 'next'\\\\nimport './globals.css'\\\")\np.write_text(s)\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff --stat && git diff -- tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat .gitignore && ls -la .next/server/app && python3 - <<'PY'\nfrom pathlib import Path\np = Path('.next/server/app/index.html')\nif p.exists():\n    s = p.read_text()\n    for term in ['Dashboard', 'Total Revenue', 'Total Invoices', 'Revenue', 'Latest Invoices', 'Loading dashboard...']:\n        print(f'{term}: {term in s}')\nelse:\n    print('No index.html found')\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > /tmp/dashboard-fetch-mock.cjs <<'EOF'\nconst originalFetch = globalThis.fetch\nglobalThis.fetch = async function (input, init) {\n  const url = typeof input === 'string' ? input : input.url\n  if (url === 'https://api.example.com/dashboard') {\n    console.log('MOCK_DASHBOARD_REQUEST')\n    await new Promise(resolve => setTimeout(resolve, 1500))\n    return Response.json({ totalRevenue: 1200, totalInvoices: 2, revenue: [{month: 'Jan', amount: 1200}], invoices: [{id: '1', name: 'Acme', amount: 1200}] })\n  }\n  return originalFetch(input, init)\n}\nEOF\nNODE_OPTIONS='--require=/tmp/dashboard-fetch-mock.cjs' npm start -- -p 3123\""
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nimport time\nfrom urllib.request import urlopen\nstart = time.monotonic()\nwith urlopen('http://localhost:3123/') as response:\n    chunks = []\n    while True:\n        chunk = response.read1(65536)\n        if not chunk:\n            break\n        elapsed = time.monotonic() - start\n        chunks.append(chunk)\n        print(f'{elapsed:.2f}s: {len(chunk)} bytes; shell={b\\\"Latest Invoices\\\" in chunk}; data={b\\\"Acme\\\" in chunk}')\n    body = b''.join(chunks).decode()\n    print('dashboard headings:', all(text in body for text in ('Total Revenue', 'Total Invoices', 'Revenue', 'Latest Invoices')))\n    print('dashboard data:', all(text in body for text in ('1,200', 'Acme', 'Jan')))\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'curl --silent --output /dev/null http://localhost:3123/'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('app/skeletons.tsx')\ns = p.read_text().replace('<p><span className=\\\"skeleton-line\\\" aria-hidden=\\\"true\\\" /><span className=\\\"sr-only\\\">Loading total revenue</span></p>', '''<p>\n          <span className=\\\"skeleton-line\\\" aria-hidden=\\\"true\\\" />\n          <span className=\\\"sr-only\\\">Loading total revenue</span>\n        </p>''').replace('<p><span className=\\\"skeleton-line\\\" aria-hidden=\\\"true\\\" /><span className=\\\"sr-only\\\">Loading total invoices</span></p>', '''<p>\n          <span className=\\\"skeleton-line\\\" aria-hidden=\\\"true\\\" />\n          <span className=\\\"sr-only\\\">Loading total invoices</span>\n        </p>''').replace('{[0, 1, 2, 3].map((line) => <li key={line}><span className=\\\"skeleton-line\\\" /></li>)}', '''{[0, 1, 2, 3].map((line) => (\n          <li key={line}><span className=\\\"skeleton-line\\\" /></li>\n        ))}''')\np.write_text(s)\nPY\ngit show HEAD:tsconfig.json > tsconfig.json\nartifact_dir=\"'$(mktemp -d /tmp/dashboard-build-artifacts.XXXXXX)\nmv .next next-env.d.ts \"$artifact_dir/\"\ngit status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 45,
+      "outputTokens": 6451,
+      "cacheReadTokens": 247696,
+      "cacheWriteTokens": 23475,
+      "reasoningTokens": 2520,
+      "totalTokens": 277667
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

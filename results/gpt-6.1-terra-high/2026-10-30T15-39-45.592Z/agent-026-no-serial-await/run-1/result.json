@@ -1,0 +1,131 @@
+{
+  "status": "passed",
+  "duration": 194.878,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 33,
+    "outputTokens": 5190,
+    "cacheReadTokens": 156043,
+    "cacheWriteTokens": 19225,
+    "reasoningTokens": 2875,
+    "totalTokens": 180491
+  },
+  "model": "openai/gpt-6.1-terra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 15,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 15,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"ls -la && rg --files -g '\"'!node_modules'\"' -g '\"'!vendor'\"' -g '\"'!dist'\"' -g '\"'!build'\"' | head -150\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g '\"'!node_modules'\"' -g '\"'!vendor'\"' -g '\"'!dist'\"' -g '\"'!build'\"' | head -100\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat app/Dashboard.tsx && cat app/page.tsx && cat app/layout.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && cat tsconfig.json && cat next.config.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'fetch\\\\(|useSWR|react-query|axios|analytics|notifications|settings' -g '\"'!package-lock.json'\"' -g '\"'!node_modules/**'\"' .\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find /workspace -name AGENTS.md -print'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > app/Dashboard.tsx <<'EOF'\nimport { headers } from 'next/headers'\n\ntype ApiResult = { data: unknown; error?: never } | { data?: never; error: true }\n\nasync function fetchDashboardData(origin: string, path: string): Promise<ApiResult> {\n  try {\n    const response = await fetch(new URL(path, origin), { cache: 'no-store' })\n    if (\"'!response.ok) throw new Error('\"'Request failed')\n\n    return { data: await response.json() }\n  } catch {\n    return { error: true }\n  }\n}\n\nexport default async function Dashboard() {\n  const requestHeaders = await headers()\n  const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host')\n\n  if (\"'!host) {\n    return <p>Unable to load dashboard data.</p>\n  }\n\n  const protocol = requestHeaders.get('\"'x-forwarded-proto') === 'https' ? 'https' : 'http'\n  const origin = \"'`${protocol}://${host}`\n  const [analytics, notifications, settings] = await Promise.all([\n    fetchDashboardData(origin, '\"'/api/analytics'),\n    fetchDashboardData(origin, '/api/notifications'),\n    fetchDashboardData(origin, '/api/settings'),\n  ])\n\n  return (\n    <div>\n      <h2>Dashboard Content</h2>\n      <section>\n        <h3>Analytics</h3>\n        {analytics.error ? <p>Unable to load analytics.</p> : <pre>{JSON.stringify(analytics.data, null, 2)}</pre>}\n      </section>\n      <section>\n        <h3>Notifications</h3>\n        {notifications.error ? <p>Unable to load notifications.</p> : <pre>{JSON.stringify(notifications.data, null, 2)}</pre>}\n      </section>\n      <section>\n        <h3>Settings</h3>\n        {settings.error ? <p>Unable to load settings.</p> : <pre>{JSON.stringify(settings.data, null, 2)}</pre>}\n      </section>\n    </div>\n  )\n}\nEOF\nnpx tsc --noEmit\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > app/Dashboard.test.tsx <<'EOF'\nimport { renderToStaticMarkup } from 'react-dom/server'\nimport { afterEach, expect, it, vi } from 'vitest'\nimport Dashboard from './Dashboard'\n\nconst getHeaders = vi.hoisted(() => vi.fn())\nvi.mock('next/headers', () => ({ headers: getHeaders }))\n\nafterEach(() => {\n  vi.unstubAllGlobals()\n  vi.resetAllMocks()\n})\n\nit('starts all requests together and displays successful responses when one fails', async () => {\n  getHeaders.mockResolvedValue(new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' }))\n  const pending: Array<(response: Response) => void> = []\n  const fetchMock = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)))\n  vi.stubGlobal('fetch', fetchMock)\n\n  const dashboard = Dashboard()\n  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))\n  expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([\n    'https://example.test/api/analytics',\n    'https://example.test/api/notifications',\n    'https://example.test/api/settings',\n  ])\n\n  pending[0](Response.json({ views: 42 }))\n  pending[1](new Response(null, { status: 503 }))\n  pending[2](Response.json({ theme: 'dark' }))\n\n  const html = renderToStaticMarkup(await dashboard)\n  expect(html).toContain('views')\n  expect(html).toContain('42')\n  expect(html).toContain('Unable to load notifications.')\n  expect(html).toContain('theme')\n  expect(html).toContain('dark')\n})\nEOF\nnpx vitest run app/Dashboard.test.tsx\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/Dashboard.tsx && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit'"
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": false,
+        "exitCode": 2
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\np = Path('app/Dashboard.test.tsx')\ns = p.read_text().replace(\\\"const fetchMock = vi.fn(() => new Promise<Response>((resolve) => pending.push(resolve)))\\\", \\\"const fetchMock = vi.fn((_url: URL, _options: RequestInit) => new Promise<Response>((resolve) => pending.push(resolve)))\\\")\np.write_text(s)\nPY\nnpx tsc --noEmit --incremental false\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx vitest run app/Dashboard.test.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git show HEAD:tsconfig.json > tsconfig.json\npython3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nshutil.rmtree('.next')\nPath('next-env.d.ts').unlink()\nPath('tsconfig.tsbuildinfo').unlink()\nPY\ngit status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 33,
+      "outputTokens": 5190,
+      "cacheReadTokens": 156043,
+      "cacheWriteTokens": 19225,
+      "reasoningTokens": 2875,
+      "totalTokens": 180491
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
