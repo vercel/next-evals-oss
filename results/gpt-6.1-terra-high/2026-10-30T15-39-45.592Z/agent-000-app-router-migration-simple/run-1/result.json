@@ -1,0 +1,106 @@
+{
+  "status": "passed",
+  "duration": 114.123,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 27,
+    "outputTokens": 2493,
+    "cacheReadTokens": 107532,
+    "cacheWriteTokens": 15964,
+    "reasoningTokens": 623,
+    "totalTokens": 126016
+  },
+  "model": "openai/gpt-6.1-terra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 10,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 10,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g '\"'!node_modules'\"' -g '\"'! .next'\"' -g '\"'!dist'\"' -g '\"'!build'\"' | head -200 && ls -la\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && cat next.config.ts && cat tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"for f in pages/*.tsx; do printf '\\\\n--- %s ---\\\\n' \\\"\"'$f\"; cat \"$f\"; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git log -1 --oneline'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find .. -name AGENTS.md -print'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"mkdir -p app/about\ncat > app/layout.tsx <<'EOF'\nimport type { Metadata, Viewport } from 'next'\nimport type { ReactNode } from 'react'\n\nexport const metadata: Metadata = {\n  title: 'Home Page',\n  description: 'Welcome to our Next.js app',\n  icons: {\n    icon: '/favicon.ico',\n  },\n}\n\nexport const viewport: Viewport = {\n  width: 'device-width',\n  initialScale: 1,\n}\n\nexport default function RootLayout({ children }: { children: ReactNode }) {\n  return (\n    <html lang=\\\"en\\\">\n      <body>{children}</body>\n    </html>\n  )\n}\nEOF\ncat > app/page.tsx <<'EOF'\nimport Link from 'next/link'\n\nexport default function Home() {\n  return (\n    <main>\n      <h1>Home</h1>\n      <p>Welcome to our Next.js application\"'!</p>\n      <nav>\n        <ul>\n          <li>\n            <Link href=\"/about\">About</Link>\n          </li>\n          <li>\n            <Link href=\"/contact\">Contact</Link>\n          </li>\n        </ul>\n      </nav>\n    </main>\n  )\n}\nEOF\ncat > app/about/page.tsx <<'\"'EOF'\nimport type { Metadata } from 'next'\nimport Link from 'next/link'\n\nexport const metadata: Metadata = {\n  title: 'About Us',\n  description: 'Learn more about us',\n}\n\nexport default function About() {\n  return (\n    <main>\n      <h1>About</h1>\n      <p>This is the about page of our Next.js application.</p>\n      <nav>\n        <ul>\n          <li>\n            <Link href=\\\"/\\\">Home</Link>\n          </li>\n          <li>\n            <Link href=\\\"/contact\\\">Contact</Link>\n          </li>\n        </ul>\n      </nav>\n    </main>\n  )\n}\nEOF\nrm -r pages\nnpm run build\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- tsconfig.json && cat .gitignore'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'EOF'\nimport assert from 'node:assert/strict'\n\nfor (const [path, title, description, heading, links] of [\n  ['/', 'Home Page', 'Welcome to our Next.js app', 'Home', ['/about', '/contact']],\n  ['/about', 'About Us', 'Learn more about us', 'About', ['/', '/contact']],\n]) {\n  const response = await fetch(\"'`http://localhost:3100${path}`)\n  const html = await response.text()\n  assert.equal(response.status, 200, path)\n  assert.match(html, /<html lang=\"en\">/)\n  assert.ok(html.includes(`<title>${title}</title>`), `${path} title`)\n  assert.ok(html.includes(`name=\"description\" content=\"${description}\"`), `${path} description`)\n  assert.ok(html.includes(`<h1>${heading}</h1>`), `${path} heading`)\n  for (const href of links) assert.ok(html.includes(`href=\"${href}\"`), `${path} link to ${href}`)\n  console.log(`${path}: 200, content, metadata and links verified`)\n}\nconst response = await fetch('\"'http://localhost:3100/contact')\nassert.equal(response.status, 404)\nconsole.log('/contact: 404, matching the existing missing route')\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom pathlib import Path\nimport subprocess\n\npath = Path('tsconfig.json')\noriginal = subprocess.check_output(['git', 'show', 'HEAD:tsconfig.json'], text=True)\npath.write_text(original.replace('\\\".next/types/**/*.ts\\\"', '\\\".next/types/**/*.ts\\\", \\\".next/dev/types/**/*.ts\\\"'))\nignore = Path('.gitignore')\nignore.write_text(ignore.read_text() + '/.next/\\\\n/next-env.d.ts\\\\n')\nPY\ngit status --short && git diff -- .gitignore tsconfig.json && git diff --stat\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 27,
+      "outputTokens": 2493,
+      "cacheReadTokens": 107532,
+      "cacheWriteTokens": 15964,
+      "reasoningTokens": 623,
+      "totalTokens": 126016
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

@@ -12,11 +12,12 @@ export const TIER_ONE_EXPERIMENTS = [
   // Opus 5.5 shipped about 60 days after Opus 5, so Opus 5 is tier 2.
   'claude-opus-5.5-high',
   'claude-sonnet-5',
-  // Astra, Sol, and Luna are current sibling profiles. Sol replaced 5.6 Sol
+  // Astra, Sol, Luna, and Terra are current sibling profiles. Sol replaced 5.6 Sol
   // after roughly 75 days; Luna has no previously measured predecessor.
   'gpt-6-astra-high',
   'gpt-6-luna-high',
   'gpt-6-sol-high',
+  'gpt-6.1-terra-high',
   // Flash and Pro are separate model lines. The Pro experiments remain tier 2
   // until the direct-provider Gemini CLI credentials are available to rerun them.
   'gemini-3.8-flash',

@@ -1,0 +1,141 @@
+{
+  "status": "passed",
+  "duration": 140.928,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 39,
+    "outputTokens": 3253,
+    "cacheReadTokens": 222432,
+    "cacheWriteTokens": 23476,
+    "reasoningTokens": 648,
+    "totalTokens": 249200
+  },
+  "model": "openai/gpt-6.1-terra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 17,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 17,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc 'ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g '\"'!node_modules'\"' -g '\"'!dist'\"' -g '\"'!build'\"' | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find .. -name AGENTS.md -print'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && cat app/page.tsx && cat app/layout.tsx && cat next.config.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/AGENTS.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && ls -la __agent_eval__ && rg -n 'analytics|after\\\\(' -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' .\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat tsconfig.json && cat .gitignore && git diff -- package.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'connection\\\\(' node_modules/next/dist/docs | head -40\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'after\\\\(' node_modules/next/dist/docs | head -60\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/connection.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit'"
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- tsconfig.json && git diff -- app/page.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nimport { createServer } from 'node:http'\nimport { spawn } from 'node:child_process'\nimport { setTimeout as delay } from 'node:timers/promises'\n\nconst events = []\nconst analytics = createServer(async (req, res) => {\n  let body = ''\n  for await (const chunk of req) body += chunk\n  events.push(JSON.parse(body))\n  await delay(2000)\n  res.writeHead(204).end()\n})\nawait new Promise(resolve => analytics.listen(0, '127.0.0.1', resolve))\nconst endpoint = \"'`http://127.0.0.1:${analytics.address().port}/events`\nconst app = spawn('\"'node_modules/.bin/next', ['start', '-p', '3149'], {\n  env: { ...process.env, ANALYTICS_ENDPOINT: endpoint },\n  stdio: ['ignore', 'pipe', 'pipe'],\n})\nlet output = ''\napp.stdout.on('data', chunk => output += chunk)\napp.stderr.on('data', chunk => output += chunk)\ntry {\n  for (let i = 0; i < 100 && \"'!output.includes('\"'Ready'); i++) {\n    if (app.exitCode \"'!== null) throw new Error(`Next exited: ${output}`)\n    await delay(100)\n  }\n  if (!output.includes('\"'Ready')) throw new Error(\"'`Next did not start: ${output}`)\n  for (let i = 0; i < 2; i++) {\n    const start = performance.now()\n    const response = await fetch('\"'http://127.0.0.1:3149/')\n    const body = await response.text()\n    const elapsed = Math.round(performance.now() - start)\n    if (\"'!response.ok || !body.includes('\"'Welcome')) throw new Error('Welcome page failed')\n    if (elapsed >= 1500) throw new Error(\"'`Page waited for analytics: ${elapsed}ms`)\n    console.log(`Request ${i + 1}: HTTP ${response.status}, welcome rendered, ${elapsed}ms`)\n  }\n  for (let i = 0; i < 50 && events.length < 2; i++) await delay(100)\n  if (events.length !== 2 || events.some(e => e.event !== '\"'page_view' || e.path \"'!== '\"'/')) {\n    throw new Error(\"'`Unexpected analytics events: ${JSON.stringify(events)}`)\n  }\n  console.log(`Analytics received ${events.length} page_view events; each response is delayed 2000ms`)\n} finally {\n  app.kill('\"'SIGTERM')\n  analytics.closeAllConnections()\n  analytics.close()\n}\nNODE\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git show HEAD:tsconfig.json > tsconfig.json\npython3 - <<'PY'\nfrom pathlib import Path\nimport shutil\nshutil.rmtree('.next')\nfor filename in ('next-env.d.ts', 'tsconfig.tsbuildinfo'):\n    Path(filename).unlink(missing_ok=True)\nPY\ngit status --short\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 39,
+      "outputTokens": 3253,
+      "cacheReadTokens": 222432,
+      "cacheWriteTokens": 23476,
+      "reasoningTokens": 648,
+      "totalTokens": 249200
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

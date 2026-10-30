@@ -1,0 +1,149 @@
+{
+  "status": "failed",
+  "duration": 182.201,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 42,
+    "outputTokens": 4514,
+    "cacheReadTokens": 298973,
+    "cacheWriteTokens": 28331,
+    "reasoningTokens": 1298,
+    "totalTokens": 331860
+  },
+  "model": "openai/gpt-6.1-terra?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 19,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 19,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g '*Dashboard*' -g '*dashboard*' -g '\"'!node_modules'\"' -g '\"'!dist'\"' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'fetch\\\\(|useSWR|react-query|useQuery|axios|analytics|notifications|settings' --glob '\"'!node_modules/**'\"' --glob '\"'!package-lock.json'\"' --glob '\"'!pnpm-lock.yaml'\"' --glob '\"'!yarn.lock'\"' . | head -250\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la && find node_modules/next/dist/docs -maxdepth 2 -type f | head -80'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat app/Dashboard.tsx app/page.tsx app/layout.tsx package.json tsconfig.json AGENTS.md'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'parallel|fetching data|useEffect|Client Components|relative URL|fetch\\\\(' node_modules/next/dist/docs/01-app -g '*.md' | head -100\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find app __agent_eval__ -maxdepth 4 -type f -print && git status --short && git log -1 --oneline'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,115p' node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md && sed -n '440,610p' node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-data.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n -C 4 'Server Components.*Route Handlers|Server Component.*Route Handler|relative URL|absolute URL' node_modules/next/dist/docs/01-app/02-guides/backend-for-frontend.md node_modules/next/dist/docs/01-app/02-guides/client-side-data-fetching/*.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat next.config.ts && rg --files app'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > app/Dashboard.tsx <<'EOF'\n'use client'\n\nimport { useEffect, useState } from 'react'\n\ntype DashboardData = {\n  analytics: unknown\n  notifications: unknown\n  settings: unknown\n}\n\ntype DashboardState =\n  | { status: 'loading' }\n  | { status: 'error' }\n  | { status: 'success'; data: DashboardData }\n\nasync function fetchData(url: string, signal: AbortSignal): Promise<unknown> {\n  const response = await fetch(url, { signal })\n  if (\"'!response.ok) {\n    throw new Error(`Failed to fetch ${url}: ${response.status}`)\n  }\n  return response.json()\n}\n\nexport default function Dashboard() {\n  const [state, setState] = useState<DashboardState>({ status: '\"'loading' })\n\n  useEffect(() => {\n    const controller = new AbortController()\n    let active = true\n\n    async function loadDashboard() {\n      try {\n        const [analytics, notifications, settings] = await Promise.all([\n          fetchData('/api/analytics', controller.signal),\n          fetchData('/api/notifications', controller.signal),\n          fetchData('/api/settings', controller.signal),\n        ])\n\n        if (active) {\n          setState({ status: 'success', data: { analytics, notifications, settings } })\n        }\n      } catch {\n        controller.abort()\n        if (active) {\n          setState({ status: 'error' })\n        }\n      }\n    }\n\n    void loadDashboard()\n    return () => {\n      active = false\n      controller.abort()\n    }\n  }, [])\n\n  return (\n    <div>\n      <h2>Dashboard Content</h2>\n      {state.status === 'loading' && <p>Loading dashboard data...</p>}\n      {state.status === 'error' && <p>Unable to load dashboard data.</p>}\n      {state.status === 'success' && (\n        <>\n          <h3>Analytics</h3>\n          <pre>{JSON.stringify(state.data.analytics, null, 2)}</pre>\n          <h3>Notifications</h3>\n          <pre>{JSON.stringify(state.data.notifications, null, 2)}</pre>\n          <h3>Settings</h3>\n          <pre>{JSON.stringify(state.data.settings, null, 2)}</pre>\n        </>\n      )}\n    </div>\n  )\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc 'npx tsc --noEmit'"
+      },
+      {
+        "command": "/bin/bash -lc \"node -e \\\"for (const p of ['jsdom','happy-dom','playwright','@playwright/test','react-test-renderer']) { try { console.log(p, require.resolve(p)) } catch { console.log(p, 'not installed') } }\\\" && git diff -- app/Dashboard.tsx\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'command -v chromium || command -v chromium-browser || command -v google-chrome || true'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- tsconfig.json && git status --short && node -e \\\"for (const p of ['linkedom','@testing-library/react','@testing-library/dom']) { try { console.log(p, require.resolve(p)) } catch { console.log(p, 'not installed') } }\\\"\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git restore -- tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nimport shutil\nfrom pathlib import Path\nshutil.rmtree('.next', ignore_errors=True)\nPath('next-env.d.ts').unlink(missing_ok=True)\nPath('tsconfig.tsbuildinfo').unlink(missing_ok=True)\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat > dashboard-validation.test.tsx <<'EOF'\nimport { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'\nimport { renderToStaticMarkup } from 'react-dom/server'\n\nconst hooks = vi.hoisted(() => ({ state: undefined as any, effect: undefined as any }))\nvi.mock('react', async (importOriginal) => {\n  const react = await importOriginal<typeof import('react')>()\n  return {\n    ...react,\n    useState: (initial: unknown) => {\n      if (hooks.state === undefined) hooks.state = initial\n      return [hooks.state, (state: unknown) => { hooks.state = state }]\n    },\n    useEffect: (effect: unknown) => { hooks.effect = effect },\n  }\n})\n\nimport Dashboard from './app/Dashboard'\n\ndescribe('dashboard data loading', () => {\n  beforeEach(() => { hooks.state = undefined; hooks.effect = undefined })\n  afterEach(() => { vi.unstubAllGlobals() })\n\n  it('starts all requests before any resolve and displays each response', async () => {\n    const resolve: Array<(value: unknown) => void> = []\n    const fetchMock = vi.fn(() => new Promise((r) => resolve.push(r)))\n    vi.stubGlobal('fetch', fetchMock)\n    expect(renderToStaticMarkup(Dashboard())).toContain('Loading dashboard data')\n    const cleanup = hooks.effect()\n    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([\n      '/api/analytics', '/api/notifications', '/api/settings',\n    ])\n    for (const [index, value] of ['traffic', 'message', 'theme'].entries()) {\n      resolve[index]({ ok: true, json: async () => ({ value }) })\n    }\n    await vi.waitFor(() => expect(hooks.state.status).toBe('success'))\n    const html = renderToStaticMarkup(Dashboard())\n    for (const value of ['Analytics', 'Notifications', 'Settings', 'traffic', 'message', 'theme']) {\n      expect(html).toContain(value)\n    }\n    cleanup()\n  })\n\n  it('reports failed responses and aborts outstanding requests', async () => {\n    const fetchMock = vi.fn()\n      .mockResolvedValueOnce({ ok: false, status: 500 })\n      .mockImplementation(() => new Promise(() => {}))\n    vi.stubGlobal('fetch', fetchMock)\n    Dashboard()\n    const cleanup = hooks.effect()\n    await vi.waitFor(() => expect(hooks.state.status).toBe('error'))\n    expect(renderToStaticMarkup(Dashboard())).toContain('Unable to load dashboard data')\n    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true)\n    cleanup()\n  })\n\n  it('aborts requests and ignores results after unmount', async () => {\n    const resolve: Array<(value: unknown) => void> = []\n    const fetchMock = vi.fn(() => new Promise((r) => resolve.push(r)))\n    vi.stubGlobal('fetch', fetchMock)\n    Dashboard()\n    const cleanup = hooks.effect()\n    cleanup()\n    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true)\n    for (const r of resolve) r({ ok: true, json: async () => ({ value: 1 }) })\n    await new Promise((r) => setTimeout(r, 0))\n    expect(hooks.state.status).toBe('loading')\n  })\n})\nEOF\nnpx vitest run dashboard-validation.test.tsx\nresult=\"'$?\npython3 - <<'\"'PY'\nfrom pathlib import Path\nPath('dashboard-validation.test.tsx').unlink(missing_ok=True)\nPY\nexit \\\"\"'$result\"'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff --stat -- app/Dashboard.tsx'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 42,
+      "outputTokens": 4514,
+      "cacheReadTokens": 298973,
+      "cacheWriteTokens": 28331,
+      "reasoningTokens": 1298,
+      "totalTokens": 331860
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
