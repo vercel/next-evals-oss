@@ -99,5 +99,5 @@ export function modelPrNotificationPrompt(
     payload.event === "approval_required"
       ? "approval request"
       : "model eval start";
-  return `The ${subject} is already visible in the Slack thread root. Respond with exactly ${modelPrThreadReady} and nothing else.`;
+  return `The ${subject} is already visible in the Slack thread. Respond with exactly ${modelPrThreadReady} and nothing else.`;
 }

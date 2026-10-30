@@ -4,7 +4,7 @@ import {
   modelPrNotificationRoot,
   type ModelPrOutcome,
 } from "./model-pr-notification";
-import { postModelPrOutcome } from "./model-pr-slack";
+import { postModelPrOutcome, postModelPrNotification } from "./model-pr-slack";
 
 const channel = "C0C7VCBP4CA";
 const threadTs = "1793203626.792579";
@@ -65,7 +65,7 @@ test("a rejected Slack reply is a reporting failure, not an accepted Eve session
   );
 });
 
-test("recovers older checks from the bot's exact PR/head root, including roots with replies", async () => {
+test("recovers the oldest bot-authored PR thread across commits, including roots with replies", async () => {
   const root = modelPrNotificationRoot({
     ...outcome,
     event: "approval_required",
@@ -131,16 +131,23 @@ test("does not create a replacement root when an old thread cannot be recovered"
   );
 });
 
-
 test("recovers the original thread when a saved duplicate has been deleted", async () => {
   const deletedTs = "1793374731.463709";
-  const root = modelPrNotificationRoot({ ...outcome, event: "approval_required" });
+  const root = modelPrNotificationRoot({
+    ...outcome,
+    event: "approval_required",
+  });
   const result = await postModelPrOutcome(
-    { ...outcome, threadTs: deletedTs }, channel, async (operation, body) => {
+    { ...outcome, headSha: "7".repeat(40), threadTs: deletedTs },
+    channel,
+    async (operation, body) => {
       if (operation === "auth.test") return { ok: true, user_id: "Ubot" };
       if (operation === "conversations.history") {
         if (body.oldest === deletedTs) return { ok: true, messages: [] };
-        return { ok: true, messages: [{ user: "Ubot", ts: threadTs, text: root }] };
+        return {
+          ok: true,
+          messages: [{ user: "Ubot", ts: threadTs, text: root }],
+        };
       }
       assert.equal(operation, "chat.postMessage");
       assert.equal(body.thread_ts, threadTs);
@@ -148,4 +155,87 @@ test("recovers the original thread when a saved duplicate has been deleted", asy
     },
   );
   assert.equal(result.threadTs, threadTs);
+});
+
+test("a new head's approval notice stays in the original PR thread and is deduplicated", async () => {
+  const parent = {
+    user: "Ubot",
+    ts: threadTs,
+    text: modelPrNotificationRoot({ ...outcome, event: "approval_required" }),
+  };
+  const messages = [parent];
+  const payload = {
+    ...outcome,
+    event: "approval_required" as const,
+    headSha: "7".repeat(40),
+  };
+  let posted = 0;
+  const api = async (operation: string, body: Record<string, unknown>) => {
+    if (operation === "auth.test") return { ok: true, user_id: "Ubot" };
+    if (operation === "conversations.history")
+      return { ok: true, messages: [parent] };
+    if (operation === "conversations.replies") return { ok: true, messages };
+    assert.equal(operation, "chat.postMessage");
+    assert.equal(body.thread_ts, threadTs);
+    assert.equal(body.reply_broadcast, false);
+    assert.match(String(body.text), /7777777/);
+    posted++;
+    messages.push({
+      user: "Ubot",
+      ts: "1793373999.000001",
+      text: String(body.text),
+    });
+    return { ok: true, ts: "1793373999.000001" };
+  };
+  assert.deepEqual(await postModelPrNotification(payload, channel, api), {
+    threadTs,
+    messageTs: "1793373999.000001",
+    created: true,
+  });
+  assert.deepEqual(await postModelPrNotification(payload, channel, api), {
+    threadTs,
+    messageTs: "1793373999.000001",
+    created: false,
+  });
+  assert.equal(posted, 1);
+});
+
+test("a first registration creates a root only after checking the channel", async () => {
+  let checked = false;
+  const result = await postModelPrNotification(
+    { ...outcome, event: "approval_required" },
+    channel,
+    async (operation, body) => {
+      if (operation === "auth.test") return { ok: true, user_id: "Ubot" };
+      if (operation === "conversations.history") {
+        checked = true;
+        return { ok: true, messages: [] };
+      }
+      assert.ok(checked);
+      assert.equal(operation, "chat.postMessage");
+      assert.equal(body.thread_ts, undefined);
+      return { ok: true, ts: threadTs };
+    },
+  );
+  assert.equal(result.threadTs, threadTs);
+  assert.equal(result.created, true);
+});
+
+test("does not create a root if channel history cannot be read completely", async () => {
+  await assert.rejects(
+    postModelPrNotification(
+      { ...outcome, event: "approval_required" },
+      channel,
+      async (operation) => {
+        if (operation === "auth.test") return { ok: true, user_id: "Ubot" };
+        assert.equal(operation, "conversations.history");
+        return {
+          ok: true,
+          messages: [],
+          response_metadata: { next_cursor: "more" },
+        };
+      },
+    ),
+    /history is incomplete/,
+  );
 });

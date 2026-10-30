@@ -24,7 +24,8 @@ The intake route accepts only GitHub Actions OIDC tokens for
 `vercel/next-evals-oss` on `main`. Model PR outcomes are posted directly to the
 saved Slack parent message and acknowledged only after Slack accepts the reply.
 Older checks without a parent timestamp, or a deleted duplicate parent, are
-recovered from the bot's original message for that PR and commit. If it cannot
+recovered from the bot's original message for that PR, including earlier commits.
+New approval requests and run-start notices also reuse this thread. If it cannot
 be found, reporting fails instead of creating a new root.
 
 Slack credentials and inbound webhook verification are managed by the
