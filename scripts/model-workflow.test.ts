@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 const workflowPath = new URL(
@@ -24,6 +27,35 @@ function job(workflow: string, name: string) {
   assert.ok(rest, `missing ${name} job`);
   return rest.split(/\n  [a-z]+:\n/)[0];
 }
+
+test('publishing preserves log whitespace while checking the exported dataset', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+  const command = job(workflow, 'update').match(
+    /^\s+(git diff --cached --check[^\n]*)$/m,
+  )?.[1];
+  assert.ok(command, 'missing staged whitespace check');
+  const cwd = await mkdtemp(join(tmpdir(), 'model-result-whitespace-'));
+  const git = (...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+
+  try {
+    git('init', '--quiet');
+    const log = 'Generating static pages (2/4) \n\n';
+    await writeFile(join(cwd, 'build.txt'), log);
+    await writeFile(join(cwd, 'agent-results.json'), '{}\n');
+    git('add', '.');
+    assert.throws(() => git('diff', '--cached', '--check'));
+    execFileSync('bash', ['-e', '-c', command], { cwd, stdio: 'pipe' });
+    assert.equal(git('show', ':build.txt').toString(), log);
+
+    await writeFile(join(cwd, 'agent-results.json'), '{} \n');
+    git('add', 'agent-results.json');
+    assert.throws(() =>
+      execFileSync('bash', ['-e', '-c', command], { cwd, stdio: 'pipe' }),
+    );
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
 
 test('model registration automation is restricted to merged main', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
