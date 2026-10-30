@@ -29,7 +29,7 @@ is missing, or the gateway refuses the model id.
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm sync-evals 071a2343c509751585cd9f77ae66e8c30daf2ea8   # the SHA .github/workflows/eval-cache-check.yml pins
+pnpm sync-evals   # reviewed eval-suite-ref.txt and grader overrides, matching CI
 pnpm preflight
 ```
 
