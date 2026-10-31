@@ -1,0 +1,351 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 8ms
+   × Catalog is cached, tagged, and revalidated by the sync action 6ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  15:26:27
+   Duration  251ms (transform 52ms, setup 23ms, collect 28ms, tests 8ms, environment 0ms, prepare 68ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product catalog | Northstar Commerce',
+  description: 'Browse and manage your product catalog.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { getCachedProducts, PRODUCTS_CACHE_TAG } from '@/lib/products'
+
+type PageProps = {
+  searchParams: Promise<{
+    q?: string
+    category?: string
+    sync?: string
+  }>
+}
+
+const currency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+})
+
+function icon(name: 'grid' | 'box' | 'truck' | 'chart' | 'settings' | 'search' | 'chevron' | 'arrow' | 'plus' | 'bell') {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true as const,
+  }
+
+  switch (name) {
+    case 'grid':
+      return <svg {...common}><rect x=\"3.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.5\" /><rect x=\"13.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.5\" /><rect x=\"3.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.5\" /><rect x=\"13.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.5\" /></svg>
+    case 'box':
+      return <svg {...common}><path d=\"m12 3 8.5 4.5v9L12 21l-8.5-4.5v-9L12 3Z\" /><path d=\"m3.8 7.7 8.2 4.5 8.2-4.5M12 12.2V21\" /></svg>
+    case 'truck':
+      return <svg {...common}><path d=\"M3 6h11v11H3zM14 10h4l3 3v4h-7z\" /><circle cx=\"7.5\" cy=\"18\" r=\"1.5\" /><circle cx=\"18\" cy=\"18\" r=\"1.5\" /></svg>
+    case 'chart':
+      return <svg {...common}><path d=\"M4 20V11M10 20V5M16 20v-7M22 20H2\" /></svg>
+    case 'settings':
+      return <svg {...common}><circle cx=\"12\" cy=\"12\" r=\"3\" /><path d=\"m19.4 15 .1.1 1.1.9-1.2 2.1-1.4-.5a7.8 7.8 0 0 1-1.5.9l-.3 1.5h-2.4l-.3-1.5a7.8 7.8 0 0 1-1.5-.9l-1.4.5-1.2-2.1 1.1-.9A7.5 7.5 0 0 1 8.5 13l-1.4-.6v-2.4l1.4-.5a7.8 7.8 0 0 1 .7-1.7l-.8-1.2 1.7-1.7 1.2.8a7.8 7.8 0 0 1 1.7-.7l.5-1.4h2.4l.5 1.4a7.8 7.8 0 0 1 1.7.7l1.2-.8 1.7 1.7-.8 1.2a7.8 7.8 0 0 1 .7 1.7l1.4.5v2.4l-1.4.6a7.5 7.5 0 0 1-.8 2.1Z\" transform=\"translate(-1 -1) scale(.98)\" /></svg>
+    case 'search':
+      return <svg {...common}><circle cx=\"10.8\" cy=\"10.8\" r=\"6.8\" /><path d=\"m16 16 4.5 4.5\" /></svg>
+    case 'chevron':
+      return <svg {...common}><path d=\"m7 10 5 5 5-5\" /></svg>
+    case 'arrow':
+      return <svg {...common}><path d=\"M12 16V4m-4 4 4-4 4 4M5 14v5h14v-5\" /></svg>
+    case 'plus':
+      return <svg {...common}><path d=\"M12 5v14M5 12h14\" /></svg>
+    case 'bell':
+      return <svg {...common}><path d=\"M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4\" /></svg>
+  }
+}
+
+function initials(name: string) {
+  return name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const params = await searchParams
+  const query = params.q?.trim() ?? ''
+  const selectedCategory = params.category ?? 'All categories'
+  const products = await getCachedProducts()
+
+  const categories = ['All categories', ...Array.from(new Set(products.map((product) => product.category))).sort()]
+  const filteredProducts = products.filter((product) => {
+    const matchesQuery = !query || [product.name, product.sku, product.category].some((value) =>
+      value.toLowerCase().includes(query.toLowerCase()),
+    )
+    const matchesCategory = selectedCategory === 'All categories' || product.category === selectedCategory
+    return matchesQuery && matchesCategory
+  })
+
+  const activeProducts = products.filter((product) => product.status === 'Active').length
+  const lowStockProducts = products.filter((product) => product.status === 'Low stock').length
+  const inventoryValue = products.reduce((sum, product) => sum + product.price * product.stock, 0)
+
+  async function syncLatestCatalog(formData: FormData) {
+    'use server'
+
+    // Mark the shared catalog cache stale. Next serves the current snapshot and
+    // refreshes it in the background when a tagged view requests products.
+    revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+
+    const nextParams = new URLSearchParams()
+    const q = formData.get('q')
+    const category = formData.get('category')
+    if (typeof q === 'string' && q) nextParams.set('q', q)
+    if (typeof category === 'string' && category !== 'All categories') nextParams.set('category', category)
+    nextParams.set('sync', 'queued')
+    redirect(`/?${nextParams.toString()}`)
+  }
+
+  return (
+    <div className=\"app-shell\">
+      <aside className=\"sidebar\">
+        <a className=\"brand\" href=\"/\" aria-label=\"Northstar Commerce home\">
+          <span className=\"brand-mark\"><span /><span /><span /><span /></span>
+          <span>northstar<span className=\"brand-light\">commerce</span></span>
+        </a>
+
+        <div className=\"workspace-switcher\">
+          <div className=\"workspace-avatar\">N</div>
+          <div className=\"workspace-copy\"><strong>Northstar Supply</strong><span>Commerce workspace</span></div>
+          <span className=\"workspace-chevron\">⌄</span>
+        </div>
+
+        <div className=\"nav-label\">WORKSPACE</div>
+        <nav className=\"main-nav\" aria-label=\"Main navigation\">
+          <a href=\"#overview\" className=\"nav-item\">{icon('grid')}<span>Overview</span></a>
+          <a href=\"#catalog\" className=\"nav-item active\" aria-current=\"page\">{icon('box')}<span>Catalog</span><span className=\"nav-count\">{products.length}</span></a>
+          <a href=\"#orders\" className=\"nav-item\">{icon('truck')}<span>Orders</span></a>
+          <a href=\"#analytics\" className=\"nav-item\">{icon('chart')}<span>Analytics</span></a>
+        </nav>
+
+        <div className=\"sidebar-bottom\">
+          <a href=\"#settings\" className=\"nav-item\">{icon('settings')}<span>Settings</span></a>
+          <div className=\"help-card\">
+            <div className=\"help-dot\">?</div>
+            <div><strong>Need a hand?</strong><span>Visit the help center</span></div>
+            <span className=\"help-arrow\">↗</span>
+          </div>
+          <div className=\"profile-row\">
+            <div className=\"profile-avatar\">AM</div>
+            <div className=\"profile-copy\"><strong>Alex Morgan</strong><span>Administrator</span></div>
+            <span className=\"profile-menu\">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <main className=\"main-content\" id=\"catalog\">
+        <div className=\"topbar\">
+          <div className=\"breadcrumbs\"><span>Workspace</span><span className=\"crumb-separator\">/</span><strong>Catalog</strong></div>
+          <div className=\"topbar-right\"><span className=\"status-indicator\"><i /> All systems operational</span><button className=\"icon-button\" aria-label=\"Notifications\"><span className=\"notification-dot\" />{icon('bell')}</button></div>
+        </div>
+
+        <div className=\"content-wrap\">
+          <header className=\"page-heading\">
+            <div>
+              <div className=\"eyebrow\">PRODUCT OPERATIONS</div>
+              <h1>Product catalog</h1>
+              <p>Keep your products, pricing, and availability in one place.</p>
+            </div>
+            <div className=\"heading-actions\">
+              <form action={syncLatestCatalog}>
+                <input type=\"hidden\" name=\"q\" value={query} />
+                <input type=\"hidden\" name=\"category\" value={selectedCategory} />
+                <button className=\"button button-secondary sync-button\" type=\"submit\">{icon('arrow')}<span>Sync latest catalog</span></button>
+              </form>
+              <button className=\"button button-primary\" type=\"button\">{icon('plus')}<span>Add product</span></button>
+            </div>
+          </header>
+
+          {params.sync === 'queued' && (
+            <div className=\"sync-notice\" role=\"status\">
+              <span className=\"notice-check\">✓</span>
+              <div><strong>Catalog sync requested</strong><span>Products are refreshing in the background. Updated data will appear shortly.</span></div>
+              <a href={query || selectedCategory !== 'All categories' ? `/?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(selectedCategory !== 'All categories' ? { category: selectedCategory } : {}) }).toString()}` : '/'} aria-label=\"Dismiss notification\">×</a>
+            </div>
+          )}
+
+          <section className=\"metrics-grid\" aria-label=\"Catalog summary\">
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Total products</span><span className=\"metric-icon purple\">{icon('box')}</span></div>
+              <div className=\"metric-value\">{products.length.toLocaleString()}</div>
+              <div className=\"metric-caption\"><span className=\"metric-neutral-dot\" />Across all categories</div>
+            </article>
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Active products</span><span className=\"metric-icon green\">✓</span></div>
+              <div className=\"metric-value\">{activeProducts.toLocaleString()}</div>
+              <div className=\"metric-caption\"><span className=\"mini-trend\">↗</span>Available to customers</div>
+            </article>
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Low stock</span><span className=\"metric-icon amber\">!</span></div>
+              <div className=\"metric-value\">{lowStockProducts.toLocaleString()}</div>
+              <div className=\"metric-caption\"><span className=\"metric-warning-dot\" />Needs replenishment</div>
+            </article>
+            <article className=\"metric-card\">
+              <div className=\"metric-top\"><span>Inventory value</span><span className=\"metric-icon blue\">$</span></div>
+              <div className=\"metric-value\">{currency.format(inventoryValue)}</div>
+              <div className=\"metric-caption\"><span className=\"metric-neutral-dot\" />Based on current stock</div>
+            </article>
+          </section>
+
+          <section className=\"catalog-panel\" aria-labelledby=\"catalog-title\">
+            <div className=\"panel-heading\">
+              <div><h2 id=\"catalog-title\">All products</h2><p>A complete view of your product inventory.</p></div>
+              <button className=\"button button-tertiary\" type=\"button\">Last 30 days <span className=\"small-chevron\">⌄</span></button>
+            </div>
+
+            <div className=\"toolbar\">
+              <form method=\"get\" className=\"filter-form\">
+                <label className=\"search-field\">
+                  {icon('search')}
+                  <input type=\"search\" name=\"q\" placeholder=\"Search products or SKU...\" defaultValue={query} />
+                </label>
+                <label className=\"select-field\">
+                  <span className=\"visually-hidden\">Filter by category</span>
+                  <select name=\"category\" defaultValue={selectedCategory}>
+                    {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                  {icon('chevron')}
+                </label>
+                <button className=\"button button-filter\" type=\"submit\">Filter</button>
+              </form>
+              <button className=\"button button-tertiary export-button\" type=\"button\">Export <span className=\"export-symbol\">↧</span></button>
+            </div>
+
+            <div className=\"table-scroll\">
+              <table>
+                <thead><tr><th><span className=\"checkbox\" aria-hidden=\"true\" /></th><th>PRODUCT</th><th>SKU</th><th>CATEGORY</th><th>PRICE</th><th>IN STOCK</th><th>STATUS</th><th><span className=\"visually-hidden\">Actions</span></th></tr></thead>
+                <tbody>
+                  {filteredProducts.map((product, index) => (
+                    <tr key={product.id}>
+                      <td><span className=\"checkbox\" aria-hidden=\"true\" /></td>
+                      <td><div className=\"product-cell\"><div className={`product-thumb thumb-${index % 6}`}><span>{initials(product.name)}</span></div><div className=\"product-copy\"><strong>{product.name}</strong><span>Added {product.added}</span></div></div></td>
+                      <td className=\"sku-cell\">{product.sku}</td>
+                      <td><span className=\"category-pill\">{product.category}</span></td>
+                      <td className=\"price-cell\">{currency.format(product.price)}</td>
+                      <td><div className=\"stock-cell\"><span className={product.stock <= 10 ? 'stock-number low' : 'stock-number'}>{product.stock}</span><span className=\"stock-unit\">units</span></div></td>
+                      <td><span className={`status-pill ${product.status.toLowerCase().replace(' ', '-')}`}><i />{product.status}</span></td>
+                      <td><button className=\"row-menu\" type=\"button\" aria-label={`More actions for ${product.name}`}>···</button></td>
+                    </tr>
+                  ))}
+                  {filteredProducts.length === 0 && <tr><td className=\"empty-state\" colSpan={8}>No products match your search. Try a different name, SKU, or category.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <div className=\"table-footer\">
+              <span>Showing <strong>{filteredProducts.length ? 1 : 0}–{filteredProducts.length}</strong> of <strong>{filteredProducts.length}</strong> products</span>
+              <div className=\"pagination\"><button type=\"button\" disabled>← <span>Previous</span></button><button type=\"button\" disabled><span>Next</span> →</button></div>
+            </div>
+          </section>
+          <footer className=\"page-footer\"><span>Catalog data is cached for fast browsing.</span><span>© 2026 Northstar Commerce</span></footer>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+const products = [
+  { id: 1, name: 'Studio Headphones', sku: 'NS-AUD-001', category: 'Audio', price: 249, stock: 84, status: 'Active', added: 'Oct 21, 2026' },
+  { id: 2, name: 'Everyday Backpack', sku: 'NS-BAG-014', category: 'Accessories', price: 89, stock: 7, status: 'Low stock', added: 'Oct 19, 2026' },
+  { id: 3, name: 'Wireless Keyboard', sku: 'NS-TEC-023', category: 'Electronics', price: 129, stock: 42, status: 'Active', added: 'Oct 17, 2026' },
+  { id: 4, name: 'Ceramic Travel Mug', sku: 'NS-HOM-008', category: 'Home & Living', price: 34, stock: 0, status: 'Out of stock', added: 'Oct 15, 2026' },
+  { id: 5, name: 'Linen Market Tote', sku: 'NS-BAG-021', category: 'Accessories', price: 42, stock: 126, status: 'Active', added: 'Oct 13, 2026' },
+  { id: 6, name: 'Portable Speaker', sku: 'NS-AUD-017', category: 'Audio', price: 179, stock: 9, status: 'Low stock', added: 'Oct 11, 2026' },
+  { id: 7, name: 'Desk Lamp', sku: 'NS-HOM-031', category: 'Home & Living', price: 76, stock: 31, status: 'Active', added: 'Oct 08, 2026' },
+  { id: 8, name: 'USB-C Hub', sku: 'NS-TEC-039', category: 'Electronics', price: 59, stock: 58, status: 'Active', added: 'Oct 06, 2026' },
+]
+
+export async function getAllProducts() {
+  // Represents the catalog read from the application's product store.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  return products
+}
+
+import { unstable_cache } from 'next/cache'
+import { getAllProducts } from './db.js'
+
+export const PRODUCTS_CACHE_TAG = 'products'
+
+// Every catalog view shares this tagged read, so one revalidation refreshes the
+// same product snapshot wherever it is used.
+export const getCachedProducts = unstable_cache(
+  async () => getAllProducts(),
+  ['catalog-products'],
+  {
+    tags: [PRODUCTS_CACHE_TAG],
+    revalidate: 60 * 60,
+  },
+)
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

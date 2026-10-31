@@ -1,0 +1,253 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 10ms
+   × Catalog is cached, tagged, and revalidated by the sync action 9ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  15:38:24
+   Duration  406ms (transform 91ms, setup 38ms, collect 45ms, tests 10ms, environment 0ms, prepare 116ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Products · Northstar Admin',
+  description: 'Manage your Northstar product catalog.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { getAllProducts, PRODUCTS_CACHE_TAG } from '../lib/db.js'
+
+export default async function Page() {
+  async function syncCatalog() {
+    'use server'
+
+    // Mark the shared catalog cache stale. Next can return the current snapshot
+    // immediately and refresh it in the background for this and other views.
+    revalidateTag(PRODUCTS_CACHE_TAG, 'max')
+  }
+
+  const products = await getAllProducts()
+  const activeCount = products.filter((product) => product.status === 'Active').length
+  const lowStockCount = products.filter((product) => product.inventory < 20).length
+
+  return (
+    <main className=\"app-shell\">
+      <aside className=\"sidebar\">
+        <a className=\"brand\" href=\"#catalog\" aria-label=\"Northstar home\">
+          <span className=\"brand-mark\">N</span>
+          <span>northstar<span className=\"brand-period\">.</span></span>
+        </a>
+
+        <div className=\"workspace-label\">WORKSPACE</div>
+        <nav aria-label=\"Main navigation\" className=\"main-nav\">
+          <a className=\"nav-item\" href=\"#overview\"><span className=\"nav-icon\">◫</span>Overview</a>
+          <a className=\"nav-item nav-item-active\" href=\"#catalog\"><span className=\"nav-icon\">▦</span>Products<span className=\"nav-count\">{products.length}</span></a>
+          <a className=\"nav-item\" href=\"#orders\"><span className=\"nav-icon\">▤</span>Orders</a>
+          <a className=\"nav-item\" href=\"#inventory\"><span className=\"nav-icon\">▧</span>Inventory</a>
+          <a className=\"nav-item\" href=\"#customers\"><span className=\"nav-icon\">♙</span>Customers</a>
+        </nav>
+
+        <div className=\"sidebar-bottom\">
+          <a className=\"nav-item\" href=\"#settings\"><span className=\"nav-icon\">⚙</span>Settings</a>
+          <div className=\"user-card\">
+            <div className=\"avatar\">JD</div>
+            <div className=\"user-copy\"><strong>Jordan Davis</strong><span>Store admin</span></div>
+            <span className=\"user-menu\">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <section className=\"main-panel\" id=\"catalog\">
+        <header className=\"topbar\">
+          <div className=\"breadcrumbs\"><span>Workspace</span><span className=\"crumb-slash\">/</span><strong>Products</strong></div>
+          <div className=\"topbar-actions\">
+            <button className=\"icon-button\" type=\"button\" aria-label=\"Help\">?</button>
+            <button className=\"icon-button notification-button\" type=\"button\" aria-label=\"Notifications\">♧<i /></button>
+            <div className=\"topbar-avatar\">JD</div>
+          </div>
+        </header>
+
+        <div className=\"content-wrap\">
+          <div className=\"page-heading\">
+            <div>
+              <div className=\"eyebrow\">CATALOG MANAGEMENT</div>
+              <h1>Products</h1>
+              <p className=\"page-subtitle\">Manage your product catalog, pricing, and availability.</p>
+            </div>
+            <div className=\"heading-actions\">
+              <form action={syncCatalog}>
+                <button className=\"button button-secondary\" type=\"submit\"><span className=\"sync-icon\">↻</span>Sync latest catalog</button>
+              </form>
+              <button className=\"button button-primary\" type=\"button\"><span className=\"plus-icon\">＋</span>Add product</button>
+            </div>
+          </div>
+
+          <div className=\"sync-note\"><span className=\"note-dot\" />Catalog synced from ERP · Changes may take a moment to appear</div>
+
+          <section className=\"stats-grid\" aria-label=\"Catalog summary\">
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Total products</span><span className=\"stat-icon violet\">▦</span></div>
+              <div className=\"stat-value\">{products.length}</div>
+              <div className=\"stat-foot\"><span className=\"trend-up\">↗ 4.8%</span> <span>vs. last month</span></div>
+            </article>
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Active products</span><span className=\"stat-icon green\">✓</span></div>
+              <div className=\"stat-value\">{activeCount}</div>
+              <div className=\"stat-foot\"><span className=\"stat-muted\">Available in your store</span></div>
+            </article>
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Low stock</span><span className=\"stat-icon amber\">⌁</span></div>
+              <div className=\"stat-value\">{lowStockCount}</div>
+              <div className=\"stat-foot\"><span className=\"attention\">Needs your attention</span></div>
+            </article>
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Catalog value</span><span className=\"stat-icon blue\">＄</span></div>
+              <div className=\"stat-value\">${products.reduce((sum, product) => sum + product.price, 0).toLocaleString()}</div>
+              <div className=\"stat-foot\"><span className=\"stat-muted\">Combined listed prices</span></div>
+            </article>
+          </section>
+
+          <section className=\"catalog-card\" aria-label=\"Product catalog\">
+            <div className=\"catalog-toolbar\">
+              <div className=\"catalog-tabs\" role=\"tablist\" aria-label=\"Product status\">
+                <button className=\"catalog-tab selected\" type=\"button\" role=\"tab\" aria-selected=\"true\">All products <span>{products.length}</span></button>
+                <button className=\"catalog-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\">Active</button>
+                <button className=\"catalog-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\">Drafts</button>
+                <button className=\"catalog-tab\" type=\"button\" role=\"tab\" aria-selected=\"false\">Archived</button>
+              </div>
+              <div className=\"table-actions\">
+                <label className=\"search-box\"><span>⌕</span><input type=\"search\" placeholder=\"Search products\" aria-label=\"Search products\" /></label>
+                <button className=\"filter-button\" type=\"button\"><span>☷</span> Filters</button>
+                <button className=\"view-button\" type=\"button\" aria-label=\"Table view\">☰</button>
+              </div>
+            </div>
+
+            <div className=\"table-scroll\">
+              <table>
+                <thead>
+                  <tr>
+                    <th className=\"check-cell\"><input type=\"checkbox\" aria-label=\"Select all products\" /></th>
+                    <th>PRODUCT <span className=\"sort-mark\">↕</span></th>
+                    <th>STATUS</th>
+                    <th>INVENTORY <span className=\"sort-mark\">↕</span></th>
+                    <th>PRICE <span className=\"sort-mark\">↕</span></th>
+                    <th>LAST UPDATED</th>
+                    <th aria-label=\"Actions\" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product, index) => (
+                    <tr key={product.id}>
+                      <td className=\"check-cell\"><input type=\"checkbox\" aria-label={`Select ${product.name}`} /></td>
+                      <td>
+                        <div className=\"product-cell\">
+                          <div className={`product-thumb thumb-${index % 5}`}><span>{product.name.slice(0, 1)}</span></div>
+                          <div className=\"product-copy\"><strong>{product.name}</strong><span>{product.sku} <i>·</i> {product.category}</span></div>
+                        </div>
+                      </td>
+                      <td><span className={`status-pill ${product.status === 'Active' ? 'status-active' : 'status-draft'}`}><i />{product.status}</span></td>
+                      <td><span className={product.inventory < 20 ? 'stock-low' : 'stock-ok'}>{product.inventory}</span><span className=\"stock-label\"> in stock</span></td>
+                      <td className=\"price-cell\">${product.price.toFixed(2)}</td>
+                      <td className=\"updated-cell\">{product.updated}</td>
+                      <td><button className=\"row-menu\" type=\"button\" aria-label={`More actions for ${product.name}`}>···</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <footer className=\"table-footer\">
+              <span>Showing <strong>1–{products.length}</strong> of <strong>{products.length}</strong> products</span>
+              <div className=\"pagination\"><button type=\"button\" disabled aria-label=\"Previous page\">‹</button><button className=\"current-page\" type=\"button\" aria-current=\"page\">1</button><button type=\"button\" disabled aria-label=\"Next page\">›</button></div>
+            </footer>
+          </section>
+          <div className=\"bottom-note\"><span>↻</span> Product data is refreshed automatically after each catalog sync.</div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+export const PRODUCTS_CACHE_TAG = 'products'
+
+async function queryProducts() {
+  // Simulate a database read. In production this is where the catalog query lives.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Studio headphones', sku: 'NS-AU-1042', category: 'Audio', status: 'Active', inventory: 84, price: 199, updated: 'Oct 31, 2026' },
+    { id: 2, name: 'Everyday laptop', sku: 'NS-EL-2088', category: 'Electronics', status: 'Active', inventory: 32, price: 999, updated: 'Oct 31, 2026' },
+    { id: 3, name: 'Classic watch', sku: 'NS-AC-0316', category: 'Accessories', status: 'Active', inventory: 12, price: 299, updated: 'Oct 30, 2026' },
+    { id: 4, name: 'Smartphone Pro', sku: 'NS-EL-5410', category: 'Electronics', status: 'Active', inventory: 57, price: 699, updated: 'Oct 30, 2026' },
+    { id: 5, name: 'Tablet Air', sku: 'NS-EL-7732', category: 'Electronics', status: 'Draft', inventory: 8, price: 499, updated: 'Oct 29, 2026' },
+  ]
+}
+
+// Keep catalog reads shared across requests and invalidate them as one unit
+// whenever the upstream catalog changes.
+export const getAllProducts = unstable_cache(queryProducts, ['catalog-products'], {
+  tags: [PRODUCTS_CACHE_TAG],
+})
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
