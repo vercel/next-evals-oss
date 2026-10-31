@@ -1,0 +1,257 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (2 tests | 1 failed) 10ms
+   × Catalog is cached, tagged, and revalidated by the sync action 8ms
+     → expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+   ✓ Inline form-triggered Server Action flow exists 1ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  15:44:32
+   Duration  356ms (transform 66ms, setup 29ms, collect 38ms, tests 10ms, environment 0ms, prepare 87ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Catalog is cached, tagged, and revalidated by the sync action
+AssertionError: expected 'import type { Metadata } from \'next\…' to match /['"]use cache['"];?/
+
+[32m- Expected:[39m 
+/['"]use cache['"];?/
+
+[31m+ Received:[39m 
+"import type { Metadata } from 'next'
+import './globals.css'
+
+export const metadata: Metadata = {
+  title: 'Product catalog | Northstar',
+  description: 'Manage your Northstar store catalog and inventory.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+import { revalidateTag } from 'next/cache'
+import { getAllProducts } from '@/lib/db'
+
+const currency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string | string[] }>
+}) {
+  async function syncLatestCatalog() {
+    'use server'
+
+    // Mark the shared catalog cache stale. The next read serves stale data while
+    // Next refreshes it in the background, so the admin action stays responsive.
+    revalidateTag('products', 'max')
+  }
+
+  const [allProducts, params] = await Promise.all([getAllProducts(), searchParams])
+  const searchText = Array.isArray(params.q) ? params.q[0] : params.q
+  const query = searchText?.trim().toLowerCase() ?? ''
+  const products = allProducts.filter((product) =>
+    [product.name, product.sku, product.category].some((value) => value.toLowerCase().includes(query)),
+  )
+  const activeCount = allProducts.filter((product) => product.status === 'Active').length
+  const lowStockCount = allProducts.filter((product) => product.status === 'Low stock').length
+  const outOfStockCount = allProducts.filter((product) => product.status === 'Out of stock').length
+
+  return (
+    <div className=\"app-shell\">
+      <aside className=\"sidebar\">
+        <a className=\"brand\" href=\"#catalog\" aria-label=\"Northstar home\">
+          <span className=\"brand-mark\">N</span>
+          <span>northstar<span className=\"brand-dot\">.</span></span>
+        </a>
+
+        <div className=\"workspace-label\">WORKSPACE</div>
+        <nav className=\"primary-nav\" aria-label=\"Main navigation\">
+          <a className=\"nav-link\" href=\"#overview\"><span className=\"nav-icon\">◫</span> Overview</a>
+          <a className=\"nav-link active\" href=\"#catalog\" aria-current=\"page\"><span className=\"nav-icon\">▦</span> Catalog <span className=\"nav-count\">{allProducts.length}</span></a>
+          <a className=\"nav-link\" href=\"#orders\"><span className=\"nav-icon\">▤</span> Orders</a>
+          <a className=\"nav-link\" href=\"#customers\"><span className=\"nav-icon\">♙</span> Customers</a>
+          <a className=\"nav-link\" href=\"#analytics\"><span className=\"nav-icon\">⌁</span> Analytics</a>
+        </nav>
+
+        <div className=\"sidebar-bottom\">
+          <a className=\"nav-link\" href=\"#settings\"><span className=\"nav-icon\">⚙</span> Settings</a>
+          <div className=\"account-card\">
+            <div className=\"avatar\">JD</div>
+            <div className=\"account-copy\"><strong>Jamie Davis</strong><span>Store admin</span></div>
+            <span className=\"account-menu\">···</span>
+          </div>
+        </div>
+      </aside>
+
+      <main className=\"main-content\" id=\"catalog\">
+        <header className=\"topbar\">
+          <div className=\"breadcrumbs\"><span>Workspace</span><span className=\"crumb-divider\">/</span><strong>Catalog</strong></div>
+          <div className=\"topbar-actions\"><span className=\"store-indicator\"><span className=\"online-dot\" /> Store is live</span><button className=\"icon-button\" aria-label=\"Notifications\">♧<i /></button></div>
+        </header>
+
+        <div className=\"page-content\">
+          <div className=\"page-heading\">
+            <div>
+              <div className=\"eyebrow\">YOUR STORE</div>
+              <h1>Product catalog</h1>
+              <p className=\"page-subtitle\">Manage your products, pricing, and inventory in one place.</p>
+            </div>
+            <form action={syncLatestCatalog}>
+              <button className=\"sync-button\" type=\"submit\">
+                <span className=\"sync-icon\" aria-hidden=\"true\">↻</span>
+                Sync latest catalog
+              </button>
+            </form>
+          </div>
+
+          <section className=\"stat-grid\" aria-label=\"Catalog summary\">
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Total products</span><span className=\"stat-icon violet\">▦</span></div>
+              <div className=\"stat-number\">{allProducts.length}</div>
+              <div className=\"stat-foot\">Across all categories</div>
+            </article>
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Active products</span><span className=\"stat-icon green\">✓</span></div>
+              <div className=\"stat-number\">{activeCount}</div>
+              <div className=\"stat-foot\"><span className=\"foot-dot green-dot\" /> Available to customers</div>
+            </article>
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Low stock</span><span className=\"stat-icon amber\">⌁</span></div>
+              <div className=\"stat-number\">{lowStockCount}</div>
+              <div className=\"stat-foot\">Needs a quick inventory check</div>
+            </article>
+            <article className=\"stat-card\">
+              <div className=\"stat-top\"><span>Out of stock</span><span className=\"stat-icon red\">⊘</span></div>
+              <div className=\"stat-number\">{outOfStockCount}</div>
+              <div className=\"stat-foot\">Currently unavailable</div>
+            </article>
+          </section>
+
+          <section className=\"catalog-panel\" aria-labelledby=\"products-title\">
+            <div className=\"panel-heading\">
+              <div>
+                <h2 id=\"products-title\">All products <span className=\"table-count\">{products.length}</span></h2>
+                <p>Keep track of every item in your store.</p>
+              </div>
+            </div>
+
+            <div className=\"table-toolbar\">
+              <form className=\"search-box\" action=\"/\" method=\"get\">
+                <span aria-hidden=\"true\">⌕</span>
+                <input type=\"search\" name=\"q\" defaultValue={searchText} placeholder=\"Search products...\" aria-label=\"Search products\" />
+                <button className=\"search-submit\" type=\"submit\">Search</button>
+              </form>
+            </div>
+
+            <div className=\"table-scroll\">
+              <table>
+                <thead>
+                  <tr>
+                    <th className=\"product-heading\"><input type=\"checkbox\" aria-label=\"Select all products\" /> Product <span className=\"sort-mark\">↕</span></th>
+                    <th>SKU <span className=\"sort-mark\">↕</span></th>
+                    <th>Category <span className=\"sort-mark\">↕</span></th>
+                    <th>Price <span className=\"sort-mark\">↕</span></th>
+                    <th>Inventory <span className=\"sort-mark\">↕</span></th>
+                    <th>Status</th>
+                    <th><span className=\"visually-hidden\">More actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product, index) => (
+                    <tr key={product.id}>
+                      <td className=\"product-cell\"><input type=\"checkbox\" aria-label={`Select ${product.name}`} /><span className={`product-thumb thumb-${index % 5}`} aria-hidden=\"true\"><span>{product.name.slice(0, 1)}</span></span><span className=\"product-name\">{product.name}</span></td>
+                      <td className=\"sku-cell\">{product.sku}</td>
+                      <td><span className=\"category-pill\">{product.category}</span></td>
+                      <td className=\"price-cell\">{currency.format(product.price)}</td>
+                      <td><span className=\"inventory-number\">{product.inventory}</span><span className=\"inventory-unit\"> in stock</span></td>
+                      <td><span className={`status-pill ${product.status.toLowerCase().replaceAll(' ', '-')}`}><span />{product.status}</span></td>
+                      <td><button className=\"row-menu\" type=\"button\" aria-label={`More actions for ${product.name}`}>···</button></td>
+                    </tr>
+                  ))}
+                  {products.length === 0 && <tr><td className=\"empty-state\" colSpan={7}>No products match “{searchText}”. Try a different name, SKU, or category.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <div className=\"table-footer\"><span>Showing <strong>{products.length ? 1 : 0}–{products.length}</strong> of <strong>{allProducts.length} products</strong></span><div className=\"pagination\"><span>{query ? `Filtered by “${searchText}”` : 'All catalog products'}</span></div></div>
+          </section>
+          <p className=\"sync-note\"><span className=\"note-check\">✓</span> Catalog data is cached for fast browsing. Syncing marks it for a background refresh.</p>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+import { unstable_cache } from 'next/cache'
+
+async function queryAllProducts() {
+  // Simulate database delay
+  await new Promise((resolve) => setTimeout(resolve, 100))
+
+  return [
+    { id: 1, name: 'Studio Laptop Pro', sku: 'EL-1024', category: 'Electronics', price: 1299, inventory: 42, status: 'Active' },
+    { id: 2, name: 'Wireless Headphones', sku: 'AU-2840', category: 'Audio', price: 249, inventory: 8, status: 'Low stock' },
+    { id: 3, name: 'Everyday Backpack', sku: 'AC-0918', category: 'Accessories', price: 89, inventory: 156, status: 'Active' },
+    { id: 4, name: 'Smart Watch Series 5', sku: 'WT-5103', category: 'Wearables', price: 329, inventory: 0, status: 'Out of stock' },
+    { id: 5, name: 'Portable Speaker', sku: 'AU-1732', category: 'Audio', price: 119, inventory: 64, status: 'Active' },
+  ]
+}
+
+// Shared tagged cache keeps product reads fast across every server view that
+// imports this query. The sync action can stale this tag without expiring all
+// other cached data.
+export const getAllProducts = unstable_cache(queryAllProducts, ['catalog-products'], {
+  tags: ['products'],
+})
+
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {}
+
+export default nextConfig
+
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    // Agentic judge matchers spawn a full agent run in-sandbox; give them room.
+    // The sandbox-level timeout is the real bound.
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:78:18
+     76| test('Catalog is cached, tagged, and revalidated by the sync action', …
+     77|   // Cheap and style-independent: the directive itself must be present…
+     78|   expect(source).toMatch(/['"]use cache['"];?/)
+       |                  ^
+     79| 
+     80|   // One judge call rather than two: the whole EVAL.ts run must finish…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

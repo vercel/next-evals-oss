@@ -1,0 +1,129 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 9ms
+   ✓ Page is an async server component with parallel data fetching 1ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 5ms
+     → expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  15:24:31
+   Duration  230ms (transform 47ms, setup 20ms, collect 26ms, tests 9ms, environment 0ms, prepare 63ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+type DashboardSection = 'analytics' | 'notifications' | 'settings'
+
+type SectionResult = {
+  data: unknown
+  error: string | null
+}
+
+type DashboardData = Record<DashboardSection, SectionResult>
+
+const sections: { key: DashboardSection; label: string; endpoint: string }[] = [
+  { key: 'analytics', label: 'Analytics', endpoint: '/api/analytics' },
+  { key: 'notifications', label: 'Notifications', endpoint: '/api/notifications' },
+  { key: 'settings', label: 'Settings', endpoint: '/api/settings' },
+]
+
+async function fetchSection(endpoint: string, signal: AbortSignal): Promise<SectionResult> {
+  try {
+    const response = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+      signal,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+
+    return { data: await response.json(), error: null }
+  } catch (error) {
+    return {
+      data: null,
+      error: error instanceof Error ? error.message : 'Unable to load this section',
+    }
+  }
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardData | null>(null)
+
+  useEffect(() => {
+    let isCurrent = true
+    const controller = new AbortController()
+
+    async function loadDashboard() {
+      const [analytics, notifications, settings] = await Promise.all(
+        sections.map(({ endpoint }) => fetchSection(endpoint, controller.signal)),
+      )
+
+      if (isCurrent) {
+        setData({ analytics, notifications, settings })
+      }
+    }
+
+    void loadDashboard()
+
+    return () => {
+      isCurrent = false
+      controller.abort()
+    }
+  }, [])
+
+  return (
+    <section aria-labelledby=\"dashboard-heading\">
+      <h2 id=\"dashboard-heading\">Dashboard</h2>
+
+      {data === null ? (
+        <p role=\"status\">Loading dashboard data…</p>
+      ) : (
+        <div>
+          {sections.map(({ key, label }) => {
+            const result = data[key]
+
+            return (
+              <section key={key} aria-labelledby={`${key}-heading`}>
+                <h3 id={`${key}-heading`}>{label}</h3>
+                {result.error ? (
+                  <p role=\"alert\">Could not load {label.toLowerCase()}: {result.error}</p>
+                ) : (
+                  <pre>{JSON.stringify(result.data, null, 2)}</pre>
+                )}
+              </section>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+"
+
+ ❯ EVAL.ts:68:32
+     66| 
+     67|   // Should NOT have 'use client' directive
+     68|   expect(dashboardContent).not.toMatch(/['"]use client['"];?/)
+       |                                ^
+     69| })
+     70| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

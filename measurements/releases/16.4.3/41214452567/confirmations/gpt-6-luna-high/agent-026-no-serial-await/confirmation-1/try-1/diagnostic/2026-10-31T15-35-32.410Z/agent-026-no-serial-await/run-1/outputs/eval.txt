@@ -1,0 +1,140 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 8ms
+   ✓ Page is an async server component with parallel data fetching 1ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 5ms
+     → expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  15:37:01
+   Duration  249ms (transform 48ms, setup 21ms, collect 23ms, tests 8ms, environment 0ms, prepare 64ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' not to match /['"]use client['"];?/
+
+[32m- Expected:[39m 
+/['"]use client['"];?/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+type ApiResult =
+  | { status: 'loading' }
+  | { status: 'success'; data: unknown }
+  | { status: 'error'; message: string }
+
+type DashboardData = {
+  analytics: ApiResult
+  notifications: ApiResult
+  settings: ApiResult
+}
+
+const endpoints = [
+  { key: 'analytics', title: 'Analytics', url: '/api/analytics' },
+  { key: 'notifications', title: 'Notifications', url: '/api/notifications' },
+  { key: 'settings', title: 'Settings', url: '/api/settings' },
+] as const
+
+const initialData: DashboardData = {
+  analytics: { status: 'loading' },
+  notifications: { status: 'loading' },
+  settings: { status: 'loading' },
+}
+
+function formatData(data: unknown) {
+  return JSON.stringify(data, null, 2) ?? String(data)
+}
+
+export default function Dashboard() {
+  const [dashboardData, setDashboardData] = useState<DashboardData>(initialData)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadData() {
+      const results = await Promise.all(
+        endpoints.map(async ({ key, url }) => {
+          try {
+            const response = await fetch(url, { signal: controller.signal })
+
+            if (!response.ok) {
+              throw new Error(`Request failed with status ${response.status}`)
+            }
+
+            const data: unknown = await response.json()
+            return [key, { status: 'success', data }] as const
+          } catch (error) {
+            if (controller.signal.aborted) return null
+
+            const message =
+              error instanceof Error ? error.message : 'An unknown error occurred'
+            return [key, { status: 'error', message }] as const
+          }
+        }),
+      )
+
+      if (controller.signal.aborted) return
+
+      setDashboardData((current) => {
+        const next = { ...current }
+
+        for (const result of results) {
+          if (result) {
+            const [key, value] = result
+            next[key] = value
+          }
+        }
+
+        return next
+      })
+    }
+
+    void loadData()
+
+    return () => controller.abort()
+  }, [])
+
+  return (
+    <div>
+      <h2>Dashboard Content</h2>
+      <div>
+        {endpoints.map(({ key, title }) => {
+          const result = dashboardData[key]
+
+          return (
+            <section key={key} aria-labelledby={`${key}-heading`}>
+              <h3 id={`${key}-heading`}>{title}</h3>
+              {result.status === 'loading' && <p role=\"status\">Loading {title.toLowerCase()}…</p>}
+              {result.status === 'error' && (
+                <p role=\"alert\">Could not load {title.toLowerCase()}: {result.message}</p>
+              )}
+              {result.status === 'success' && <pre>{formatData(result.data)}</pre>}
+            </section>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+"
+
+ ❯ EVAL.ts:68:32
+     66| 
+     67|   // Should NOT have 'use client' directive
+     68|   expect(dashboardContent).not.toMatch(/['"]use client['"];?/)
+       |                                ^
+     69| })
+     70| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

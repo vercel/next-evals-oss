@@ -1,0 +1,217 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 5 failed) 21884ms
+   × enables Partial Prefetching globally or for the product route 8ms
+     → expected false to be true // Object.is equality
+   × opts the featured product link into per-link prefetching 1ms
+     → expected '\'use client\'\n\nimport Link from \'…' to match /<Link\b[^>]*\bprefetch(?:\s*=\s*\{tru…/
+   × uses the prefetch cache stage 1ms
+     → expected null not to be null
+   × keeps stable product content in the reusable shell 11167ms
+     → [judge:environment] FAIL — The product title and description must remain in the reusable product App Shell. The related-products section must remain outside that shell, beneath its own Suspense boundary. Reject solutions that put the whole product page behind the prefetch stage or move related products into the App Shell. Accept equivalent component and file organization.
+  reason: In app/product/page.tsx, the title and description are rendered directly in ProductPage, which first awaits getRelatedProducts(); there is no reusable product App Shell. The related-products section is rendered in the same main with no Suspense boundary, so the whole page depends on the related-products fetch.
+   × includes related products only in the selected prefetch 10707ms
+     → [judge:environment] FAIL — The related-products section must be available before navigation from the featured-product Link without joining the default product App Shell.
+
+Render related products through an async component that awaits unstable_prefetch() before calling the cached getRelatedProducts() function. The unstable_prefetch() call must be outside every use cache scope, while the existing cached data function stays below it.
+
+Reject solutions that replace the stage with connection() or unstable_navigation(), make the related-products data uncached, or defer it until after navigation. Accept equivalent component and file organization.
+  reason: app/featured-product-link.tsx sets prefetch={false}, and no source imports or awaits unstable_prefetch(). app/product/page.tsx calls getRelatedProducts() directly in ProductPage and renders related products without a separate async component; the cached data function in lib/data.ts remains cached, but the required pre-navigation stage is absent.
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  15:53:53
+   Duration  22.12s (transform 49ms, setup 21ms, collect 28ms, tests 21.88s, environment 0ms, prepare 65ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > enables Partial Prefetching globally or for the product route
+AssertionError: expected false to be true // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+ ❯ EVAL.ts:56:5
+     54|     /partialPrefetching\s*:\s*true/.test(config) ||
+     55|       /export\s+const\s+prefetch\s*=\s*['"]partial['"]/.test(source)
+     56|   ).toBe(true)
+       |     ^
+     57| })
+     58| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  EVAL.ts > opts the featured product link into per-link prefetching
+AssertionError: expected '\'use client\'\n\nimport Link from \'…' to match /<Link\b[^>]*\bprefetch(?:\s*=\s*\{tru…/
+
+[32m- Expected:[39m 
+/<Link\b[^>]*\bprefetch(?:\s*=\s*\{true\})?(?:\s|>)/
+
+[31m+ Received:[39m 
+"'use client'
+
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+
+export default function FeaturedProductLink() {
+  const router = useRouter()
+
+  function prefetchProduct() {
+    router.prefetch('/product')
+  }
+
+  return (
+    <Link
+      href=\"/product\"
+      prefetch={false}
+      onPointerEnter={prefetchProduct}
+      onFocus={prefetchProduct}
+    >
+      View Premium Widget
+    </Link>
+  )
+}
+
+---FILE---
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Featured product',
+  description: 'Shop our featured product',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang=\"en\">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+---FILE---
+import FeaturedProductLink from './featured-product-link'
+
+export default function Home() {
+  return (
+    <main>
+      <h1>Featured product</h1>
+      <FeaturedProductLink />
+    </main>
+  )
+}
+
+---FILE---
+import { getRelatedProducts } from '@/lib/data'
+
+export default async function ProductPage() {
+  const relatedProducts = await getRelatedProducts()
+
+  return (
+    <main>
+      <h1>Premium Widget</h1>
+      <p>A durable widget for everyday projects.</p>
+      <section>
+        <h2>Related products</h2>
+        <ul>
+          {relatedProducts.map((product) => (
+            <li key={product}>{product}</li>
+          ))}
+        </ul>
+      </section>
+    </main>
+  )
+}
+
+---FILE---
+import { cacheLife } from 'next/cache'
+
+export async function getRelatedProducts() {
+  'use cache'
+  cacheLife('hours')
+  return ['Compact Widget', 'Widget Carry Case']
+}
+
+---FILE---
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  cacheComponents: true,
+}
+
+export default nextConfig
+
+---FILE---
+
+import { defineConfig } from 'vitest/config';
+export default defineConfig({
+  test: {
+    include: ['EVAL.ts'],
+    globals: false,
+    
+    
+    testTimeout: 900000,
+    hookTimeout: 900000,
+    setupFiles: ['/workspace/__agent_eval__/eval-helper.mjs'],
+  },
+  resolve: {
+    alias: { '@vercel/agent-eval/eval': '/workspace/__agent_eval__/eval-helper.mjs' },
+  },
+});
+"
+
+ ❯ EVAL.ts:60:18
+     58| 
+     59| test('opts the featured product link into per-link prefetching', () =>…
+     60|   expect(source).toMatch(/<Link\b[^>]*\bprefetch(?:\s*=\s*\{true\})?(?…
+       |                  ^
+     61| })
+     62| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  EVAL.ts > uses the prefetch cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:67:30
+     65|     /\bunstable_prefetch(?:\s+as\s+([A-Za-z_$][\w$]*))?/
+     66|   )
+     67|   expect(prefetchImport).not.toBeNull()
+       |                              ^
+     68| 
+     69|   const localName = prefetchImport?.[1] ?? 'unstable_prefetch'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  EVAL.ts > keeps stable product content in the reusable shell
+Error: [judge:environment] FAIL — The product title and description must remain in the reusable product App Shell. The related-products section must remain outside that shell, beneath its own Suspense boundary. Reject solutions that put the whole product page behind the prefetch stage or move related products into the App Shell. Accept equivalent component and file organization.
+  reason: In app/product/page.tsx, the title and description are rendered directly in ProductPage, which first awaits getRelatedProducts(); there is no reusable product App Shell. The related-products section is rendered in the same main with no Suspense boundary, so the whole page depends on the related-products fetch.
+ ❯ EVAL.ts:74:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  EVAL.ts > includes related products only in the selected prefetch
+Error: [judge:environment] FAIL — The related-products section must be available before navigation from the featured-product Link without joining the default product App Shell.
+
+Render related products through an async component that awaits unstable_prefetch() before calling the cached getRelatedProducts() function. The unstable_prefetch() call must be outside every use cache scope, while the existing cached data function stays below it.
+
+Reject solutions that replace the stage with connection() or unstable_navigation(), make the related-products data uncached, or defer it until after navigation. Accept equivalent component and file organization.
+  reason: app/featured-product-link.tsx sets prefetch={false}, and no source imports or awaits unstable_prefetch(). app/product/page.tsx calls getRelatedProducts() directly in ProductPage and renders related products without a separate async component; the cached data function in lib/data.ts remains cached, but the required pre-navigation stage is absent.
+ ❯ EVAL.ts:80:3
+     78| 
+     79| test('includes related products only in the selected prefetch', async …
+     80|   await expect(environment).toSatisfyCriterion(
+       |   ^
+     81|     `The related-products section must be available before navigation …
+     82| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+

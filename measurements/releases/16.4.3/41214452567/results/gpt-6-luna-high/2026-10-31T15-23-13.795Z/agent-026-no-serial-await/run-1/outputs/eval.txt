@@ -1,0 +1,122 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 1 failed) 9ms
+   ✓ Page is an async server component with parallel data fetching 1ms
+   ✓ Dashboard component fetches from all required APIs 0ms
+   ✓ Dashboard uses parallel fetching with Promise.all 0ms
+   × Dashboard is an async server component 5ms
+     → expected '\'use client\'\n\nimport { useEffect,…' to match /async\s+function|export\s+default\s+a…/
+   ✓ Dashboard displays data from all three sources 0ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+   Start at  15:24:48
+   Duration  297ms (transform 58ms, setup 27ms, collect 27ms, tests 9ms, environment 0ms, prepare 85ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > Dashboard is an async server component
+AssertionError: expected '\'use client\'\n\nimport { useEffect,…' to match /async\s+function|export\s+default\s+a…/
+
+[32m- Expected:[39m 
+/async\s+function|export\s+default\s+async/
+
+[31m+ Received:[39m 
+"'use client'
+
+import { useEffect, useState } from 'react'
+
+type ResourceKey = 'analytics' | 'notifications' | 'settings'
+
+type ResourceState =
+  | { status: 'loading' }
+  | { status: 'success'; data: unknown }
+  | { status: 'error'; message: string }
+
+type DashboardData = Record<ResourceKey, ResourceState>
+
+const resources = [
+  { key: 'analytics', label: 'Analytics', url: '/api/analytics' },
+  { key: 'notifications', label: 'Notifications', url: '/api/notifications' },
+  { key: 'settings', label: 'Settings', url: '/api/settings' },
+] as const
+
+const initialData: DashboardData = {
+  analytics: { status: 'loading' },
+  notifications: { status: 'loading' },
+  settings: { status: 'loading' },
+}
+
+function formatData(data: unknown) {
+  if (typeof data === 'string') return data
+  return JSON.stringify(data, null, 2) ?? 'No data returned.'
+}
+
+export default function Dashboard() {
+  const [data, setData] = useState<DashboardData>(initialData)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const requests = resources.map(async ({ key, url }) => {
+      try {
+        const response = await fetch(url, { signal: controller.signal })
+        if (!response.ok) {
+          throw new Error(`Request failed (${response.status})`)
+        }
+
+        const result: unknown = await response.json()
+        setData((current) => ({ ...current, [key]: { status: 'success', data: result } }))
+      } catch (error) {
+        if (controller.signal.aborted) return
+
+        const message = error instanceof Error ? error.message : 'Unable to load data.'
+        setData((current) => ({ ...current, [key]: { status: 'error', message } }))
+      }
+    })
+
+    void Promise.all(requests)
+
+    return () => controller.abort()
+  }, [])
+
+  return (
+    <section aria-labelledby=\"dashboard-content-title\">
+      <h2 id=\"dashboard-content-title\">Dashboard</h2>
+      <div>
+        {resources.map(({ key, label }) => {
+          const resource = data[key]
+
+          return (
+            <section key={key} aria-labelledby={`${key}-title`}>
+              <h3 id={`${key}-title`}>{label}</h3>
+              {resource.status === 'loading' && <p>Loading {label.toLowerCase()}…</p>}
+              {resource.status === 'error' && (
+                <p role=\"alert\">Could not load {label.toLowerCase()}: {resource.message}</p>
+              )}
+              {resource.status === 'success' && (
+                <pre style={{ whiteSpace: 'pre-wrap', overflowX: 'auto' }}>
+                  {formatData(resource.data)}
+                </pre>
+              )}
+            </section>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+"
+
+ ❯ EVAL.ts:65:28
+     63| 
+     64|   // Should be async function
+     65|   expect(dashboardContent).toMatch(/async\s+function|export\s+default\…
+       |                            ^
+     66| 
+     67|   // Should NOT have 'use client' directive
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
