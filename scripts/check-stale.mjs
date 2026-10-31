@@ -9,6 +9,8 @@
  * `pnpm sync-evals <sha>`.
  */
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { retainsGraderResult } from './grader-retention.mjs';
 
 // The accepted set follows the README's model retention policy: tier-2
 // (previously measured) experiments keep their last results and are not rerun
@@ -51,10 +53,6 @@ const ACCEPTED_STALE = {
   'gemini-3-pro-preview-gemini-cli': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app', 'agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation', 'agent-052-cache-components-session-isolation', 'agent-053-cache-components-url-shell', 'agent-035-connection-dynamic', 'agent-042-enable-ppr'],
   'gemini-3.1-pro-preview': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app', 'agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation', 'agent-052-cache-components-session-isolation', 'agent-053-cache-components-url-shell', 'agent-035-connection-dynamic', 'agent-042-enable-ppr'],
   'gemini-3.1-pro-preview--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app', 'agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation', 'agent-052-cache-components-session-isolation', 'agent-053-cache-components-url-shell', 'agent-035-connection-dynamic', 'agent-042-enable-ppr'],
-  // Retains the Argon reruns against the stable prefetch() and navigation()
-  // graders from next.js#99241. Remove when the pin includes 3452ebbcf93.
-  'gemini-4-argon': ['agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation'],
-  'gemini-4-argon--agents-md': ['agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation'],
   'glm-5.1-opencode': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app', 'agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation', 'agent-052-cache-components-session-isolation', 'agent-053-cache-components-url-shell', 'agent-035-connection-dynamic', 'agent-042-enable-ppr'],
   'glm-5.1-opencode--agents-md': ['agent-029-use-cache-directive', 'agent-030-app-router-migration-hard', 'agent-031-proxy-middleware', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app', 'agent-048-prefetch-url-data', 'agent-049-prefetch-stage', 'agent-051-prefetch-until-navigation', 'agent-052-cache-components-session-isolation', 'agent-053-cache-components-url-shell', 'agent-035-connection-dynamic', 'agent-042-enable-ppr'],
   'glm-5.2': ['agent-030-app-router-migration-hard', 'agent-034-async-cookies', 'agent-040-instant', 'agent-041-optimize-ppr-shell'],
@@ -86,11 +84,21 @@ const ACCEPTED_STALE = {
   'opus5-local--agents-md': ['agent-029-use-cache-directive', 'agent-031-proxy-middleware', 'agent-041-optimize-ppr-shell', 'agent-043-view-transitions', 'agent-044-uses-nextjs', 'agent-045-build-a-nextjs-app'],
 };
 
+// These saved measurements predate the grader-only corrections. Keep their
+// original fingerprints, so normal model runs still see them as changed.
+const graderRetention = JSON.parse(readFileSync('grader-result-retention.json', 'utf8'));
+
 const { work } = JSON.parse(execSync('pnpm exec agent-eval status --json', { encoding: 'utf-8' }));
 const offenders = work
   .map((w) => ({
     experiment: w.experiment,
-    evals: [...w.new, ...w.changed].filter((e) => !(ACCEPTED_STALE[w.experiment] ?? []).includes(e)),
+    evals: [
+      ...w.new.filter((e) => !(ACCEPTED_STALE[w.experiment] ?? []).includes(e)),
+      ...w.changed.filter((e) =>
+        !(ACCEPTED_STALE[w.experiment] ?? []).includes(e) &&
+        !retainsGraderResult(process.cwd(), w.experiment, e, graderRetention)
+      ),
+    ],
   }))
   .filter((w) => w.evals.length > 0);
 

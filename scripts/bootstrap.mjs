@@ -11,11 +11,10 @@
  * command and would shadow the script.
  *
  * Usage:
- *   pnpm bootstrap           # sync fixtures from next.js canary
+ *   pnpm bootstrap           # sync the reviewed fixture pin
  *   pnpm bootstrap <ref>     # ...from a branch, tag, or commit SHA
  *
- * Pass the SHA that .github/workflows/eval-cache-check.yml pins to reproduce
- * CI's view of the fixtures; canary drifts, and drift shows up as stale evals.
+ * The default uses eval-suite-ref.txt, matching CI.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -54,7 +53,7 @@ function runOrExit(cmd, args) {
 step(1, 3, 'Install dependencies');
 runOrExit('pnpm', ['install', '--frozen-lockfile']);
 
-step(2, 3, `Sync eval fixtures from vercel/next.js@${ref ?? 'canary'}`);
+step(2, 3, `Sync eval fixtures from vercel/next.js@${ref ?? 'the reviewed suite pin'}`);
 runOrExit('pnpm', ['sync-evals', ...(ref ? [ref] : [])]);
 
 // Preflight has already printed the specifics and the fix for each problem, so
