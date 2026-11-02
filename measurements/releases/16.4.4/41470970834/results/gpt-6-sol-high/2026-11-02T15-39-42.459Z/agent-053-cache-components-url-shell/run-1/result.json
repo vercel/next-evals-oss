@@ -1,0 +1,162 @@
+{
+  "status": "passed",
+  "duration": 223.295,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 96,
+    "outputTokens": 9901,
+    "cacheReadTokens": 990483,
+    "cacheWriteTokens": 43253,
+    "reasoningTokens": 5199,
+    "totalTokens": 1043733
+  },
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 6,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 22,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 22,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'pages/**' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg --files -g '\"'!node_modules'\"' -g '\"'!'\"\\\\.next' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"' && rg --files -g 'AGENTS.md' /workspace / 2>/dev/null | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json next.config.ts tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat app/layout.tsx app/page.tsx 'app/products/[slug]/page.tsx' lib/products.ts\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && find __agent_eval__ -maxdepth 2 -type f -printf '%p\\\\n'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'cacheComponents|use cache|Uncached data was accessed outside' node_modules/next/dist/server node_modules/next/dist/esm/server -g '*.js' | head -65\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- package.json && cat __agent_eval__/run.mjs'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'cacheLife\\\\(|cacheComponents: true|Suspense.*searchParams' node_modules/next -g '*.md' -g '*.ts' | head -90\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"sed -n '1,190p' node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md && sed -n '150,260p' node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-cache.md\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'EOF'\nconst urls = ['/products/lamp?currency=USD', '/products/lamp?currency=EUR', '/products/vase?currency=USD', '/products/vase?currency=EUR', '/products/missing?currency=EUR']\nfor (const path of urls) {\n  const start = performance.now()\n  const response = await fetch(\"'`http://localhost:3100${path}`)\n  const reader = response.body.getReader()\n  const chunks = []\n  for (;;) {\n    const { value, done } = await reader.read()\n    if (done) break\n    const body = new TextDecoder().decode(value)\n    chunks.push({ ms: Math.round(performance.now() - start), length: value.length, shell: body.includes('\"'Loading product details...'), relatedFallback: body.includes('Loading related products...'), product: body.includes('<h1>'), related: body.includes('Stone vase') || body.includes('Brass lamp') })\n  }\n  const html = (await (await fetch(\"'`http://localhost:3100${path}`)).text())\n  const title = html.match(/<h1>(.*?)<'\"\\\\/h1>/)?.[1] ?? null\n  const price = html.match(/<p>((?:USD|EUR) [0-9.]+)<\\\\/p>/)?.[1] ?? null\n  console.log(JSON.stringify({ path, status: response.status, title, price, chunks }))\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'EOF'\nfor (const path of ['/products/lamp?currency=EUR', '/products/lamp?currency=EUR', '/products/lamp']) {\n  const start = performance.now()\n  const response = await fetch(\"'`http://localhost:3100${path}`)\n  const reader = response.body.getReader()\n  const decoder = new TextDecoder()\n  let text = '\"''\n  let detailsAt = null\n  let relatedAt = null\n  for (;;) {\n    const { value, done } = await reader.read()\n    if (done) break\n    text += decoder.decode(value)\n    if (detailsAt === null && text.includes('<h1>Brass lamp</h1>')) detailsAt = Math.round(performance.now() - start)\n    if (relatedAt === null && text.includes('<p>Stone vase</p>')) relatedAt = Math.round(performance.now() - start)\n  }\n  console.log(JSON.stringify({ path, status: response.status, detailsAt, relatedAt, price: text.match(/<p>((?:USD|EUR) [0-9.]+)<\\\\/p>/)?.[1] }))\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat 'app/products/[slug]/page.tsx' && cat next.config.ts && cat lib/products.ts\""
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- next.config.ts lib/products.ts 'app/products/[slug]/page.tsx' tsconfig.json && git status --short\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat .gitignore && git diff -- next-env.d.ts && git ls-files package-lock.json .next tsconfig.json next-env.d.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && git diff --stat && rg -n 'export const (dynamic|revalidate|fetchCache|dynamicParams)' app || true && nl -ba next.config.ts && nl -ba lib/products.ts | head -28 && nl -ba 'app/products/[slug]/page.tsx' | head -70\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- --port 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'EOF'\nfor (const [path, expected] of [\n  ['/products/lamp?currency=EUR', ['Brass lamp', 'EUR 110.40']],\n  ['/products/vase?currency=USD', ['Stone vase', 'USD 80.00']],\n  ['/products/vase?currency=EUR', ['Stone vase', 'EUR 73.60']],\n  ['/products/lamp?currency=GBP', ['Brass lamp', 'USD 120.00']],\n  ['/products/lamp?currency=EUR&currency=USD', ['Brass lamp', 'USD 120.00']],\n]) {\n  const response = await fetch(\"'`http://localhost:3100${path}`)\n  const html = await response.text()\n  const actual = [html.match(/<h1>(.*?)<'\"\\\\/h1>/)?.[1], html.match(/<p>((?:USD|EUR) [0-9.]+)<\\\\/p>/)?.[1]]\n  if (response.status \"'!== 200 || actual.some((value, index) => value !== expected[index])) throw new Error(`${path}: ${JSON.stringify(actual)}`)\n  console.log(`${path}: ${actual.join('\"', ')}\"'`)\n}\nEOF'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 96,
+      "outputTokens": 9901,
+      "cacheReadTokens": 990483,
+      "cacheWriteTokens": 43253,
+      "reasoningTokens": 5199,
+      "totalTokens": 1043733
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
