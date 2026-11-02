@@ -490,7 +490,9 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: model-export
-          path: agent-results.json
+          path: |
+            agent-results.json
+            eval-suite-ref.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -618,7 +620,10 @@ jobs:
                 const { summarizeModelResults } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/model-result-summary.mjs`);
                 const dataset = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/model-summary/agent-results.json`, 'utf8'));
                 const policy = JSON.parse(await readFile(`${process.env.GITHUB_WORKSPACE}/eval-publication-overrides.json`, 'utf8'));
-                const excluded = Object.entries(policy.evals).filter(([, value]) => value.publish === false).map(([name]) => name);
+                const suiteRef = (await readFile(`${process.env.RUNNER_TEMP}/model-summary/eval-suite-ref.txt`, 'utf8')).trim();
+                const excluded = suiteRef === policy.suiteRef
+                  ? Object.entries(policy.evals).filter(([, value]) => value.publish === false).map(([name]) => name)
+                  : [];
                 results = summarizeModelResults(dataset, JSON.parse(process.env.PAIRS_JSON), excluded);
               } catch {
                 core.warning('Could not summarize the completed results. The Slack reply will link the PR for review.');

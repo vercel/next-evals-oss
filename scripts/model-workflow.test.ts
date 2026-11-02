@@ -244,8 +244,9 @@ test('a rerun reuses the Slack parent saved by the outcome step', async () => {
   };
   const require = () => ({ readFile: async (path: string) => {
     if (path.endsWith('/eval-publication-overrides.json')) {
-      return JSON.stringify({ evals: { hidden: { publish: false } } });
+      return JSON.stringify({ suiteRef: 'a'.repeat(40), evals: { 'task-b': { publish: false } } });
     }
+    if (path.endsWith('/eval-suite-ref.txt')) return 'b'.repeat(40);
     assert.equal(path, '/tmp/model-summary-test/model-summary/agent-results.json');
     return JSON.stringify({
       metadata: { experiments: [{ name: 'test-model', modelName: 'Test Model', tier: 2,

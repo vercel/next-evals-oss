@@ -717,7 +717,7 @@ async function main(): Promise<void> {
     );
     const report = buildReleaseReport(data, diagnostics, excluded);
     report.comparison = await loadReleaseComparison(
-      requiredEnv('RELEASE_BASELINE_ROOT'), data, report,
+      requiredEnv('RELEASE_BASELINE_ROOT'), data, report, excluded,
     );
     const notification = buildReleaseNotification({
       target,

@@ -248,3 +248,23 @@ test('release Slack omits unpublished scores and confirmation failures', () => {
   assert.deepEqual(report.tasks.map(task => task.name), ['task']);
   assert.deepEqual(report.failures, []);
 });
+
+
+test('legacy comparisons omit unpublished regressions and improvements', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-legacy-public-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const old = measurement('16.4.2', false);
+  old.results.sol.push({ evalPath: 'unpublished', result: { success: true } });
+  const current = measurement('16.4.4', true);
+  current.metadata.evaluationTarget!.evaluatedAt = '2026-11-02T00:00:00.000Z';
+  current.results.sol.push({ evalPath: 'unpublished', result: { success: false } });
+  const dir = join(root, '16.4.2/123');
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'measurement.json'), JSON.stringify(old));
+  const report = buildReleaseReport(current, diagnostics, ['unpublished']);
+  const comparison = await loadReleaseComparison(root, current, report, ['unpublished']);
+  assert.ok(comparison.available);
+  if (!comparison.available) return;
+  assert.deepEqual(comparison.regressions, []);
+  assert.deepEqual(comparison.improvements.map(change => change.evalName), ['task', 'task']);
+});
