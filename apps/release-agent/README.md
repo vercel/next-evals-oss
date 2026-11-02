@@ -8,8 +8,9 @@ evidence and suspected eval problems. The root message links the measurement PR.
 The summary asks maintainers to review and merge the PR to retain the run.
 Three thread replies contain findings to investigate, full task results, and
 model results. Without a comparable previous run, the report says regressions
-could not be determined. The current notification payload has no previous-run
-comparison. Routine infrastructure retries stay out of the summary.
+could not be determined. The workflow supplies changes against the latest
+compatible earlier measurement merged into `main`. Open and closed unmerged
+PRs are not baselines. Routine infrastructure retries stay out of the summary.
 
 Release measurements are separate from the public pass@4 leaderboard. Their
 draft PRs retain pass@1 scores, release provenance, failure confirmations, and

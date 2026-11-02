@@ -299,16 +299,27 @@ build-and-deploy run, and source branch before any model job starts. Existing
 verified automation-authored measurement pull requests are skipped unless a
 maintainer explicitly requests a forced manual rerun.
 
-To limit recurring spend, scheduled and manual release runs temporarily use only
-GPT-6 Luna (high), with and without AGENTS.md, against the full fixed eval suite.
-The selection is in `RELEASE_SELECTED_EXPERIMENTS` in
-[`lib/tier-one.ts`](lib/tier-one.ts); expand it when broader runs are needed.
-New-model PR runs and the public board's tier-1 list are unchanged.
-Existing Next.js fixtures install the exact published package,
-so agents read the documentation bundled in that release from
-`node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
-the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
-release, backport, and canary measurements remain comparable.
+Scheduled and manual release runs use GPT-6 Sol (high), with and without
+AGENTS.md, on the same published suite and grader overrides as model-registration
+runs: currently 31 tasks and 62 scored attempts per release. The model selection
+is in `RELEASE_SELECTED_EXPERIMENTS` in [`lib/tier-one.ts`](lib/tier-one.ts).
+Both conditions contain the released package's bundled docs. AGENTS.md adds the
+pointer to them. New-model scoring and the public board's model list are unchanged.
+
+The suite stays pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt), including
+[`eval-grader-overrides.json`](eval-grader-overrides.json). Measurements record
+that revision and a comparison key covering experiment configs, setup helpers,
+the suite sync script, and the locked runner dependencies.
+
+Future reports compare against the latest compatible earlier version retained
+in a measurement PR **merged into main**. The same major/minor release line,
+stable/canary track, suite revision, execution key, model, harness, tasks, and
+pass@1 conditions must match. Open or closed unmerged measurement PRs are not
+baselines. The first matching measurement becomes a baseline after review and
+merge. A changed setup starts a new baseline rather than producing a misleading
+delta. Pass→fail and fail→pass changes are reported separately for Base and
+AGENTS.md, with failure-confirmation status. Remote model and CLI aliases may
+still change; a score change alone does not prove a framework regression.
 
 Release, backport, and canary measurements always use pass@1 through the
 `NEXT_RELEASE_EVAL_RUNS=1` workflow override. Normal local runs and publishable
