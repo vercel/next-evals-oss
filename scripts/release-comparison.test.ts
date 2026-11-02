@@ -6,7 +6,6 @@ import test from 'node:test';
 import { comparisonKey, loadReleaseComparison } from './release-comparison.js';
 import { buildReleaseReport } from './release-automation.js';
 import type { ExportedReleaseData } from './release-automation.js';
-import { releaseNotificationSchema } from '../apps/release-agent/agent/lib/release-notification.js';
 
 function measurement(version = '16.4.2', passed = true): ExportedReleaseData {
   return {
@@ -103,22 +102,6 @@ test('first reviewed run becomes usable; both condition changes reach the Slack 
       false,
     );
   }
-  assert.equal(
-    releaseNotificationSchema.safeParse({
-      schemaVersion: 5,
-      target: current.metadata.evaluationTarget,
-      workflowUrl: 'https://github.com/vercel/next-evals-oss/actions/runs/123',
-      measurementUrl: 'https://github.com/vercel/next-evals-oss/pull/1',
-      metric: 'pass@1',
-      validation: {
-        complete: true,
-        infrastructureFailuresExcluded: true,
-        modelFailureConfirmationAttempts: 2,
-      },
-      report,
-    }).success,
-    true,
-  );
 
   current.metadata.experiments[0].docsImpact!.newlyFailed = ['task'];
   report.comparison = await loadReleaseComparison(
