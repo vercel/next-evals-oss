@@ -479,6 +479,15 @@ existing measurements without marking them fresh. Retention requires the exact
 reviewed fixture and saved summary bytes. Another task edit or a newer result
 invalidates it. Normal eval runs still see the changed fingerprints.
 
+**Effort is exported separately for Base and AGENTS.md.** The board's input-token
+average includes cache reads and writes; output and cache-read averages are also
+available in the expanded comparison. Counts come only from provider usage.
+Missing counts remain unknown, and coverage shows measured runs out of scored
+runs. Averages include valid passing and failing attempts, exclude unavailable
+evals, and give each measured eval equal weight. They describe an average
+executed attempt, not total spend to achieve pass@4. Historical scores, durations,
+and list-cost accounting are unchanged.
+
 **Costs use provider-reported token counts.** Each run's usage (input, output,
 cache read/write) comes from the token counts the model's own API reported in
 the transcript, priced at the list rates in `scripts/cost.ts` (snapshotted

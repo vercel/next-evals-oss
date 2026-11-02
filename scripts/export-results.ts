@@ -17,12 +17,8 @@ import { createRequire } from 'node:module';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import {
-  MODEL_PRICING,
-  extractRunTokens,
-  estimateUsageFromTranscript,
-  priceUsage,
-} from './cost.js';
+import { MODEL_PRICING } from './cost.js';
+import { readEvalEffort, aggregateEffort, type TokenUsage, type EffortMetrics } from './effort.js';
 import { TIER_ONE_EXPERIMENTS } from '../lib/tier-one.js';
 
 const require = createRequire(import.meta.url);
@@ -47,6 +43,7 @@ interface AgentResult {
   // Mean list cost in USD across this eval's runs, or undefined when the run
   // saved no token usage (e.g. a timeout) or the model has no price entry.
   costUsd?: number;
+  tokenUsage?: TokenUsage;
   result: {
     success: boolean;
     duration: number;
@@ -99,45 +96,6 @@ const AGENTS_MD_PAIRS: Record<string, string> = {
 };
 
 /**
- * Mean list cost (USD) for one eval, averaged over its runs. Reads each run's
- * transcript-raw.jsonl, extracts tokens, and prices them at the experiment's
- * list rate. Returns undefined when the model has no price or no run carried
- * usage (e.g. a timeout), so the caller can leave it out of the average.
- */
-async function meanEvalCostUsd(
-  evalDir: string,
-  experiment: string,
-): Promise<number | undefined> {
-  const baseSlug = AGENTS_MD_PAIRS[experiment] ?? experiment;
-  const pricing = MODEL_PRICING[baseSlug];
-  if (!pricing) return undefined;
-
-  let runEntries: string[];
-  try {
-    runEntries = await readdir(evalDir);
-  } catch {
-    return undefined;
-  }
-
-  const costs: number[] = [];
-  for (const entry of runEntries) {
-    if (!entry.startsWith('run-')) continue;
-    try {
-      const raw = await readFile(join(evalDir, entry, 'transcript-raw.jsonl'), 'utf-8');
-      // Provider-reported token counts first; canonical chars/4 estimate for
-      // the rare transcript that carries none (see cost.ts).
-      const usage = extractRunTokens(raw) ?? estimateUsageFromTranscript(raw);
-      if (usage) costs.push(priceUsage(usage, pricing));
-    } catch {
-      // No transcript for this run (e.g. timeout) — skip it.
-    }
-  }
-
-  if (costs.length === 0) return undefined;
-  return costs.reduce((a, b) => a + b, 0) / costs.length;
-}
-
-/**
  * Mean per-eval list cost across results, over cells that have a cost. Returns
  * null when none do (so an all-timeout or unpriced experiment reads as N/A).
  */
@@ -182,6 +140,8 @@ interface ExportedData {
       // Mean list cost per eval (USD). null = not estimated (no price, or the
       // model's runs carry no usable token usage) — rendered as N/A.
       avgCostUsd?: number | null;
+      avgInputTokens?: number | null;
+      effort?: { base: EffortMetrics; agentsMd?: EffortMetrics };
       docsImpact?: DocsImpact;
       // 1 = current (fresh full run on the current eval set), 2 = previously
       // measured. See "Model retention policy" in the README.
@@ -471,11 +431,15 @@ async function main(): Promise<void> {
           // Skip invalid results (infra/timeout failures)
           if (summary.valid === false) continue;
 
-          const costUsd = await meanEvalCostUsd(join(runDir, evalDir), experiment);
+          const { costUsd, tokenUsage } = await readEvalEffort(
+            join(runDir, evalDir), summary.totalRuns,
+            MODEL_PRICING[AGENTS_MD_PAIRS[experiment] ?? experiment],
+          );
 
           agentResults.push({
             evalPath: evalDir,
             ...(costUsd !== undefined ? { costUsd } : {}),
+            tokenUsage,
             result: {
               success: summary.passedRuns > 0,
               duration: summary.meanDuration * 1000,
@@ -595,6 +559,9 @@ async function main(): Promise<void> {
       newlyFailed,
     };
 
+    baseExp.effort = { base: aggregateEffort(baseResults), agentsMd: aggregateEffort(variantResults) };
+    baseExp.avgInputTokens = aggregateEffort([...baseResults, ...variantResults]).avgInputTokens;
+
     // Average duration across base + variant runs (seconds), excluding
     // notAvailable placeholders (their duration is 0).
     const allDurationsMs = [...baseResults, ...variantResults]
@@ -633,6 +600,10 @@ async function main(): Promise<void> {
   for (const exp of exportedData.metadata.experiments) {
     const results = exportedData.results[exp.name];
     if (!results || results.length === 0) continue;
+    if (!exp.effort) {
+      exp.effort = { base: aggregateEffort(results) };
+      exp.avgInputTokens = exp.effort.base.avgInputTokens;
+    }
     if (exp.avgDuration === undefined) {
       const durations = results
         .filter((r) => !r.notAvailable)
