@@ -9,89 +9,16 @@
  * Usage:
  *   pnpm sync-evals              # sync the reviewed suite pin
  *   pnpm sync-evals <ref>        # sync from a specific ref/branch/tag
- *   pnpm sync-evals <ref> --suite regression # select an upstream suite
  */
 
 import { execFileSync, execSync } from 'node:child_process';
-import {
-  cpSync,
-  existsSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
 
 const REPO_URL = 'https://github.com/vercel/next.js.git';
-
-export function copyEvalFixtures(
-  repoDir: string,
-  evalsDir: string,
-  suite?: string,
-): string[] {
-  const source = join(repoDir, 'evals/evals');
-  const available = readdirSync(source, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
-  const configPath = join(repoDir, 'evals/eval.config.json');
-  const config = existsSync(configPath)
-    ? (JSON.parse(readFileSync(configPath, 'utf8')) as Record<
-        string,
-        { skills?: string[]; publish?: boolean }
-      >)
-    : {};
-  const publicEvals = available.filter(
-    (name) => config[name]?.publish !== false && !config[name]?.skills?.length,
-  );
-  let selected = publicEvals;
-  if (suite !== undefined) {
-    const manifest = JSON.parse(
-      readFileSync(join(repoDir, 'evals/eval.suites.json'), 'utf8'),
-    );
-    const names: unknown = Object.hasOwn(manifest, suite)
-      ? manifest[suite]
-      : undefined;
-    if (
-      !Array.isArray(names) ||
-      names.length === 0 ||
-      new Set(names).size !== names.length
-    ) {
-      throw new Error(
-        `Suite ${suite} must contain a non-empty, unique list of evals`,
-      );
-    }
-    for (const name of names) {
-      if (typeof name !== 'string' || !publicEvals.includes(name)) {
-        throw new Error(
-          `Suite ${suite} contains an unknown or non-public eval: ${String(name)}`,
-        );
-      }
-    }
-    selected = names;
-  }
-
-  // Validate the selection before replacing any existing fixtures.
-  rmSync(evalsDir, { recursive: true, force: true });
-  cpSync(source, evalsDir, { recursive: true });
-  for (const name of available) {
-    if (!selected.includes(name))
-      rmSync(join(evalsDir, name), { recursive: true });
-  }
-  return selected;
-}
-
 async function main(): Promise<void> {
-  const { positionals, values } = parseArgs({
-    allowPositionals: true,
-    options: { suite: { type: 'string' } },
-  });
-  if (positionals.length > 1)
-    throw new Error('Usage: pnpm sync-evals [ref] [--suite name]');
   const ref =
-    positionals[0] || readFileSync('eval-suite-ref.txt', 'utf8').trim();
+    process.argv[2] || readFileSync('eval-suite-ref.txt', 'utf8').trim();
   const evalsDir = join(process.cwd(), 'evals');
   const tmpDir = join(process.cwd(), '.sync-tmp');
 
@@ -176,27 +103,39 @@ async function main(): Promise<void> {
     }
   }
 
-  const selected = copyEvalFixtures(repoDir, evalsDir, values.suite);
-  console.log(`Synced ${selected.length} ${values.suite ?? 'public'} evals.`);
+  // Swap the fetched tree into place: only now is the old one expendable.
+  if (existsSync(evalsDir)) rmSync(evalsDir, { recursive: true });
+  execSync(`cp -r "${tmpDir}/next.js/evals/evals" "${evalsDir}"`);
+
+  // Upstream fixtures with a local skill treatment or `publish: false` are
+  // PR-development evals, not part of the public model and bundled-docs matrix.
+  const evalConfigPath = join(repoDir, 'evals/eval.config.json');
+  const evalConfig = existsSync(evalConfigPath)
+    ? (JSON.parse(readFileSync(evalConfigPath, 'utf8')) as Record<
+        string,
+        { skills?: string[]; publish?: boolean }
+      >)
+    : {};
+  const nonPublicEvals = Object.entries(evalConfig)
+    .filter(([, config]) => config.publish === false || config.skills?.length)
+    .map(([evalName]) => evalName);
+  for (const evalName of nonPublicEvals) {
+    rmSync(join(evalsDir, evalName), { recursive: true, force: true });
+  }
+  if (nonPublicEvals.length > 0) {
+    console.log(`Omitted non-public evals: ${nonPublicEvals.join(', ')}`);
+  }
 
   rmSync(tmpDir, { recursive: true, force: true });
 
   // Carry config-only changes forward in cached results (the framework owns this now;
   // it never masks a real eval-content change). Then `agent-eval status` shows the work.
-  // A subset measurement must not update the public board's cached results.
-  if (values.suite === undefined) {
-    execSync('pnpm exec agent-eval refingerprint', { stdio: 'inherit' });
-  }
+  execSync('pnpm exec agent-eval refingerprint', { stdio: 'inherit' });
 
   console.log('\nDone. Run `agent-eval status` to see what changed.');
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
-  main().catch((err) => {
-    console.error('Error:', err.message);
-    process.exitCode = 1;
-  });
-}
+main().catch((err) => {
+  console.error('Error:', err.message);
+  process.exit(1);
+});

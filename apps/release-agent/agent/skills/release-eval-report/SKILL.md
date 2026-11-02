@@ -27,6 +27,11 @@ The renderer removes the separators and posts the replies under the root.
   labeled `Measurement PR`. For a large matrix, give the model count.
 - Lead with regressions when comparison evidence supports them. Name the task,
   model, and Base or AGENTS.md condition, with the previous and current outcome.
+- When `comparison.available` is true, link `comparison.baseline.measurementUrl`
+  and name its version. `regressions` are pass→fail changes; `improvements` are
+  fail→pass changes. Use `reproducible` to distinguish confirmed failures from
+  unverified changes. These do not by themselves prove a framework defect.
+  If both lists are empty, say there were no pass/fail changes from that baseline.
 - Keep suspected grader problems separate under `Evals to investigate`. Give the
   specific evidence, such as an API-name mismatch. A low score alone does not
   prove an eval is broken.

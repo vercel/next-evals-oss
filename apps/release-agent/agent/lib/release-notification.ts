@@ -41,10 +41,26 @@ const reportSchema = z.object({
       scoredFailureReason: z.string().min(1),
     }),
   ),
-  comparison: z.object({
-    available: z.literal(false),
-    note: z.string().min(1),
-  }),
+  comparison: z.discriminatedUnion("available", [
+    z.object({ available: z.literal(false), note: z.string().min(1) }),
+    z.object({
+      available: z.literal(true),
+      note: z.string().min(1),
+      baseline: z.object({
+        version: z.string().regex(/^\d+\.\d+\.\d+(?:-canary\.\d+)?$/),
+        evaluatedAt: z.iso.datetime(),
+        measurementUrl: z.url().startsWith("https://github.com/vercel/next-evals-oss/blob/main/measurements/releases/"),
+      }),
+      regressions: z.array(z.object({
+        experiment: z.string().min(1), model: z.string().min(1),
+        evalName: z.string().min(1), agentsMd: z.boolean(), reproducible: z.boolean(),
+      })),
+      improvements: z.array(z.object({
+        experiment: z.string().min(1), model: z.string().min(1),
+        evalName: z.string().min(1), agentsMd: z.boolean(), reproducible: z.boolean(),
+      })),
+    }),
+  ]),
 });
 
 export const releaseNotificationSchema = z.object({

@@ -12,6 +12,8 @@ import {
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { TIER_ONE_RELEASE_MATRIX } from '../lib/tier-one.js';
+import { comparisonKey, loadReleaseComparison } from './release-comparison.js';
+import type { ReleaseComparison } from './release-comparison.js';
 
 export interface ReleaseTarget {
   kind: 'release' | 'backport' | 'canary';
@@ -192,8 +194,9 @@ interface ExportedExperiment {
   };
 }
 
-interface ExportedReleaseData {
+export interface ExportedReleaseData {
   metadata: {
+    evaluationTarget?: ReleaseTarget & { suite: string; suiteRef: string; comparisonKey: string };
     measurement?: {
       metric: string;
       scoredAttempts: number;
@@ -255,10 +258,7 @@ export interface ReleaseReport {
     infrastructureRetries: number;
     scoredFailureReason: string;
   }>;
-  comparison: {
-    available: false;
-    note: string;
-  };
+  comparison: ReleaseComparison;
 }
 
 function score(values: boolean[]): ReleaseScore {
@@ -605,9 +605,9 @@ export async function prepareReleaseWorkspace(options: {
 }
 
 async function readReleaseSuiteRef(): Promise<string> {
-  const ref = (await readFile('release-eval-suite-ref.txt', 'utf8')).trim();
+  const ref = (await readFile('eval-suite-ref.txt', 'utf8')).trim();
   if (!shaPattern.test(ref))
-    throw new Error('release-eval-suite-ref.txt must contain a full commit SHA');
+    throw new Error('eval-suite-ref.txt must contain a full commit SHA');
   return ref;
 }
 
@@ -675,7 +675,12 @@ async function main(): Promise<void> {
     await writeFile(
       join(releaseWorkspace(), 'evaluation-target.json'),
       `${JSON.stringify(
-        { ...target, suite: 'regression', suiteRef: await readReleaseSuiteRef() },
+        {
+          ...target,
+          suite: 'published',
+          suiteRef: await readReleaseSuiteRef(),
+          comparisonKey: await comparisonKey(process.cwd(), TIER_ONE_RELEASE_MATRIX),
+        },
         null,
         2,
       )}\n`,
@@ -698,11 +703,15 @@ async function main(): Promise<void> {
     const diagnostics = JSON.parse(
       await readFile(requiredEnv('RELEASE_DIAGNOSTICS_PATH'), 'utf8'),
     ) as ReleaseDiagnosticsData;
+    const report = buildReleaseReport(data, diagnostics);
+    report.comparison = await loadReleaseComparison(
+      requiredEnv('RELEASE_BASELINE_ROOT'), data, report,
+    );
     const notification = buildReleaseNotification({
       target,
       workflowUrl: process.env.WORKFLOW_URL ?? '',
       measurementUrl: process.env.MEASUREMENT_URL ?? '',
-      report: buildReleaseReport(data, diagnostics),
+      report,
     });
     await writeFile(
       process.env.AGENT_PAYLOAD_PATH ?? 'release-notification.json',

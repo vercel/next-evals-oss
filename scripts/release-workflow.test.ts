@@ -13,15 +13,15 @@ const notificationSchemaPath = new URL(
 
 test('release scoring and confirmations both load the Sandbox refresh hook', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
-  for (const step of ['Run regression evals against the release package', 'Confirm first-attempt model failures']) {
+  for (const step of ['Run published evals against the release package', 'Confirm first-attempt model failures']) {
     const body = workflow.split(`- name: ${step}\n`)[1].split('\n      - name:')[0];
     assert.match(body, /NODE_OPTIONS: --import=\$\{\{ github\.workspace \}\}\/scripts\/ci-sandbox-auth\.mjs/);
   }
 });
 
-test('release workflow syncs only regression fixtures from its selected pin', async () => {
+test('release workflow syncs the same published suite as model registration', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
-  assert.match(workflow, /pnpm sync-evals "\$SUITE_REF" --suite regression/);
+  assert.match(workflow, /pnpm sync-evals "\$SUITE_REF"/);
   assert.equal((workflow.match(/pnpm sync-evals/g) ?? []).length, 1);
   assert.match(workflow, /SUITE_REF: \$\{\{ steps\.release\.outputs\.suite-ref \}\}/);
 });

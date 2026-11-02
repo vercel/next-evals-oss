@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -23,12 +23,15 @@ afterEach(async () => {
   );
 });
 
-test('release preparation and durable provenance use the release pin, not the public pin', async () => {
+test('durable provenance records the published suite and execution configuration', async () => {
   const root = await mkdtemp(join(tmpdir(), 'release-suite-pin-'));
   tempDirs.push(root);
   const suiteRef = 'b'.repeat(40);
-  await writeFile(join(root, 'eval-suite-ref.txt'), 'a'.repeat(40));
-  await writeFile(join(root, 'release-eval-suite-ref.txt'), suiteRef);
+  await writeFile(join(root, 'eval-suite-ref.txt'), suiteRef);
+  for (const path of ['eval-grader-overrides.json', 'scripts/sync-evals.ts', 'pnpm-lock.yaml', 'lib/setup.ts', 'lib/release-runs.ts', 'experiments/gpt-6-sol-high.ts', 'experiments/gpt-6-sol-high--agents-md.ts']) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), await readFile(new URL(`../${path}`, import.meta.url)));
+  }
   const env = {
     ...process.env,
     GITHUB_OUTPUT: join(root, 'outputs'),
@@ -60,9 +63,10 @@ test('release preparation and durable provenance use the release pin, not the pu
   const target = JSON.parse(
     await readFile(join(root, 'evaluation-target.json'), 'utf8'),
   );
-  assert.equal(target.suite, 'regression');
+  assert.equal(target.suite, 'published');
   assert.equal(target.suiteRef, suiteRef);
   assert.equal(target.version, '16.4.2');
+  assert.match(target.comparisonKey, /^[a-f0-9]{64}$/);
 });
 
 test('release metadata is pinned to an exact tag and full SHA', () => {

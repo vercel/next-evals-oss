@@ -34,7 +34,7 @@ export const TIER_ONE_EXPERIMENTS = [
 ] as const;
 
 const RELEASE_SELECTED_EXPERIMENTS = new Set<string>([
-  // Use one frontier model for the regression suite to limit recurring spend.
+  // Monitor the published suite with one frontier model to limit recurring spend.
   'gpt-6-sol-high',
 ]);
 
