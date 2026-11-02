@@ -604,6 +604,13 @@ export async function prepareReleaseWorkspace(options: {
   );
 }
 
+async function readReleaseSuiteRef(): Promise<string> {
+  const ref = (await readFile('release-eval-suite-ref.txt', 'utf8')).trim();
+  if (!shaPattern.test(ref))
+    throw new Error('release-eval-suite-ref.txt must contain a full commit SHA');
+  return ref;
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2];
   if (command === 'prepare-workspace') {
@@ -627,9 +634,7 @@ async function main(): Promise<void> {
       sourceRunUrl: process.env.SOURCE_RUN_URL ?? '',
       evaluatedAt,
     });
-    const suiteRef = (await readFile('eval-suite-ref.txt', 'utf8')).trim();
-    if (!shaPattern.test(suiteRef))
-      throw new Error('eval-suite-ref.txt must contain a full commit SHA');
+    const suiteRef = await readReleaseSuiteRef();
 
     await writeOutput('next-version', target.version);
     await writeOutput('release-kind', target.kind);
@@ -669,7 +674,11 @@ async function main(): Promise<void> {
     });
     await writeFile(
       join(releaseWorkspace(), 'evaluation-target.json'),
-      `${JSON.stringify(target, null, 2)}\n`,
+      `${JSON.stringify(
+        { ...target, suite: 'regression', suiteRef: await readReleaseSuiteRef() },
+        null,
+        2,
+      )}\n`,
     );
     return;
   }

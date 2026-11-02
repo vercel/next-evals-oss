@@ -299,16 +299,24 @@ build-and-deploy run, and source branch before any model job starts. Existing
 verified automation-authored measurement pull requests are skipped unless a
 maintainer explicitly requests a forced manual rerun.
 
-To limit recurring spend, scheduled and manual release runs temporarily use only
-GPT-6 Luna (high), with and without AGENTS.md, against the full fixed eval suite.
+Scheduled and manual release runs use GPT-6 Sol (high), with and without
+AGENTS.md, on all 22 regression tasks. This gives 44 scored attempts per release.
 The selection is in `RELEASE_SELECTED_EXPERIMENTS` in
-[`lib/tier-one.ts`](lib/tier-one.ts); expand it when broader runs are needed.
+[`lib/tier-one.ts`](lib/tier-one.ts).
 New-model PR runs and the public board's tier-1 list are unchanged.
 Existing Next.js fixtures install the exact published package,
-so agents read the documentation bundled in that release from
-`node_modules/next/dist/docs`. The release commit SHA is recorded as provenance;
-the eval definitions stay pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt) so
-release, backport, and canary measurements remain comparable.
+so both conditions contain the documentation bundled in that release at
+`node_modules/next/dist/docs`. The AGENTS.md condition adds instructions to read it.
+
+The regression definitions and their `eval.suites.json` classification come from
+the audited Next.js revision in
+[`release-eval-suite-ref.txt`](release-eval-suite-ref.txt).
+`pnpm sync-evals <ref> --suite regression` selects those fixtures before scoring,
+validation, and reporting. A missing or invalid selection fails before any model
+runs. Subset syncs do not refingerprint public results. The public suite keeps its
+separate [`eval-suite-ref.txt`](eval-suite-ref.txt) pin.
+Measurements record both the release commit and the regression suite revision.
+Changing the model or suite starts a new comparison baseline.
 
 Release, backport, and canary measurements always use pass@1 through the
 `NEXT_RELEASE_EVAL_RUNS=1` workflow override. Normal local runs and publishable

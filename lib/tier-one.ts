@@ -34,8 +34,8 @@ export const TIER_ONE_EXPERIMENTS = [
 ] as const;
 
 const RELEASE_SELECTED_EXPERIMENTS = new Set<string>([
-  // Temporarily use one inexpensive AI Gateway model to limit recurring spend.
-  'gpt-6-luna-high',
+  // Use one frontier model for the regression suite to limit recurring spend.
+  'gpt-6-sol-high',
 ]);
 
 export const TIER_ONE_RELEASE_EXPERIMENTS = TIER_ONE_EXPERIMENTS.filter(

@@ -16,10 +16,10 @@ const experimentsDirectory = join(
   "experiments",
 );
 
-test("release automation runs only Luna and its docs variant without changing the public board", () => {
+test("release automation runs only Sol and its docs variant without changing the public board", () => {
   assert.deepEqual(TIER_ONE_RELEASE_MATRIX, [
-    "gpt-6-luna-high",
-    "gpt-6-luna-high--agents-md",
+    "gpt-6-sol-high",
+    "gpt-6-sol-high--agents-md",
   ]);
   assert.ok(TIER_ONE_EXPERIMENTS.includes("claude-opus-5.5-high"));
   assert.ok(TIER_ONE_EXPERIMENTS.includes("cursor-composer-2.5"));
