@@ -481,7 +481,8 @@ invalidates it. Normal eval runs still see the changed fingerprints.
 
 **Effort is exported separately for Base and AGENTS.md.** The board's input-token
 average includes cache reads and writes; output and cache-read averages are also
-available in the expanded comparison. Counts come only from provider usage.
+available in the expanded comparison. Each task retains both conditions’ score,
+duration, and cost so its detail rows can be compared directly. Counts come only from provider usage.
 Missing counts remain unknown, and coverage shows measured runs out of scored
 runs. Averages include valid passing and failing attempts, exclude unavailable
 evals, and give each measured eval equal weight. They describe an average

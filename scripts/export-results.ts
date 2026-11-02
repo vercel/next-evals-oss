@@ -44,6 +44,8 @@ interface AgentResult {
   // saved no token usage (e.g. a timeout) or the model has no price entry.
   costUsd?: number;
   tokenUsage?: TokenUsage;
+  effort?: { base: EffortMetrics; agentsMd?: EffortMetrics };
+  baseResult?: AgentResult['result'] | null;
   result: {
     success: boolean;
     duration: number;
@@ -582,11 +584,20 @@ async function main(): Promise<void> {
       baseExp.timestamp = variantExp.timestamp;
     }
 
-    // Replace base results with the --agents-md results (better scores)
-    exportedData.results[baseName] = variantResults.map((r) => ({
-      ...r,
-      // Keep the evalPath as-is
-    }));
+    // Keep the historical docs-backed result and preserve each condition's
+    // score and effort so task details no longer imply a shared duration/cost.
+    const baseByEval = new Map(baseResults.map((r) => [r.evalPath, r]));
+    exportedData.results[baseName] = variantResults.map((r) => {
+      const base = baseByEval.get(r.evalPath);
+      return {
+        ...r,
+        baseResult: base && !base.notAvailable ? base.result : null,
+        effort: {
+          base: aggregateEffort(base ? [base] : []),
+          agentsMd: aggregateEffort([r]),
+        },
+      };
+    });
 
     // Remove the variant from metadata and results
     exportedData.metadata.experiments = exportedData.metadata.experiments.filter(
@@ -602,6 +613,10 @@ async function main(): Promise<void> {
     if (!results || results.length === 0) continue;
     if (!exp.effort) {
       exp.effort = { base: aggregateEffort(results) };
+      exportedData.results[exp.name] = results.map((r) => ({
+        ...r,
+        effort: { base: aggregateEffort([r]) },
+      }));
       exp.avgInputTokens = exp.effort.base.avgInputTokens;
     }
     if (exp.avgDuration === undefined) {
@@ -616,6 +631,11 @@ async function main(): Promise<void> {
     if (exp.avgCostUsd === undefined) {
       exp.avgCostUsd = MODEL_PRICING[exp.name] ? avgCost(results) : null;
     }
+  }
+
+  // Internal run means are already represented in the condition comparison.
+  for (const results of Object.values(exportedData.results)) {
+    for (const result of results) delete result.tokenUsage;
   }
 
   // Count stats
