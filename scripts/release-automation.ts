@@ -12,6 +12,7 @@ import {
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { TIER_ONE_RELEASE_MATRIX } from '../lib/tier-one.js';
+import { nonPublicEvalNames } from '../lib/published-evals.js';
 import { comparisonKey, loadReleaseComparison } from './release-comparison.js';
 import type { ReleaseComparison } from './release-comparison.js';
 
@@ -286,7 +287,9 @@ function baseSuccess(
 export function buildReleaseReport(
   data: ExportedReleaseData,
   diagnostics: ReleaseDiagnosticsData,
+  excludedEvals: readonly string[] = [],
 ): ReleaseReport {
+  const excluded = new Set(excludedEvals);
   if (
     data.metadata.measurement?.metric !== 'pass@1' ||
     data.metadata.measurement.scoredAttempts !== 1 ||
@@ -318,7 +321,7 @@ export function buildReleaseReport(
   const experiments = data.metadata.experiments
     .map((experiment) => {
       const cells = (data.results[experiment.name] ?? []).filter(
-        (result) => !result.notAvailable,
+        (result) => !result.notAvailable && !excluded.has(result.evalPath),
       );
       const without = cells.map((result) => baseSuccess(experiment, result));
       const withAgents = cells.map((result) => result.result.success);
@@ -348,7 +351,8 @@ export function buildReleaseReport(
       const agentsMd = experiment.experiment.endsWith('--agents-md');
       const baseExperiment = experiment.experiment.replace(/--agents-md$/, '');
       const model = metadata.get(baseExperiment)?.modelName ?? baseExperiment;
-      return experiment.tasks.map((task) => {
+      const tasks = experiment.tasks.filter((task) => !excluded.has(task.evalName));
+      return tasks.map((task) => {
         const confirmationPasses = task.confirmations.filter(
           (attempt) => attempt.outcome === 'passed',
         ).length;
@@ -703,7 +707,15 @@ async function main(): Promise<void> {
     const diagnostics = JSON.parse(
       await readFile(requiredEnv('RELEASE_DIAGNOSTICS_PATH'), 'utf8'),
     ) as ReleaseDiagnosticsData;
-    const report = buildReleaseReport(data, diagnostics);
+    const policy = JSON.parse(
+      await readFile('eval-publication-overrides.json', 'utf8'),
+    );
+    const excluded = nonPublicEvalNames(
+      {},
+      policy,
+      data.metadata.evaluationTarget?.suiteRef ?? '',
+    );
+    const report = buildReleaseReport(data, diagnostics, excluded);
     report.comparison = await loadReleaseComparison(
       requiredEnv('RELEASE_BASELINE_ROOT'), data, report,
     );

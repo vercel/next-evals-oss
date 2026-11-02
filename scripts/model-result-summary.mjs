@@ -1,5 +1,6 @@
 /** Read the exported dataset as data only. Never load code from a model PR. */
-export function summarizeModelResults(dataset, pairs) {
+export function summarizeModelResults(dataset, pairs, excludedEvals = []) {
+  const excluded = new Set(excludedEvals);
   return pairs.map(({ base }) => {
     const model = dataset.metadata?.experiments?.find(
       (entry) => entry.name === base,
@@ -54,16 +55,24 @@ export function summarizeModelResults(dataset, pairs) {
     ) {
       throw new Error(`Inconsistent score totals for ${base}`);
     }
+    const publicNames = names.filter((name) => !excluded.has(name));
+    if (!publicNames.length) throw new Error(`No public results for ${base}`);
+    const publicDocsPassed = publicNames.filter((name) =>
+      docsPassed.has(name),
+    ).length;
+    const publicNewlyPassed = newlyPassed.filter((name) => !excluded.has(name));
+    const publicNewlyFailed = newlyFailed.filter((name) => !excluded.has(name));
     return {
       experiment: base,
       model: model.modelName,
       tier: model.tier,
-      total: rows.length,
-      basePassed,
-      agentsMdPassed: docsPassed.size,
-      newlyPassed,
-      newlyFailed,
-      failedBoth: names.filter(
+      total: publicNames.length,
+      basePassed:
+        publicDocsPassed - publicNewlyPassed.length + publicNewlyFailed.length,
+      agentsMdPassed: publicDocsPassed,
+      newlyPassed: publicNewlyPassed,
+      newlyFailed: publicNewlyFailed,
+      failedBoth: publicNames.filter(
         (name) => !docsPassed.has(name) && !newlyFailed.includes(name),
       ),
     };

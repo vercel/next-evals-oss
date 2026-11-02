@@ -114,3 +114,12 @@ test('summarizes every requested model and excludes unrelated models', () => {
   );
   assert.equal(summarizeModelResults(data, pairs).length, 1);
 });
+
+test('Slack omits unpublished tasks from totals, flips, and failures', () => {
+  const [result] = summarizeModelResults(dataset(), pairs, ['docs-only', 'both-fail']);
+  assert.deepEqual(result, {
+    experiment: 'test-model', model: 'Test Model', tier: 2,
+    total: 2, basePassed: 2, agentsMdPassed: 1,
+    newlyPassed: [], newlyFailed: ['base-only'], failedBoth: [],
+  });
+});

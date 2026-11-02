@@ -617,7 +617,9 @@ jobs:
                 const { readFile } = require('node:fs/promises');
                 const { summarizeModelResults } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/model-result-summary.mjs`);
                 const dataset = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/model-summary/agent-results.json`, 'utf8'));
-                results = summarizeModelResults(dataset, JSON.parse(process.env.PAIRS_JSON));
+                const policy = JSON.parse(await readFile(`${process.env.GITHUB_WORKSPACE}/eval-publication-overrides.json`, 'utf8'));
+                const excluded = Object.entries(policy.evals).filter(([, value]) => value.publish === false).map(([name]) => name);
+                results = summarizeModelResults(dataset, JSON.parse(process.env.PAIRS_JSON), excluded);
               } catch {
                 core.warning('Could not summarize the completed results. The Slack reply will link the PR for review.');
               }

@@ -214,6 +214,8 @@ test('execution configuration changes invalidate the comparison key', async (t) 
   for (const path of [
     'eval-suite-ref.txt',
     'eval-grader-overrides.json',
+    'eval-publication-overrides.json',
+    'lib/published-evals.ts',
     'scripts/sync-evals.ts',
     'pnpm-lock.yaml',
     'lib/setup.ts',
@@ -229,4 +231,20 @@ test('execution configuration changes invalidate the comparison key', async (t) 
   assert.notEqual(await comparisonKey(root, ['sol']), original);
   await writeFile(join(root, 'experiments/sol.ts'), 'original');
   assert.equal(await comparisonKey(root, ['sol']), original);
+});
+
+test('release Slack omits unpublished scores and confirmation failures', () => {
+  const data = measurement('16.4.4');
+  data.results.sol.push({ evalPath: 'unpublished', result: { success: false } });
+  const report = buildReleaseReport(data, {
+    ...diagnostics,
+    experiments: [{ experiment: 'sol', tasks: [{
+      evalName: 'unpublished', scoredFailureReason: 'Not used for release checks',
+      confirmations: [{ outcome: 'failed', infrastructureRetries: 0 }, { outcome: 'failed', infrastructureRetries: 0 }],
+    }] }],
+  }, ['unpublished']);
+  assert.deepEqual(report.scores.withoutAgentsMd, { passed: 1, total: 1, percentage: 100 });
+  assert.deepEqual(report.scores.withAgentsMd, { passed: 1, total: 1, percentage: 100 });
+  assert.deepEqual(report.tasks.map(task => task.name), ['task']);
+  assert.deepEqual(report.failures, []);
 });

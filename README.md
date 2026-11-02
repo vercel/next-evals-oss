@@ -56,6 +56,9 @@ N result(s) have a changed eval and were left stale — run them to refresh.
 [`eval-grader-overrides.json`](eval-grader-overrides.json) imports reviewed
 `EVAL.ts` files from newer commits without changing this cohort's prompts, apps,
 or task list. Overrides apply only to their specified suite pin.
+[`eval-publication-overrides.json`](eval-publication-overrides.json) also carries
+reviewed `publish: false` decisions into that older cohort. Those tasks are
+omitted from release and model runs, confirmation jobs, and their reports.
 
 ### 3. Provide credentials
 

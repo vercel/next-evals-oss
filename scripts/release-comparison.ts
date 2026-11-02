@@ -39,6 +39,8 @@ export async function comparisonKey(
   for (const path of [
     'eval-suite-ref.txt',
     'eval-grader-overrides.json',
+    'eval-publication-overrides.json',
+    'lib/published-evals.ts',
     'scripts/sync-evals.ts',
     'pnpm-lock.yaml',
     'lib/setup.ts',
