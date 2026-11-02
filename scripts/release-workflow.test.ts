@@ -24,6 +24,8 @@ test('release workflow syncs the same published suite as model registration', as
   assert.match(workflow, /pnpm sync-evals "\$SUITE_REF"/);
   assert.equal((workflow.match(/pnpm sync-evals/g) ?? []).length, 1);
   assert.match(workflow, /SUITE_REF: \$\{\{ steps\.release\.outputs\.suite-ref \}\}/);
+  assert.match(workflow, /RELEASE_BASELINE_ROOT: \$\{\{ github\.workspace \}\}\/measurements\/releases/);
+  assert.doesNotMatch(workflow, /RELEASE_BASELINE_ROOT: .*measurement-repository/);
 });
 
 test('release automation is standalone and restricted to merged main', async () => {
