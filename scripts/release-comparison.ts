@@ -39,6 +39,8 @@ export async function comparisonKey(
   for (const path of [
     'eval-suite-ref.txt',
     'eval-grader-overrides.json',
+    'eval-publication-overrides.json',
+    'lib/published-evals.ts',
     'scripts/sync-evals.ts',
     'pnpm-lock.yaml',
     'lib/setup.ts',
@@ -137,7 +139,9 @@ export async function loadReleaseComparison(
   root: string,
   current: ExportedReleaseData,
   report: ReleaseReport,
+  excludedEvals: readonly string[] = [],
 ): Promise<ReleaseComparison> {
+  const excluded = new Set(excludedEvals);
   const unavailable = {
     available: false as const,
     note: 'No reviewed, compatible earlier measurement is merged. This run establishes a baseline once its measurement PR is reviewed and merged.',
@@ -219,6 +223,7 @@ export async function loadReleaseComparison(
     improvements: Change[] = [];
   const previousCells = cells(baseline.data);
   for (const [key, value] of currentCells) {
+    if (excluded.has(value.evalName)) continue;
     if (value.success === previousCells.get(key)!.success) continue;
     const { success, ...change } = value;
     const reproducible = report.failures.some(

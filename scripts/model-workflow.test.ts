@@ -243,6 +243,10 @@ test('a rerun reuses the Slack parent saved by the outcome step', async () => {
     return Response.json({ accepted: true, threadTs, threadUrl });
   };
   const require = () => ({ readFile: async (path: string) => {
+    if (path.endsWith('/eval-publication-overrides.json')) {
+      return JSON.stringify({ suiteRef: 'a'.repeat(40), evals: { 'task-b': { publish: false } } });
+    }
+    if (path.endsWith('/eval-suite-ref.txt')) return 'b'.repeat(40);
     assert.equal(path, '/tmp/model-summary-test/model-summary/agent-results.json');
     return JSON.stringify({
       metadata: { experiments: [{ name: 'test-model', modelName: 'Test Model', tier: 2,
@@ -269,7 +273,7 @@ test('score reporting reads only exported JSON with main code', async () => {
   assert.match(report, /ref: refs\/heads\/main/);
   assert.match(report, /name: model-export/);
   assert.match(report, /model-summary\/agent-results.json/);
-  assert.match(report, /summarizeModelResults\(dataset, JSON.parse\(process.env.PAIRS_JSON\)\)/);
+  assert.match(report, /summarizeModelResults\(dataset, JSON.parse\(process.env.PAIRS_JSON\), excluded\)/);
   assert.match(report, /results \? \{ results \} : \{\}/);
   assert.match(report, /if \(succeeded && !results\) core.setFailed/);
   assert.doesNotMatch(report, /pnpm|contents: write|needs.prepare.outputs.head-ref/);

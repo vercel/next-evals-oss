@@ -14,6 +14,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { nonPublicEvalNames } from '../lib/published-evals.js';
 
 const REPO_URL = 'https://github.com/vercel/next.js.git';
 async function main(): Promise<void> {
@@ -116,9 +117,10 @@ async function main(): Promise<void> {
         { skills?: string[]; publish?: boolean }
       >)
     : {};
-  const nonPublicEvals = Object.entries(evalConfig)
-    .filter(([, config]) => config.publish === false || config.skills?.length)
-    .map(([evalName]) => evalName);
+  const publicationPolicy = JSON.parse(
+    readFileSync('eval-publication-overrides.json', 'utf8'),
+  );
+  const nonPublicEvals = nonPublicEvalNames(evalConfig, publicationPolicy, ref);
   for (const evalName of nonPublicEvals) {
     rmSync(join(evalsDir, evalName), { recursive: true, force: true });
   }
