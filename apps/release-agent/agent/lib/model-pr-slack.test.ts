@@ -161,7 +161,7 @@ test("a new head's approval notice stays in the original PR thread and is dedupl
   const parent = {
     user: "Ubot",
     ts: threadTs,
-    text: modelPrNotificationRoot({ ...outcome, event: "approval_required" }),
+    text: `<${outcome.prUrl}|Model registration PR #161> needs two maintainers to approve \`e194006\` before credentialed evals can run. Models: \`gpt-6.1-terra-high\`.`,
   };
   const messages = [parent];
   const payload = {

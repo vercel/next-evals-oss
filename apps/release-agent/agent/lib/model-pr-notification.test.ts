@@ -30,8 +30,20 @@ const approval = {
 test("builds the model approval thread root before starting Eve", () => {
   assert.equal(
     modelPrNotificationRoot(approval),
-    "<https://github.com/vercel/next-evals-oss/pull/159|Model registration PR #159> needs two maintainers to approve `0123456` before credentialed evals can run. Models: `kimi-k3.1-pro`.",
+    "<https://github.com/vercel/next-evals-oss/pull/159|kimi-k3.1-pro> needs two maintainer approvals on `0123456` to run evals.",
   );
+});
+
+test("links the model name in run-start notices and escapes link labels", () => {
+  assert.equal(
+    modelPrNotificationRoot({ ...approval, event: "run_started" }),
+    "<https://github.com/vercel/next-evals-oss/pull/159|kimi-k3.1-pro> is approved. Evals are starting for `0123456`.",
+  );
+  const text = modelPrNotificationRoot({
+    ...approval,
+    pairs: [{ ...approval.pairs[0], base: "model|<!channel>" }],
+  });
+  assert.ok(text.includes("|model &lt;!channel&gt;>"));
 });
 
 test("suppresses the bootstrap turn after the thread root is posted", () => {

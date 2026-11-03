@@ -25,11 +25,8 @@ export async function findModelPrParent(
   if (!identity.ok || typeof identity.user_id !== "string") {
     throw new Error("Could not identify the Slack bot for thread recovery");
   }
-  const pr = `<${payload.prUrl}|Model registration PR #${payload.prNumber}>`;
-  const prefixes = [
-    `${pr} needs two maintainers to approve `,
-    `${pr} is approved and its model evals are starting for `,
-  ];
+  // Match the PR URL so older labels still recover the original thread.
+  const pr = `<${payload.prUrl}|`;
   let cursor: string | undefined;
   let oldest: string | undefined;
   for (let page = 0; page < 10; page++) {
@@ -47,7 +44,7 @@ export async function findModelPrParent(
         (!message.thread_ts || message.thread_ts === message.ts) &&
         typeof message.ts === "string" &&
         typeof message.text === "string" &&
-        prefixes.some((prefix) => message.text.startsWith(prefix)),
+        message.text.startsWith(pr),
     );
     for (const parent of parents) {
       if (!oldest || Number(parent.ts) < Number(oldest))

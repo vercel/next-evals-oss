@@ -152,18 +152,20 @@ function slackText(value: string) {
 }
 
 function models(payload: ModelPrNotification) {
-  return payload.pairs.map((pair) => `\`${pair.base}\``).join(", ");
+  return payload.pairs
+    .map((pair) => slackText(pair.base).replace(/\|/g, " "))
+    .join(", ");
 }
 
 export function modelPrNotificationRoot(payload: ModelPrNotification) {
-  const pullRequest = `<${payload.prUrl}|Model registration PR #${payload.prNumber}>`;
+  const pullRequest = `<${payload.prUrl}|${models(payload)}>`;
   const head = `\`${payload.headSha.slice(0, 7)}\``;
 
   if (payload.event === "approval_required") {
-    return `${pullRequest} needs two maintainers to approve ${head} before credentialed evals can run. Models: ${models(payload)}.`;
+    return `${pullRequest} needs two maintainer approvals on ${head} to run evals.`;
   }
   if (payload.event === "run_started") {
-    return `${pullRequest} is approved and its model evals are starting for ${head}. Models: ${models(payload)}.`;
+    return `${pullRequest} is approved. Evals are starting for ${head}.`;
   }
   throw new Error("Only a new model eval thread has a root notification");
 }
