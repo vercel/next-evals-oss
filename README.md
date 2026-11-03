@@ -193,6 +193,10 @@ Editing an existing experiment config changes its fingerprint, which makes its
 cached results stale. That is the intended signal, but it means config churn costs
 real re-runs.
 
+Use one registration PR per model, containing its Base and AGENTS.md experiments.
+Each model has its own access check, approvals, results and publication. Split
+models from the same provider too; unavailable models must not hold up others.
+
 RoboEve model-registration pull requests run through
 [`model-pr-evals.yml`](.github/workflows/model-pr-evals.yml). The workflow accepts
 only same-repository branches under `v/register-*`. When RoboEve creates one of
@@ -215,12 +219,12 @@ Different model pull requests can run in parallel, while duplicate events for
 the same pull request are serialized. Opening a registration PR creates one
 Slack thread asking for those approvals. Its parent message ID is saved in the
 PR check, and outcome delivery is confirmed by Slack. The same thread receives
-the final Base and AGENTS.md scores for every measured model, or a classified,
+the final Base and AGENTS.md scores for that model, or a classified,
 sanitized failure without raw logs. Completed-run replies link the results PR
 and ask reviewers to check failed attempts, graders, and the public-board tier
 before merging to publish. These scores do not establish release regressions. The
 workflow then runs that
-pull request's new base and AGENTS.md pairs sequentially against the pinned eval
+model's Base and AGENTS.md experiments sequentially against the pinned eval
 suite. A manual dispatch can select an eligible pull request by number and
 request a forced rerun of an already measured pull request, but it cannot skip
 the approval. It

@@ -66,6 +66,25 @@ jobs:
             let prNumber = existing.data[0]?.number;
             if (!prNumber) {
               const commit = await github.rest.repos.getCommit({ owner, repo, ref: branch });
+              const comparison = await github.rest.repos.compareCommitsWithBasehead({
+                owner, repo, basehead: `main...${commit.data.sha}`,
+              });
+              const files = comparison.data.files;
+              if (!files || files.length >= 300) {
+                throw new Error('Cannot validate the complete registration diff');
+              }
+              const experiments = files
+                .filter((file) => file.status === 'added')
+                .map((file) => /^experiments\/([a-z0-9][a-z0-9.-]*)(--agents-md)?\.ts$/.exec(file.filename))
+                .filter(Boolean)
+                .map((match) => `${match[1]}${match[2] || ''}`);
+              const bases = experiments.filter((name) => !name.endsWith('--agents-md'));
+              if (
+                bases.length !== 1 || experiments.length !== 2 ||
+                !experiments.includes(`${bases[0]}--agents-md`)
+              ) {
+                throw new Error('Register one model per branch, with its Base and AGENTS.md pair');
+              }
               const created = await github.rest.pulls.create({
                 owner,
                 repo,

@@ -162,6 +162,67 @@ test('RoboEve branch detection opens a draft registration PR from main', async (
   assert.match(open, /force: 'false'/);
 });
 
+test('the opener creates one model pair and rejects combined or incomplete registrations', async () => {
+  const workflow = await readFile(openerWorkflowPath, 'utf8');
+  const script = job(workflow, 'open')
+    .split('          script: |\n')[1]
+    .split('\n')
+    .map((line) => line.slice(12))
+    .join('\n');
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const pair = (slug: string) =>
+    ['', '--agents-md'].map((suffix) => ({
+      filename: `experiments/${slug}${suffix}.ts`,
+      status: 'added',
+    }));
+  for (const [files, valid] of [
+    [pair('sol'), true],
+    [[...pair('sol'), ...pair('minimax')], false],
+    [[pair('sol')[0]], false],
+    [[], false],
+    [Array.from({ length: 300 }, () => pair('sol')[0]), false],
+  ] as const) {
+    let opened = 0;
+    let dispatched = 0;
+    const github = {
+      rest: {
+        repos: {
+          getCommit: async () => ({
+            data: { sha: 'a'.repeat(40), commit: { message: 'Register Sol' } },
+          }),
+          compareCommitsWithBasehead: async (input: { basehead: string }) => {
+            assert.equal(input.basehead, `main...${'a'.repeat(40)}`);
+            return { data: { files } };
+          },
+        },
+        pulls: {
+          list: async () => ({ data: [] }),
+          create: async (input: { draft: boolean }) => {
+            assert.equal(input.draft, true);
+            opened++;
+            return { data: { number: 123 } };
+          },
+        },
+        actions: {
+          createWorkflowDispatch: async () => {
+            dispatched++;
+          },
+        },
+      },
+    };
+    const run = () =>
+      new AsyncFunction('github', 'context', 'process', script)(
+        github,
+        { repo: { owner: 'vercel', repo: 'next-evals-oss' } },
+        { env: { BRANCH: 'v/register-sol' } },
+      );
+    if (valid) await run();
+    else await assert.rejects(run, /one model|complete registration diff/);
+    assert.equal(opened, valid ? 1 : 0);
+    assert.equal(dispatched, valid ? 1 : 0);
+  }
+});
+
 test('duplicate model PR measurements are single-flight', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
   assert.match(

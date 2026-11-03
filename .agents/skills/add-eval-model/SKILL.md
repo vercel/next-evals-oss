@@ -8,7 +8,7 @@ description: Add a model to the nextjs.org/evals board end to end — register t
 ## The deliverable is a landed run, not a config
 
 A model addition is **done** when the run has happened, `agent-results.json` contains
-its numbers, and a PR against the site repo carries that file. It is **not** done when
+its numbers, and the results PR in this repo is ready for review. It is **not** done when
 the experiment config exists.
 
 `export-results` only exports experiments that have results, so a registered-but-unrun
@@ -42,6 +42,13 @@ are in the injected instructions; put the missing ones in `.env.local` (gitignor
 Do not proceed on a red preflight.
 
 ### 2. Register the experiment pair
+
+Create one branch and one registration PR per model, even when several models
+ship together or share a provider. Keep only that model's Base and AGENTS.md
+experiments, names, pricing and temporary stale entries in the PR. Access checks,
+approvals, runs and publication then stay independent. The opener and evaluator
+reject registrations containing more than one model. Do not combine discoveries
+into a batch PR.
 
 Confirm the model id and the effort rung against the **live gateway** before writing
 either into a config. Catalogs disagree with the API and with each other; the gateway
