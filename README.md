@@ -304,8 +304,8 @@ maintainer explicitly requests a forced manual rerun.
 
 Scheduled and manual release runs use GPT-6 Sol (high), with and without
 AGENTS.md, on the same published suite and grader overrides as model-registration
-runs: currently 31 tasks and 62 scored attempts per release. The model selection
-is in `RELEASE_SELECTED_EXPERIMENTS` in [`lib/tier-one.ts`](lib/tier-one.ts).
+runs: currently 28 published tasks and 56 scored attempts per release. The model
+selection is in `RELEASE_SELECTED_EXPERIMENTS` in [`lib/tier-one.ts`](lib/tier-one.ts).
 Both conditions contain the released package's bundled docs. AGENTS.md adds the
 pointer to them. New-model scoring and the public board's model list are unchanged.
 
@@ -323,6 +323,13 @@ merge. A changed setup starts a new baseline rather than producing a misleading
 delta. Pass→fail and fail→pass changes are reported separately for Base and
 AGENTS.md, with failure-confirmation status. Remote model and CLI aliases may
 still change; a score change alone does not prove a framework regression.
+
+When only publication exclusions change, a reviewed `publicationComparison`
+annotation on a merged baseline can retain it for the remaining tasks. The
+annotation matches the exact old and new comparison keys and excluded task set;
+it does not accept later model, grader, or harness changes. Original scores and
+the execution key remain unchanged. Both measurements exclude unpublished tasks
+before comparing, and their remaining tasks and model conditions must match.
 
 Release, backport, and canary measurements always use pass@1 through the
 `NEXT_RELEASE_EVAL_RUNS=1` workflow override. Normal local runs and publishable
