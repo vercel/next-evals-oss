@@ -56,7 +56,7 @@ export async function comparisonKey(
   return hash.digest('hex');
 }
 
-function cells(data: ExportedReleaseData) {
+function cells(data: ExportedReleaseData, excluded: ReadonlySet<string>) {
   const measurement = data.metadata.measurement;
   if (
     measurement?.metric !== 'pass@1' ||
@@ -76,7 +76,9 @@ function cells(data: ExportedReleaseData) {
   >();
   let tasks: string | undefined;
   for (const experiment of data.metadata.experiments) {
-    const results = data.results[experiment.name];
+    const results = data.results[experiment.name]?.filter(
+      (result) => !excluded.has(result.evalPath),
+    );
     if (!results?.length) throw new Error('Missing results');
     if (
       !Array.isArray(experiment.docsImpact?.newlyPassed) ||
@@ -121,6 +123,27 @@ function cells(data: ExportedReleaseData) {
   return values;
 }
 
+function matchesComparisonKey(
+  previous: NonNullable<ExportedReleaseData['metadata']['evaluationTarget']>,
+  currentKey: string,
+  excluded: ReadonlySet<string>,
+): boolean {
+  if (previous.comparisonKey === currentKey) return true;
+  // Only a reviewed annotation merged with the baseline can bridge a
+  // publication-only change. Preserve its original execution key and scores.
+  const reviewed = previous.publicationComparison;
+  return Boolean(
+    reviewed &&
+      /^[a-f0-9]{64}$/.test(previous.comparisonKey) &&
+      reviewed.originalComparisonKey === previous.comparisonKey &&
+      reviewed.comparisonKey === currentKey &&
+      Array.isArray(reviewed.excludedEvals) &&
+      reviewed.excludedEvals.length === excluded.size &&
+      new Set(reviewed.excludedEvals).size === excluded.size &&
+      reviewed.excludedEvals.every((name) => excluded.has(name)),
+  );
+}
+
 function versionOrder(version: string): number[] | undefined {
   const match = /^(\d+)\.(\d+)\.(\d+)(?:-canary\.(\d+))?$/.exec(version);
   return match
@@ -155,7 +178,7 @@ export async function loadReleaseComparison(
     return unavailable;
   const order = versionOrder(target.version);
   if (!order) throw new Error('Invalid current release version');
-  const currentCells = cells(current);
+  const currentCells = cells(current, excluded);
   const versions = await readdir(root).catch((error) => {
     if (error.code === 'ENOENT') return [];
     throw error;
@@ -188,12 +211,12 @@ export async function loadReleaseComparison(
           previous.version !== version ||
           previous.suite !== target.suite ||
           previous.suiteRef !== target.suiteRef ||
-          previous.comparisonKey !== target.comparisonKey ||
+          !matchesComparisonKey(previous, target.comparisonKey, excluded) ||
           !Number.isFinite(Date.parse(previous.evaluatedAt)) ||
           Date.parse(previous.evaluatedAt) >= Date.parse(target.evaluatedAt)
         )
           continue;
-        const previousCells = cells(data);
+        const previousCells = cells(data, excluded);
         if (
           previousCells.size !== currentCells.size ||
           [...currentCells.keys()].some((key) => !previousCells.has(key))
@@ -221,7 +244,7 @@ export async function loadReleaseComparison(
   if (!baseline) return unavailable;
   const regressions: Change[] = [],
     improvements: Change[] = [];
-  const previousCells = cells(baseline.data);
+  const previousCells = cells(baseline.data, excluded);
   for (const [key, value] of currentCells) {
     if (excluded.has(value.evalName)) continue;
     if (value.success === previousCells.get(key)!.success) continue;

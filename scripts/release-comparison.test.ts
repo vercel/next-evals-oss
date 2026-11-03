@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { comparisonKey, loadReleaseComparison } from './release-comparison.js';
 import { buildReleaseReport } from './release-automation.js';
@@ -267,4 +268,163 @@ test('legacy comparisons omit unpublished regressions and improvements', async (
   if (!comparison.available) return;
   assert.deepEqual(comparison.regressions, []);
   assert.deepEqual(comparison.improvements.map(change => change.evalName), ['task', 'task']);
+});
+
+test('publication-only compatibility reuses a larger historical cohort without changing scores', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-publication-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const old = measurement('16.4.2', false);
+  old.results.sol.push({ evalPath: 'unpublished', result: { success: true } });
+  const current = measurement('16.4.4', true);
+  current.metadata.evaluationTarget!.evaluatedAt = '2026-11-02T00:00:00.000Z';
+  current.metadata.evaluationTarget!.comparisonKey = 'd'.repeat(64);
+  const report = buildReleaseReport(current, diagnostics);
+  const dir = join(root, '16.4.2/123');
+  await mkdir(dir, { recursive: true });
+  const save = () =>
+    writeFile(join(dir, 'measurement.json'), JSON.stringify(old));
+  await save();
+  assert.equal(
+    (await loadReleaseComparison(root, current, report, ['unpublished']))
+      .available,
+    false,
+  );
+
+  old.metadata.evaluationTarget!.publicationComparison = {
+    originalComparisonKey: 'c'.repeat(64),
+    comparisonKey: 'd'.repeat(64),
+    excludedEvals: ['unpublished'],
+    note: 'Reviewed publication-only exclusion.',
+  };
+  await save();
+  const comparison = await loadReleaseComparison(root, current, report, [
+    'unpublished',
+  ]);
+  assert.ok(comparison.available);
+  if (comparison.available) {
+    assert.equal(comparison.baseline.version, '16.4.2');
+    assert.deepEqual(
+      comparison.improvements.map((change) => change.evalName),
+      ['task', 'task'],
+    );
+  }
+  assert.equal(old.metadata.evaluationTarget!.comparisonKey, 'c'.repeat(64));
+  assert.equal(old.results.sol.length, 2);
+  assert.equal(old.results.sol[0].result.success, false);
+
+  for (const mutate of [
+    (data: ExportedReleaseData) => {
+      data.metadata.evaluationTarget!.publicationComparison!.originalComparisonKey =
+        'e'.repeat(64);
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.evaluationTarget!.publicationComparison!.comparisonKey =
+        'e'.repeat(64);
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.evaluationTarget!.publicationComparison!.excludedEvals = [];
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.evaluationTarget!.publicationComparison!.excludedEvals = [
+        'different',
+      ];
+    },
+    (data: ExportedReleaseData) => {
+      data.results.sol[0].evalPath = 'different-published-task';
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.experiments[0].agentHarness = 'Other';
+    },
+  ]) {
+    const invalid = structuredClone(old);
+    mutate(invalid);
+    await writeFile(join(dir, 'measurement.json'), JSON.stringify(invalid));
+    assert.equal(
+      (await loadReleaseComparison(root, current, report, ['unpublished']))
+        .available,
+      false,
+    );
+  }
+});
+
+test('the retained 16.4.4 run is usable for the current 28-task setup', async () => {
+  const repo = fileURLToPath(new URL('..', import.meta.url));
+  const baselinePath = join(
+    repo,
+    'measurements/releases/16.4.4/41470970834/measurement.json',
+  );
+  const saved = await readFile(baselinePath, 'utf8');
+  const baseline: ExportedReleaseData = JSON.parse(saved);
+  const current = structuredClone(baseline);
+  const policy = JSON.parse(
+    await readFile(join(repo, 'eval-publication-overrides.json'), 'utf8'),
+  );
+  const excluded = Object.keys(policy.evals);
+  const target = current.metadata.evaluationTarget!;
+  target.version = '16.4.5';
+  target.ref = 'v16.4.5';
+  target.sha = 'f'.repeat(40);
+  target.evaluatedAt = '2026-11-03T00:00:00.000Z';
+  target.comparisonKey = await comparisonKey(
+    repo,
+    Object.keys(current.results),
+  );
+  delete target.publicationComparison;
+  for (const experiment of current.metadata.experiments) {
+    current.results[experiment.name] = current.results[experiment.name].filter(
+      (row) => !excluded.includes(row.evalPath),
+    );
+    assert.equal(current.results[experiment.name].length, 28);
+  }
+  const report = buildReleaseReport(current, diagnostics, excluded);
+  const comparison = await loadReleaseComparison(
+    join(repo, 'measurements/releases'),
+    current,
+    report,
+    excluded,
+  );
+  assert.ok(comparison.available);
+  if (comparison.available) {
+    assert.equal(comparison.baseline.version, '16.4.4');
+    assert.deepEqual(comparison.regressions, []);
+    assert.deepEqual(comparison.improvements, []);
+  }
+  const experiment = current.metadata.experiments[0];
+  const changed = current.results[experiment.name].find(
+    (row) =>
+      row.result.success &&
+      !experiment.docsImpact!.newlyPassed.includes(row.evalPath) &&
+      !experiment.docsImpact!.newlyFailed.includes(row.evalPath),
+  )!;
+  changed.result.success = false;
+  const changedReport = buildReleaseReport(current, diagnostics, excluded);
+  const regressed = await loadReleaseComparison(
+    join(repo, 'measurements/releases'),
+    current,
+    changedReport,
+    excluded,
+  );
+  assert.ok(regressed.available);
+  if (regressed.available) {
+    assert.deepEqual(
+      regressed.regressions.map((row) => [row.evalName, row.agentsMd]),
+      [
+        [changed.evalPath, false],
+        [changed.evalPath, true],
+      ],
+    );
+  }
+  target.comparisonKey = 'f'.repeat(64);
+  assert.equal(
+    (
+      await loadReleaseComparison(
+        join(repo, 'measurements/releases'),
+        current,
+        changedReport,
+        excluded,
+      )
+    ).available,
+    false,
+  );
+  assert.equal(await readFile(baselinePath, 'utf8'), saved);
 });

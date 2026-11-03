@@ -197,7 +197,17 @@ interface ExportedExperiment {
 
 export interface ExportedReleaseData {
   metadata: {
-    evaluationTarget?: ReleaseTarget & { suite: string; suiteRef: string; comparisonKey: string };
+    evaluationTarget?: ReleaseTarget & {
+      suite: string;
+      suiteRef: string;
+      comparisonKey: string;
+      publicationComparison?: {
+        originalComparisonKey: string;
+        comparisonKey: string;
+        excludedEvals: string[];
+        note: string;
+      };
+    };
     measurement?: {
       metric: string;
       scoredAttempts: number;
