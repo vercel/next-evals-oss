@@ -42,6 +42,7 @@ export async function comparisonKey(
     'eval-publication-overrides.json',
     'lib/published-evals.ts',
     'scripts/sync-evals.ts',
+    'scripts/grader-overrides.ts',
     'pnpm-lock.yaml',
     'lib/setup.ts',
     'lib/release-runs.ts',

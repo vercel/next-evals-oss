@@ -218,6 +218,7 @@ test('execution configuration changes invalidate the comparison key', async (t) 
     'eval-publication-overrides.json',
     'lib/published-evals.ts',
     'scripts/sync-evals.ts',
+    'scripts/grader-overrides.ts',
     'pnpm-lock.yaml',
     'lib/setup.ts',
     'lib/release-runs.ts',
@@ -232,6 +233,11 @@ test('execution configuration changes invalidate the comparison key', async (t) 
   assert.notEqual(await comparisonKey(root, ['sol']), original);
   await writeFile(join(root, 'experiments/sol.ts'), 'original');
   assert.equal(await comparisonKey(root, ['sol']), original);
+  await writeFile(
+    join(root, 'scripts/grader-overrides.ts'),
+    'changed import policy',
+  );
+  assert.notEqual(await comparisonKey(root, ['sol']), original);
 });
 
 test('release Slack omits unpublished scores and confirmation failures', () => {
@@ -347,7 +353,7 @@ test('publication-only compatibility reuses a larger historical cohort without c
   }
 });
 
-test('the retained 16.4.4 run is usable for the current 28-task setup', async () => {
+test('the retained 16.4.4 run supports its reviewed setup, not changed graders', async () => {
   const repo = fileURLToPath(new URL('..', import.meta.url));
   const baselinePath = join(
     repo,
@@ -365,10 +371,9 @@ test('the retained 16.4.4 run is usable for the current 28-task setup', async ()
   target.ref = 'v16.4.5';
   target.sha = 'f'.repeat(40);
   target.evaluatedAt = '2026-11-03T00:00:00.000Z';
-  target.comparisonKey = await comparisonKey(
-    repo,
-    Object.keys(current.results),
-  );
+  const currentKey = await comparisonKey(repo, Object.keys(current.results));
+  // Publication-only retention does not authorize a later grader change.
+  target.comparisonKey = target.publicationComparison!.comparisonKey;
   delete target.publicationComparison;
   for (const experiment of current.metadata.experiments) {
     current.results[experiment.name] = current.results[experiment.name].filter(
@@ -414,7 +419,8 @@ test('the retained 16.4.4 run is usable for the current 28-task setup', async ()
       ],
     );
   }
-  target.comparisonKey = 'f'.repeat(64);
+  assert.notEqual(currentKey, target.comparisonKey);
+  target.comparisonKey = currentKey;
   assert.equal(
     (
       await loadReleaseComparison(

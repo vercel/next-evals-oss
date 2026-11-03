@@ -54,8 +54,15 @@ N result(s) have a changed eval and were left stale — run them to refresh.
 `pnpm status` lists those changes as work. The default sync uses
 [`eval-suite-ref.txt`](eval-suite-ref.txt), matching CI.
 [`eval-grader-overrides.json`](eval-grader-overrides.json) imports reviewed
-`EVAL.ts` files from newer commits without changing this cohort's prompts, apps,
-or task list. Overrides apply only to their specified suite pin.
+grader files from newer commits without changing this cohort's apps or task list.
+A string pin imports only `EVAL.ts`. A reviewed companion-file entry may also list
+`PROMPT.md` and `tsconfig.json`, as needed to clarify the existing React contract
+and keep the hidden grader out of app builds. Overrides apply only to their
+specified suite pin; app files and arbitrary paths are rejected.
+
+Saved coding attempts retain their original prompt exposure and fingerprints.
+A grader replay does not claim the agent was run against the clarified prompt.
+Exact historical-result retention is reviewed separately below.
 [`eval-publication-overrides.json`](eval-publication-overrides.json) also carries
 reviewed `publish: false` decisions into that older cohort. Those tasks are
 omitted from release and model runs, confirmation jobs, and their reports.
@@ -484,9 +491,10 @@ retries them and does not report an incomplete measurement.
 and grader output establish a false negative, a results PR can correct that
 attempt and its summary. A `grading-review.json` beside the summary records the
 original outcome, evidence, and corrected checks. Original transcripts, grader
-logs, fingerprints, costs, and durations stay intact. These are saved-output
-reviews, not new agent or judge runs. See the
-[prefetch grader review](result-reviews/2026-10-30-prefetch-graders.md).
+logs, fingerprints, costs, and durations stay intact. A grader replay records
+its own output and judge usage separately from the original coding attempt.
+See the [prefetch review](result-reviews/2026-10-30-prefetch-graders.md) and
+[React/prefetch replays](result-reviews/2026-11-03-react-prefetch.md).
 
 For that grader-only update, `grader-result-retention.json` lets CI retain
 existing measurements without marking them fresh. Retention requires the exact
