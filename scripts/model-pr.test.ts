@@ -201,6 +201,44 @@ test('selects paired experiments from a RoboEve registration PR', () => {
   );
 });
 
+test('rejects multi-model registrations before runs or approval notices', () => {
+  const combined = [
+    ...files,
+    { filename: 'experiments/minimax-m3.1-flash.ts', status: 'added' },
+    {
+      filename: 'experiments/minimax-m3.1-flash--agents-md.ts',
+      status: 'added',
+    },
+  ];
+  for (const requireApproval of [true, false]) {
+    assert.throws(
+      () =>
+        selectModelExperiments(
+          pullRequest,
+          combined,
+          'vercel/next-evals-oss',
+          review,
+          { requireApproval },
+        ),
+      /register one model per pull request/,
+    );
+  }
+  const candidate = {
+    pullRequest,
+    files: combined,
+    ...review,
+    measuredByAutomation: false,
+  };
+  assert.equal(
+    selectModelCandidate([candidate], 'vercel/next-evals-oss'),
+    null,
+  );
+  assert.equal(
+    selectModelNotificationCandidate([candidate], 'vercel/next-evals-oss'),
+    null,
+  );
+});
+
 test('rejects a missing AGENTS.md pair', () => {
   assert.throws(
     () =>

@@ -223,6 +223,8 @@ export function selectModelExperiments(
     .filter((experiment) => !experiment.endsWith('--agents-md'))
     .sort();
   if (bases.length === 0) fail('no new base experiment was found');
+  if (bases.length !== 1)
+    fail('register one model per pull request, with its Base and AGENTS.md pair');
 
   for (const base of bases) {
     if (!added.has(`${base}--agents-md`)) {
