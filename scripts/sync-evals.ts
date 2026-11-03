@@ -15,6 +15,7 @@ import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { nonPublicEvalNames } from '../lib/published-evals.js';
+import { pinnedGraderOverrides } from './grader-overrides.js';
 
 const REPO_URL = 'https://github.com/vercel/next.js.git';
 async function main(): Promise<void> {
@@ -60,38 +61,34 @@ async function main(): Promise<void> {
   );
   execSync(`git -C "${repoDir}" checkout -q FETCH_HEAD`, { stdio: 'inherit' });
 
-  // Import only the reviewed graders, keeping this cohort's prompts and apps.
+  // Import reviewed graders and explicitly listed companion files, not apps.
   // Explicitly syncing another revision must not apply this pin's overrides.
   const overrides = JSON.parse(
     readFileSync('eval-grader-overrides.json', 'utf8'),
   );
-  if (ref === overrides.suiteRef) {
-    for (const [evalName, graderRef] of Object.entries(overrides.graders)) {
-      if (
-        !/^agent-[a-z0-9-]+$/.test(evalName) ||
-        typeof graderRef !== 'string' ||
-        !/^[a-f0-9]{40}$/.test(graderRef)
-      ) {
-        throw new Error('Invalid pinned grader override');
-      }
-      const relativePath = `evals/evals/${evalName}/EVAL.ts`;
+  for (const { evalName, ref: graderRef, files } of pinnedGraderOverrides(
+    overrides,
+    ref,
+  )) {
+    execFileSync(
+      'git',
+      [
+        '-C',
+        repoDir,
+        'fetch',
+        '--depth',
+        '1',
+        '--filter=blob:none',
+        'origin',
+        graderRef,
+      ],
+      { stdio: 'inherit' },
+    );
+    for (const file of files) {
+      const relativePath = `evals/evals/${evalName}/${file}`;
       const target = join(repoDir, relativePath);
       if (!existsSync(target))
-        throw new Error(`Unknown eval override: ${evalName}`);
-      execFileSync(
-        'git',
-        [
-          '-C',
-          repoDir,
-          'fetch',
-          '--depth',
-          '1',
-          '--filter=blob:none',
-          'origin',
-          graderRef,
-        ],
-        { stdio: 'inherit' },
-      );
+        throw new Error(`Unknown eval override: ${evalName}/${file}`);
       writeFileSync(
         target,
         execFileSync('git', [
