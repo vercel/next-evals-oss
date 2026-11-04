@@ -55,6 +55,7 @@ const reportSchema = z.object({
         experiment: z.string().min(1), model: z.string().min(1),
         evalName: z.string().min(1), agentsMd: z.boolean(), reproducible: z.boolean(),
       })),
+      changedEvals: z.array(z.string().min(1)).optional(),
       improvements: z.array(z.object({
         experiment: z.string().min(1), model: z.string().min(1),
         evalName: z.string().min(1), agentsMd: z.boolean(), reproducible: z.boolean(),

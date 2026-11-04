@@ -560,3 +560,10 @@ explicit grader overrides. After a sync, `ls evals/` is authoritative.
 ## License
 
 See [LICENSE](LICENSE).
+
+Release comparisons retain unchanged tasks when reviewed grader or companion-file
+pins change within the same suite revision. Reports list those tasks in
+`changedEvals` and exclude them from regression/improvement counts. Changes to
+the shared runner lock, setup or model experiments still require a new baseline.
+The retained 16.4.4 measurement records its original execution inputs from #175;
+this does not relabel its saved attempts as runs of a newer prompt or grader.
