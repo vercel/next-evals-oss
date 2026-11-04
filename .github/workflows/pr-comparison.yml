@@ -9,9 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       comparison:
-        description: 'Reviewed manifest name in comparisons/ (without .json)'
+        description: 'Manifest name in comparisons/ (without .json)'
         type: string
         default: activity-docs
+      request_pr:
+        description: 'Open evals OSS PR containing the comparison manifest; blank uses main'
+        type: string
+        default: ''
+      reviewed_head:
+        description: 'Exact reviewed head SHA of request_pr (required for an open PR)'
+        type: string
+        default: ''
       task:
         description: 'Task from the manifest, all, or leave empty for its default task'
         type: string
@@ -42,16 +50,21 @@ jobs:
 
   compare:
     needs: check
-    # Only reviewed manifests and runner code from main receive credentials.
+    # The runner stays on main; a manual request can select a reviewed PR manifest.
     if: github.event_name == 'workflow_dispatch' && github.repository == 'vercel/next-evals-oss' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     permissions:
       contents: read
       id-token: write
+      pull-requests: read
+      checks: write
     env:
       COMPARISON_WORKSPACE: ${{ runner.temp }}/pr-comparison
       COMPARISON_NAME: ${{ inputs.comparison }}
+      COMPARISON_REQUEST_FILE: ${{ runner.temp }}/pr-comparison-request.json
+      COMPARISON_PR: ${{ inputs.request_pr }}
+      COMPARISON_REVIEWED_HEAD: ${{ inputs.reviewed_head }}
       COMPARISON_TASK: ${{ inputs.task }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -64,7 +77,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Prepare pinned tasks and paired docs packages
+      - name: Resolve the reviewed open comparison PR
+        if: inputs.request_pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --import tsx scripts/pr-comparison.ts request
+      - name: Prepare pinned tasks and paired packages
         id: prepare
         run: node --import tsx scripts/pr-comparison.ts prepare
       - name: Pull scoped eval credentials
@@ -91,6 +109,30 @@ jobs:
           path: ${{ runner.temp }}/pr-comparison/artifact
           if-no-files-found: error
           retention-days: 90
+      - name: Attach comparison results to the request PR
+        if: ${{ !cancelled() && steps.retain.outputs.safe == 'true' && inputs.request_pr != '' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const root = process.env.COMPARISON_WORKSPACE;
+            const report = JSON.parse(fs.readFileSync(path.join(root, 'artifact/comparison.json'), 'utf8'));
+            const request = report.provenance.request;
+            const complete = report.records.every(row => row.status !== 'unavailable');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.checks.create({
+              ...context.repo,
+              name: `PR eval comparison: ${report.provenance.name}`,
+              head_sha: request.head,
+              status: 'completed',
+              conclusion: complete ? 'neutral' : 'failure',
+              details_url: runUrl,
+              output: {
+                title: complete ? 'Before/after results ready' : 'Comparison incomplete',
+                summary: (`[Results and traces](${runUrl})\n\n` + fs.readFileSync(path.join(root, 'artifact/README.md'), 'utf8')).slice(0, 60000),
+              },
+            });
       - name: Require a recorded outcome for both conditions
         if: ${{ !cancelled() && steps.retain.outputs.complete != 'true' }}
         run: |

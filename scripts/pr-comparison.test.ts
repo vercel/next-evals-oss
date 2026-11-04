@@ -19,6 +19,7 @@ import {
   retain,
   loadPlan,
   prepareWorkspace,
+  resolveRequest,
 } from './pr-comparison.js';
 import type { ComparisonPlan } from './pr-comparison.js';
 
@@ -175,6 +176,87 @@ test('before/after package artifacts support another framework and reject mismat
   );
 });
 
+test('an open PR supplies unmerged tasks without executing its runner code', async () => {
+  const reviewed = 'b'.repeat(40);
+  const candidate = {
+    ...plan,
+    tasks: ['new-docs-task'],
+    defaultTask: 'new-docs-task',
+    fixtureRef: plan.head,
+  };
+  const request = {
+    state: 'open',
+    base: { ref: 'main', repo: { full_name: 'vercel/next-evals-oss' } },
+    head: { sha: reviewed, repo: { full_name: 'vercel/next-evals-oss' } },
+  };
+  const source = {
+    state: 'open',
+    base: { sha: plan.base },
+    head: { sha: plan.head },
+  };
+  const file = {
+    type: 'file',
+    encoding: 'base64',
+    size: 2000,
+    content: Buffer.from(JSON.stringify(candidate)).toString('base64'),
+  };
+  const endpoints: string[] = [];
+  const read = async (endpoint: string) => {
+    endpoints.push(endpoint);
+    if (endpoint.includes('/contents/')) return file;
+    if (endpoint.includes('/next-evals-oss/')) return request;
+    return source;
+  };
+  const result = await resolveRequest(
+    '200',
+    reviewed,
+    plan.name,
+    read,
+    'maintainer',
+  );
+  assert.deepEqual(result.tasks, ['new-docs-task']);
+  assert.equal(result.fixtureRef, plan.head);
+  assert.deepEqual(result.request, {
+    repository: 'vercel/next-evals-oss',
+    number: 200,
+    head: reviewed,
+    actor: 'maintainer',
+  });
+  assert.equal(endpoints.length, 3);
+  assert.ok(endpoints[1].endsWith(`?ref=${reviewed}`));
+  await assert.rejects(
+    resolveRequest('200', 'c'.repeat(40), plan.name, read, 'maintainer'),
+    /reviewed SHA/,
+  );
+  await assert.rejects(
+    resolveRequest('200', reviewed, '../unsafe', read, 'maintainer'),
+    /manifest name/,
+  );
+  request.head.repo.full_name = 'someone/fork';
+  await assert.rejects(
+    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
+    /reviewed SHA/,
+  );
+  request.head.repo.full_name = 'vercel/next-evals-oss';
+  source.head.sha = 'd'.repeat(40);
+  await assert.rejects(
+    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
+    /PR changed/,
+  );
+  source.head.sha = plan.head;
+  source.state = 'closed';
+  await assert.rejects(
+    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
+    /PR changed/,
+  );
+  source.state = 'open';
+  file.type = 'symlink';
+  await assert.rejects(
+    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
+    /manifest file/,
+  );
+});
+
 test('docs packages reject runtime differences and identical treatments', () => {
   const path = 'package/dist/docs/01-app/02-guides/preserving-ui-state.md';
   const before = { [path]: 'old', 'package/dist/server.js': 'same' };
@@ -258,6 +340,13 @@ test('workflow is manual, main-only, bounded, and uploads only scanned evidence'
   assert.match(yaml, /steps.retain.outputs.safe == 'true'/);
   assert.match(yaml, /retention-days: 90/);
   assert.match(yaml, /ci-sandbox-auth.mjs/);
+  assert.match(yaml, /COMPARISON_REVIEWED_HEAD/);
+  assert.match(yaml, /head_sha: request.head/);
+  assert.ok(
+    yaml.indexOf('Resolve the reviewed open comparison PR') <
+      yaml.indexOf('Pull scoped eval credentials'),
+  );
+  assert.doesNotMatch(yaml, /ref: \$\{\{ inputs.reviewed_head/);
   assert.match(yaml, /timeout-minutes: 150/);
   assert.doesNotMatch(yaml, /secrets\./);
   const config = readFileSync(

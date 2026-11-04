@@ -6,7 +6,8 @@ and traces from both conditions together.
 
 ## Configure a comparison
 
-Add `comparisons/<name>.json` and review it before merging. The manifest pins:
+Add `comparisons/<name>.json` in an evals OSS PR. It can stay unmerged while
+you run the comparison. The manifest pins:
 
 - The PR and before/after source commits.
 - A public task repository and fixture commit. This can differ from the PR repo.
@@ -38,17 +39,45 @@ for that eval, and supply the two artifact URLs/hashes. No workflow changes are
 needed. The current harness is Codex, using a model with recorded repository
 pricing. Each manifest is limited to four tasks to bound a dispatch.
 
-Review task EVAL.ts files, package scripts and helpers as executable code. This
-workflow accepts only manifest names already merged on `main` and tasks listed
-in that manifest. Public tasks and package artifacts only; held-out tasks and
-customer data require private storage.
+Review task EVAL.ts files, package scripts and helpers as executable code,
+including code at the pinned fixture/helper commit. New tasks can be in the
+framework/docs PR or another public task repository; use that exact commit as
+`fixtureRef`. Both conditions run the same tasks and grader from that commit.
+Only the framework/package or guidance treatment changes. Public tasks and
+package artifacts only; held-out tasks and customer data require private storage.
 
 ## Run
 
-Dispatch **PR eval comparison** from `main`, select the **comparison** manifest
-name, and leave **task** empty for its default. Alternatively enter a task from
-that manifest or `all`. One attempt runs per task per condition. Activity's
-default notification task costs two coding attempts; all four tasks cost eight.
+Once this runner is merged, open a comparison PR in evals OSS containing the
+manifest. It points to the open framework/docs PR and pins its current base/head
+commits and package artifacts. The framework/docs PR and comparison PR can both
+remain unmerged. The request PR must be a branch in evals OSS targeting `main`.
+
+A maintainer reviews the manifest and its pinned executable tasks/helpers, then
+dispatches **PR eval comparison** from `main` with:
+
+- **request_pr:** the evals OSS comparison PR number.
+- **reviewed_head:** that comparison PR's exact reviewed head SHA.
+- **comparison:** its manifest name, without `.json`.
+- **task:** leave empty for the manifest default, enter a listed task, or `all`.
+
+For example, after reviewing PR 200 at its current head:
+
+```sh
+gh workflow run pr-comparison.yml --repo vercel/next-evals-oss --ref main \
+  -f request_pr=200 -f reviewed_head=FULL_REVIEWED_HEAD_SHA \
+  -f comparison=activity-docs -f task=all
+```
+
+The trusted runner reads the unmerged manifest as data through GitHub's API.
+It rejects a different request head, fork, closed PR or changed framework/docs
+base/head before obtaining Vercel credentials. It does not check out the request
+PR's workflow or runner scripts. Update/review the manifest after either PR
+changes, then dispatch again; pushes never automatically start paid runs.
+
+Existing predefined comparisons can still run from `main`: leave **request_pr**
+and **reviewed_head** empty. One attempt runs per selected task per condition.
+Activity's default task costs two attempts; all four tasks cost eight.
 The 15-minute attempt timeout includes setup and validation; the job limit is
 150 minutes. These limits are not a dollar spending cap.
 
@@ -66,6 +95,12 @@ changes to the PR. Agents can consult public docs even when bundled guidance
 is provided.
 
 ## Evidence and retention
+
+The request PR receives a **PR eval comparison** check on the reviewed commit,
+with the results table and a link to the Actions run and traces. No PR comment
+is posted. The check is neutral when the comparison completes, so model failures
+are visible without turning a research comparison into a merge gate. Incomplete
+comparisons fail the check.
 
 The Actions run has a summary and `pr-comparison-<run>-<attempt>` artifact:
 

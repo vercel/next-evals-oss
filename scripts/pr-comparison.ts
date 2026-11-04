@@ -59,6 +59,64 @@ export function loadPlan(repo: string, name: string): ComparisonPlan {
   return plan;
 }
 
+// Read PR JSON as data; never check out or run the request PR's runner code.
+export async function resolveRequest(
+  number: string,
+  reviewedHead: string,
+  name: string,
+  read: (endpoint: string) => Promise<any>,
+  actor: string,
+) {
+  if (
+    !/^[1-9][0-9]*$/.test(number) ||
+    !/^[a-f0-9]{40}$/.test(reviewedHead) ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
+  )
+    throw new Error(
+      'Provide a comparison PR number, exact reviewed head SHA and manifest name',
+    );
+  const repository = 'vercel/next-evals-oss';
+  const pr = await read(`/repos/${repository}/pulls/${number}`);
+  if (
+    pr.state !== 'open' ||
+    pr.base.repo.full_name !== repository ||
+    pr.base.ref !== 'main' ||
+    pr.head.repo?.full_name !== repository ||
+    pr.head.sha !== reviewedHead
+  )
+    throw new Error(
+      'Comparison PR must be open, in this repository, target main and match the reviewed SHA',
+    );
+  const file = await read(
+    `/repos/${repository}/contents/comparisons/${name}.json?ref=${reviewedHead}`,
+  );
+  if (file.type !== 'file' || file.encoding !== 'base64' || file.size > 65536)
+    throw new Error('Expected a small comparison manifest file');
+  const plan = JSON.parse(
+    Buffer.from(file.content, 'base64').toString('utf8'),
+  ) as ComparisonPlan;
+  if (plan.name !== name) throw new Error('Comparison name mismatch');
+  validatePlan(plan, '');
+  const match = plan.pullRequest.match(
+    /^https:\/\/github.com\/([^/]+\/[^/]+)\/pull\/(\d+)$/,
+  )!;
+  if (match[1] !== plan.repository)
+    throw new Error('PR repository does not match the manifest');
+  const source = await read(`/repos/${plan.repository}/pulls/${match[2]}`);
+  if (
+    source.state !== 'open' ||
+    source.base.sha !== plan.base ||
+    source.head.sha !== plan.head
+  )
+    throw new Error(
+      'Framework/docs PR changed; update and review the manifest base/head before running',
+    );
+  return {
+    ...plan,
+    request: { repository, number: Number(number), head: reviewedHead, actor },
+  };
+}
+
 export function validatePlan(plan: ComparisonPlan, task: string) {
   task ||= plan.defaultTask;
   if (
@@ -495,8 +553,32 @@ async function main() {
     process.env.COMPARISON_WORKSPACE ?? '/tmp/next-pr-comparison',
   );
   const command = process.argv[2];
-  if (command === 'prepare') {
-    const plan = loadPlan(repo, process.env.COMPARISON_NAME ?? 'activity-docs');
+  if (command === 'request') {
+    if (!process.env.GH_TOKEN || !process.env.COMPARISON_REQUEST_FILE)
+      throw new Error('Missing request authentication or output path');
+    const plan = await resolveRequest(
+      process.env.COMPARISON_PR ?? '',
+      process.env.COMPARISON_REVIEWED_HEAD ?? '',
+      process.env.COMPARISON_NAME ?? 'activity-docs',
+      async (endpoint) => {
+        const response = await fetch(`https://api.github.com${endpoint}`, {
+          redirect: 'error',
+          headers: {
+            authorization: `Bearer ${process.env.GH_TOKEN}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        });
+        if (!response.ok)
+          throw new Error(`GitHub request failed: ${response.status}`);
+        return response.json();
+      },
+      process.env.GITHUB_ACTOR ?? 'local',
+    );
+    save(process.env.COMPARISON_REQUEST_FILE, plan);
+  } else if (command === 'prepare') {
+    const plan = process.env.COMPARISON_PR
+      ? json(process.env.COMPARISON_REQUEST_FILE!)
+      : loadPlan(repo, process.env.COMPARISON_NAME ?? 'activity-docs');
     await prepare(repo, root, plan, process.env.COMPARISON_TASK ?? '');
   } else if (command === 'run') {
     const statuses = [];
@@ -531,7 +613,7 @@ async function main() {
     }
     save(join(root, 'runner-status.json'), statuses);
   } else if (command === 'retain') await retain(root);
-  else throw new Error('Usage: pr-comparison.ts prepare|run|retain');
+  else throw new Error('Usage: pr-comparison.ts request|prepare|run|retain');
 }
 if (
   process.argv[1] &&
