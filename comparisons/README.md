@@ -22,8 +22,8 @@ They stay excluded from automatic release and model-registration suites.
 
 ## Run
 
-After merging, authorize `pr-docs-comparison.yml` on `main` in the existing
-Vercel CI OIDC policy. Reuse the release project's scoped Sandbox credentials
+Before running, check that the existing Vercel CI OIDC policy allows
+`pr-docs-comparison.yml` on `main`. Add it if the policy restricts workflow names. Reuse the release project's scoped Sandbox credentials
 and budgeted AI Gateway key. No new long-lived credential is required.
 
 Dispatch **PR docs comparison** from `main`. The default is task 065: two coding
