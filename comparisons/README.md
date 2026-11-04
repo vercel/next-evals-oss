@@ -1,67 +1,87 @@
-# PR docs comparisons
+# Before/after PR evals
 
-Run the same task against old and revised bundled guidance to measure a docs
-change. This is separate from release regressions, model registration, and the
-public leaderboard. Both conditions have the same AGENTS.md pointer.
+Run the same eval against two package builds for a framework or docs PR.
+Keep the task, grader, model and setup the same. Retain correctness, effort
+and traces from both conditions together.
 
-## Activity example
+## Configure a comparison
 
-`activity-docs.json` pins the task/helper revision, old and new guide revisions,
-Next.js runtime, and coding model for Next.js #100208. It derives two tarballs
-from one `next@16.4.5` package, replaces only the listed bundled guides, and
-rejects any other package difference. This matches the local comparison method.
-It does not claim to compare two complete framework builds or follow a moving PR.
+Add `comparisons/<name>.json` and review it before merging. The manifest pins:
 
-The manifest must be reviewed and merged before execution. Review the pinned
-fixture's EVAL.ts, package scripts, and imported `evals/lib` code as executable
-code, not just the prompt. The workflow accepts task selection only, not arbitrary
-refs, package URLs, model names, or PR code. To compare a later revision, update
-the manifest in a reviewed PR. This initial workflow is for public tasks only,
-including these explicitly selected `publish: false` docs-development tasks.
-They stay excluded from automatic release and model-registration suites.
+- The PR and before/after source commits.
+- A public task repository and fixture commit. This can differ from the PR repo.
+- The package name, model and pricing key, selected tasks and default task.
+- Named setup exports from the task repository's `evals/lib/setup.ts`, validation
+  scripts and files to exclude from app diffs.
+- Treatment-specific inputs and any limitations on interpreting the result.
+
+The task repo supplies ordinary agent-eval tasks under `evals/evals/<task>` and
+shared helpers under `evals/lib`. Its setup exports receive the Sandbox. Setup
+must install the selected tarball from the environment variable named by
+`tarballEnv`, prepare the app, and provide the same guidance in both conditions.
+The runner verifies the tarball hash and installed package name/version. Build
+and EVAL.ts checks grade each attempt normally.
+
+There are two treatment options:
+
+- `packages`: provide `packageArtifacts.base` and `.head`, each with a public
+  HTTPS `url` and exact `sha256`. These can be before/after PR tarballs for any
+  npm framework, including builds that change bundled docs. Set `guides: []`.
+  The runner downloads and checks both archives and records their file differences.
+- `bundled-docs`: the Next.js helper used by `activity-docs.json`. Download one
+  exact `next` runtime, overlay the listed guides from the two source commits,
+  and reject any non-guide package change. This isolates guidance from runtime.
+
+`activity-docs.json` is a complete example. For another framework, use `packages`,
+set `packageName`, `repository`, `taskRepository`, `tarballEnv` and `setupSteps`
+for that eval, and supply the two artifact URLs/hashes. No workflow changes are
+needed. The current harness is Codex, using a model with recorded repository
+pricing. Each manifest is limited to four tasks to bound a dispatch.
+
+Review task EVAL.ts files, package scripts and helpers as executable code. This
+workflow accepts only manifest names already merged on `main` and tasks listed
+in that manifest. Public tasks and package artifacts only; held-out tasks and
+customer data require private storage.
 
 ## Run
 
-Before running, check that the existing Vercel CI OIDC policy allows
-`pr-docs-comparison.yml` on `main`. Add it if the policy restricts workflow names. Reuse the release project's scoped Sandbox credentials
-and budgeted AI Gateway key. No new long-lived credential is required.
+Dispatch **PR eval comparison** from `main`, select the **comparison** manifest
+name, and leave **task** empty for its default. Alternatively enter a task from
+that manifest or `all`. One attempt runs per task per condition. Activity's
+default notification task costs two coding attempts; all four tasks cost eight.
+The 15-minute attempt timeout includes setup and validation; the job limit is
+150 minutes. These limits are not a dollar spending cap.
 
-Dispatch **PR docs comparison** from `main`. The default is task 065: two coding
-attempts, one per condition. Selecting `all` runs four tasks, eight attempts.
-Sol high and the 15-minute attempt timeout (including setup and validation)
-are fixed in this first version.
-There are no automatic retries, confirmations, PR comments, or Slack posts.
-The job timeout is 150 minutes. Attempt/time limits are not a dollar spending cap.
-The SDK and dependency versions follow the eval repo lockfile, so these are new
-measurements and must not be pooled with the earlier local cohort.
+The current Vercel CI policy allows only the release and model-registration
+workflow names. This workflow needs authorization before live use, either via
+an existing policy or a separate policy with the appropriate repository, branch
+and project restrictions. Resolve the intended Vercel team/project first and
+reuse its scoped authentication and budgeted AI Gateway key.
 
-The job checks installed guide hashes before each coding attempt. The SDK stores
-actual CLI/model provenance where observable. Inspect that provenance and the
-traces before attributing differences to docs. The pinned SDK installs the CLI
-from npm, so a CLI change or missing provenance limits the comparison. Agents
-can still consult public docs. Reading bundled docs is not guaranteed by the
-pointer. Task 065 directly overlaps the new notification example and measures
-that targeted guidance, not generalization to a held-out problem.
+No release/model-registration triggers, retries, PR comments, Slack posts or
+leaderboard updates are added. The SDK follows the eval repo lockfile, so keep
+new measurements separate from earlier local runs. The SDK installs the agent
+CLI from npm; inspect actual CLI/model provenance and traces before attributing
+changes to the PR. Agents can consult public docs even when bundled guidance
+is provided.
 
 ## Evidence and retention
 
-The summary and downloadable `activity-docs-<run>-<attempt>` artifact appear
-on the Actions run. The artifact contains:
+The Actions run has a summary and `pr-comparison-<run>-<attempt>` artifact:
 
-- A per-task Base/Head outcome, tokens, estimated coding cost, and run duration.
-- Source commits, task/helper hashes, package hashes, pricing, and the guide texts.
-- SDK results, sanitized transcripts, validation output, and saved app files.
-- Missing/failed attempt evidence, without silently rerunning it.
+- Per-task Base/Head outcomes, provider-reported tokens, estimated coding cost
+  and SDK run duration.
+- Source/task/helper/package hashes, pricing and exact guide treatments when used.
+- Sanitized SDK transcripts, validation output, saved app files and unavailable
+  attempt evidence.
 
-Input tokens include cache reads/writes. Coding costs use one recorded rate
-snapshot and exclude graders and Sandbox. Duration is the SDK run duration,
-including validation. Missing usage is unknown, not zero. This initial report
-shows both conditions without declaring a winner from one attempt.
+Input tokens include cache reads/writes. Coding cost uses one recorded rate
+snapshot and excludes graders and Sandbox. Duration includes validation.
+Missing usage stays unknown. One attempt per condition does not establish a
+reliable saving. Activity task 065 matches the revised notification example,
+so it measures targeted guidance usefulness, not held-out generalization.
 
-Artifacts are public-repository evidence, retained for 90 days or the repository
-limit. They are not permanent storage. Before expiry, review the complete bundle
-and retain it in a measurement PR under `measurements/comparisons/<name>/<run>/`,
-or copy it to the agreed Vercel-owned store. Preserve source/task/package hashes
-and both conditions together. Do not place held-out tasks, customer data, or
-unreviewed private traces in this workflow. A later private store can consume the
-same bundle without changing how tasks are authored.
+Artifacts expire after 90 days or the repository limit. Review and retain the
+complete bundle in a measurement PR under `measurements/comparisons/<name>/<run>/`
+or the agreed Vercel-owned store before expiry. This is evidence capture, not
+permanent storage. A later private store can consume the same bundle.

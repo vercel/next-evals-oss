@@ -1,29 +1,27 @@
-name: PR docs comparison
+name: PR eval comparison
 
 on:
   pull_request:
     paths:
-      - '.github/workflows/pr-docs-comparison.yml'
+      - '.github/workflows/pr-comparison.yml'
       - 'scripts/pr-comparison*'
       - 'comparisons/**'
   workflow_dispatch:
     inputs:
+      comparison:
+        description: 'Reviewed manifest name in comparisons/ (without .json)'
+        type: string
+        default: activity-docs
       task:
-        description: 'Activity task (all = eight coding attempts)'
-        type: choice
-        default: agent-065-activity-hidden-notification
-        options:
-          - agent-065-activity-hidden-notification
-          - agent-062-activity-popover
-          - agent-063-activity-form-reset
-          - agent-064-activity-playwright-locators
-          - all
+        description: 'Task from the manifest, all, or leave empty for its default task'
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: pr-docs-comparison-${{ github.event_name }}-${{ github.event.pull_request.number || 'manual' }}
+  group: pr-comparison-${{ github.event_name }}-${{ github.event.pull_request.number || 'manual' }}
   cancel-in-progress: false
 
 jobs:
@@ -52,7 +50,8 @@ jobs:
       contents: read
       id-token: write
     env:
-      COMPARISON_WORKSPACE: ${{ runner.temp }}/pr-docs-comparison
+      COMPARISON_WORKSPACE: ${{ runner.temp }}/pr-comparison
+      COMPARISON_NAME: ${{ inputs.comparison }}
       COMPARISON_TASK: ${{ inputs.task }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -88,8 +87,8 @@ jobs:
         if: ${{ !cancelled() && steps.retain.outputs.safe == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: activity-docs-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/pr-docs-comparison/artifact
+          name: pr-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pr-comparison/artifact
           if-no-files-found: error
           retention-days: 90
       - name: Require a recorded outcome for both conditions

@@ -9,6 +9,7 @@ import {
   writeFileSync,
   symlinkSync,
   existsSync,
+  lstatSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -20,13 +21,23 @@ const sdkRoot = dirname(require.resolve('@vercel/agent-eval/package.json'));
 export interface ComparisonPlan {
   name: string;
   pullRequest: string;
-  runtime: string;
+  repository: string;
+  taskRepository: string;
+  treatment: 'bundled-docs' | 'packages';
+  packageName: string;
+  tarballEnv: string;
+  setupSteps: string[];
+  scripts: string[];
+  ignoredFiles: string[];
+  packageArtifacts?: Record<'base' | 'head', { url: string; sha256: string }>;
+  runtime?: string;
   base: string;
   head: string;
   fixtureRef: string;
   experiment: string;
   model: string;
   tasks: string[];
+  defaultTask: string;
   guides: string[];
   limitations: string;
 }
@@ -36,23 +47,64 @@ const json = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 const save = (path: string, value: unknown) =>
   writeFileSync(path, JSON.stringify(value, null, 2) + '\n');
 
+export function loadPlan(repo: string, name: string): ComparisonPlan {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name))
+    throw new Error('Invalid comparison name');
+  const path = join(repo, 'comparisons', `${name}.json`);
+  if (!lstatSync(path).isFile() || lstatSync(path).isSymbolicLink())
+    throw new Error('Comparison must be a reviewed manifest file');
+  const plan = json(path);
+  if (plan.name !== name) throw new Error('Comparison name mismatch');
+  validatePlan(plan, '');
+  return plan;
+}
+
 export function validatePlan(plan: ComparisonPlan, task: string) {
+  task ||= plan.defaultTask;
   if (
     !/^[a-z0-9-]+$/.test(plan.name) ||
-    !/^\d+\.\d+\.\d+(?:-canary\.\d+)?$/.test(plan.runtime) ||
+    ![plan.repository, plan.taskRepository].every((repo) =>
+      /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo),
+    ) ||
+    !/^(?:@[a-z0-9-]+\/)?[a-z0-9][a-z0-9._-]*$/.test(plan.packageName) ||
+    !/^[A-Z][A-Z0-9_]*_TARBALL$/.test(plan.tarballEnv) ||
+    !plan.setupSteps.length ||
+    !plan.setupSteps.every((step) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(step)) ||
+    !plan.scripts.every((script) => /^[a-zA-Z0-9:_-]+$/.test(script)) ||
+    !plan.ignoredFiles.every(
+      (path) =>
+        /^(?:[a-zA-Z0-9_.-]+\/)*[a-zA-Z0-9_.-]+\/?$/.test(path) &&
+        !path.split('/').includes('..'),
+    ) ||
+    !['bundled-docs', 'packages'].includes(plan.treatment) ||
+    (plan.treatment === 'bundled-docs' &&
+      (plan.packageName !== 'next' ||
+        !/^\d+\.\d+\.\d+(?:-canary\.\d+)?$/.test(plan.runtime ?? '') ||
+        !plan.guides.length)) ||
+    (plan.treatment === 'packages' &&
+      (plan.guides.length !== 0 ||
+        !['base', 'head'].every((condition) => {
+          const artifact =
+            plan.packageArtifacts?.[condition as 'base' | 'head'];
+          return (
+            artifact &&
+            /^https:\/\//.test(artifact.url) &&
+            /^[a-f0-9]{64}$/.test(artifact.sha256)
+          );
+        }))) ||
     ![plan.base, plan.head, plan.fixtureRef].every((ref) =>
       /^[a-f0-9]{40}$/.test(ref),
     ) ||
-    !/^https:\/\/github.com\/vercel\/next.js\/pull\/\d+$/.test(
+    !/^https:\/\/github.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/pull\/\d+$/.test(
       plan.pullRequest,
     ) ||
     !MODEL_PRICING[plan.experiment] ||
     !plan.model.startsWith('openai/') ||
+    !plan.tasks.includes(plan.defaultTask) ||
     !plan.tasks.length ||
     plan.tasks.length > 4 ||
     new Set(plan.tasks).size !== plan.tasks.length ||
-    !plan.tasks.every((name) => /^agent-\d{3}-[a-z0-9-]+$/.test(name)) ||
-    !plan.guides.length ||
+    !plan.tasks.every((name) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) ||
     !plan.guides.every((name) => /^(?:[a-z0-9-]+\/)+[a-z0-9-]+$/.test(name))
   ) {
     throw new Error('Invalid reviewed comparison manifest');
@@ -93,7 +145,12 @@ export function assertDocsOnly(
   return changed;
 }
 
-function fetchSource(root: string, label: string, ref: string) {
+function fetchSource(
+  root: string,
+  label: string,
+  ref: string,
+  repository: string,
+) {
   const dir = join(root, label);
   const git = (...args: string[]) =>
     execFileSync('git', ['-C', dir, ...args], {
@@ -102,7 +159,7 @@ function fetchSource(root: string, label: string, ref: string) {
     });
   mkdirSync(dir, { recursive: true });
   git('init', '-q');
-  git('remote', 'add', 'origin', 'https://github.com/vercel/next.js.git');
+  git('remote', 'add', 'origin', `https://github.com/${repository}.git`);
   git('sparse-checkout', 'init', '--cone');
   git('sparse-checkout', 'set', 'evals', 'docs');
   git('fetch', '--depth=1', '--filter=blob:none', 'origin', ref);
@@ -112,7 +169,7 @@ function fetchSource(root: string, label: string, ref: string) {
   return dir;
 }
 
-export function prepare(
+export async function prepare(
   repo: string,
   root: string,
   plan: ComparisonPlan,
@@ -123,38 +180,67 @@ export function prepare(
     throw new Error('Use a fresh comparison workspace, never reuse results');
   mkdirSync(root, { recursive: true });
   const sources = {
-    base: fetchSource(root, 'source-base', plan.base),
-    head: fetchSource(root, 'source-head', plan.head),
+    base:
+      plan.treatment === 'bundled-docs'
+        ? fetchSource(root, 'source-base', plan.base, plan.repository)
+        : '',
+    head:
+      plan.treatment === 'bundled-docs'
+        ? fetchSource(root, 'source-head', plan.head, plan.repository)
+        : '',
     fixture: '',
   };
   sources.fixture =
-    plan.fixtureRef === plan.head
+    plan.taskRepository === plan.repository &&
+    plan.fixtureRef === plan.head &&
+    sources.head
       ? sources.head
-      : fetchSource(root, 'source-fixture', plan.fixtureRef);
-  // npm verifies registry integrity; download once, then derive both treatments.
-  const packed = JSON.parse(
-    execFileSync(
-      'npm',
-      [
-        'pack',
-        `next@${plan.runtime}`,
-        '--ignore-scripts',
-        '--json',
-        '--pack-destination',
-        root,
-      ],
-      { encoding: 'utf8', timeout: 180_000 },
-    ),
-  )[0];
-  prepareWorkspace(
-    repo,
-    root,
-    plan,
-    tasks,
-    sources,
-    join(root, packed.filename),
-    packed.integrity,
-  );
+      : fetchSource(
+          root,
+          'source-fixture',
+          plan.fixtureRef,
+          plan.taskRepository,
+        );
+  if (plan.treatment === 'packages') {
+    for (const condition of ['base', 'head'] as const) {
+      const artifact = plan.packageArtifacts![condition];
+      const response = await fetch(artifact.url, {
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (!response.ok)
+        throw new Error(`Package download failed: ${response.status}`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (hash(bytes) !== artifact.sha256)
+        throw new Error('Package artifact hash mismatch');
+      writeFileSync(join(root, `download-${condition}.tgz`), bytes);
+    }
+    prepareWorkspace(repo, root, plan, tasks, sources);
+  } else {
+    // npm verifies registry integrity; derive both docs treatments from one runtime.
+    const packed = JSON.parse(
+      execFileSync(
+        'npm',
+        [
+          'pack',
+          `next@${plan.runtime}`,
+          '--ignore-scripts',
+          '--json',
+          '--pack-destination',
+          root,
+        ],
+        { encoding: 'utf8', timeout: 180_000 },
+      ),
+    )[0];
+    prepareWorkspace(
+      repo,
+      root,
+      plan,
+      tasks,
+      sources,
+      join(root, packed.filename),
+      packed.integrity,
+    );
+  }
 }
 
 export function prepareWorkspace(
@@ -163,18 +249,26 @@ export function prepareWorkspace(
   plan: ComparisonPlan,
   tasks: string[],
   sources: { base: string; head: string; fixture: string },
-  runtimeTarball: string,
-  registryIntegrity: string,
+  runtimeTarball?: string,
+  registryIntegrity?: string,
 ) {
   const packages: Record<
     string,
-    { sha256: string; guides: Record<string, string> }
+    { sha256: string; version: string; guides: Record<string, string> }
   > = {};
   const inventories: Record<string, Record<string, string>> = {};
   for (const condition of ['base', 'head'] as const) {
     const dir = join(root, `package-${condition}`);
     mkdirSync(dir);
-    execFileSync('tar', ['-xzf', runtimeTarball, '-C', dir]);
+    const input = runtimeTarball ?? join(root, `download-${condition}.tgz`);
+    if (
+      plan.treatment === 'packages' &&
+      hash(readFileSync(input)) !== plan.packageArtifacts![condition].sha256
+    )
+      throw new Error('Package artifact hash mismatch');
+    execFileSync('tar', ['-xzf', input, '-C', dir]);
+    const pkg = json(join(dir, 'package/package.json'));
+    if (pkg.name !== plan.packageName) throw new Error('Package name mismatch');
     const guides: Record<string, string> = {};
     for (const guide of plan.guides) {
       const contents = readFileSync(
@@ -188,14 +282,26 @@ export function prepareWorkspace(
     }
     inventories[condition] = fileHashes(dir);
     const tarball = join(root, `${condition}.tgz`);
-    execFileSync('tar', ['-czf', tarball, '-C', dir, 'package']);
-    packages[condition] = { sha256: hash(readFileSync(tarball)), guides };
+    if (plan.treatment === 'bundled-docs')
+      execFileSync('tar', ['-czf', tarball, '-C', dir, 'package']);
+    else cpSync(input, tarball);
+    packages[condition] = {
+      sha256: hash(readFileSync(tarball)),
+      version: pkg.version,
+      guides,
+    };
   }
-  const changedFiles = assertDocsOnly(
-    inventories.base,
-    inventories.head,
-    plan.guides,
-  );
+  const changedFiles =
+    plan.treatment === 'bundled-docs'
+      ? assertDocsOnly(inventories.base, inventories.head, plan.guides)
+      : [
+          ...new Set([
+            ...Object.keys(inventories.base),
+            ...Object.keys(inventories.head),
+          ]),
+        ].filter((path) => inventories.base[path] !== inventories.head[path]);
+  if (!changedFiles.length)
+    throw new Error('Treatments have identical package contents');
   const workspace = join(root, 'evals');
   mkdirSync(join(workspace, 'evals'), { recursive: true });
   mkdirSync(join(workspace, 'experiments'));
@@ -225,8 +331,8 @@ export function prepareWorkspace(
     changedFiles,
     fixtureHashes: fileHashes(join(workspace, 'evals')),
     helperHashes: fileHashes(join(workspace, 'lib')),
-    registryIntegrity,
-    runtimeSha256: hash(readFileSync(runtimeTarball)),
+    registryIntegrity: registryIntegrity ?? null,
+    runtimeSha256: runtimeTarball ? hash(readFileSync(runtimeTarball)) : null,
     sdkVersion: json(join(sdkRoot, 'package.json')).version,
     runnerCommit: execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], {
       encoding: 'utf8',
@@ -349,11 +455,13 @@ export async function retain(root: string) {
   const display = (n: number | null | undefined, money = false) =>
     n == null ? 'N/A' : money ? `$${n.toFixed(4)}` : n.toLocaleString('en-US');
   const text = [
-    '# Activity docs comparison',
+    `# ${provenance.name} comparison`,
     '',
     provenance.pullRequest,
     '',
-    'Same runtime, fixtures, graders, model and AGENTS.md pointer. Only bundled guide contents differ.',
+    provenance.treatment === 'bundled-docs'
+      ? 'Same runtime, fixtures, graders, model and AGENTS.md pointer. Only bundled guide contents differ.'
+      : 'Same fixtures, graders, model and setup. Before/after package artifacts differ; inspect the recorded source and package hashes.',
     '',
     '| Task | Docs | Outcome | Input tokens | Estimated coding cost | Run seconds |',
     '| --- | --- | --- | ---: | ---: | ---: |',
@@ -388,13 +496,8 @@ async function main() {
   );
   const command = process.argv[2];
   if (command === 'prepare') {
-    const plan = json(join(repo, 'comparisons/activity-docs.json'));
-    prepare(
-      repo,
-      root,
-      plan,
-      process.env.COMPARISON_TASK ?? 'agent-065-activity-hidden-notification',
-    );
+    const plan = loadPlan(repo, process.env.COMPARISON_NAME ?? 'activity-docs');
+    await prepare(repo, root, plan, process.env.COMPARISON_TASK ?? '');
   } else if (command === 'run') {
     const statuses = [];
     for (const condition of ['base', 'head']) {
@@ -412,7 +515,10 @@ async function main() {
           stdio: 'inherit',
           env: {
             ...process.env,
-            NEXT_EVAL_TARBALL: join(root, `${condition}.tgz`),
+            [json(join(root, 'provenance.json')).tarballEnv]: join(
+              root,
+              `${condition}.tgz`,
+            ),
           },
         },
       );

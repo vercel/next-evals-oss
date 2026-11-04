@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
+  symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +17,8 @@ import {
   summarizeAttempt,
   validatePlan,
   retain,
+  loadPlan,
+  prepareWorkspace,
 } from './pr-comparison.js';
 import type { ComparisonPlan } from './pr-comparison.js';
 
@@ -37,6 +41,137 @@ test('only the reviewed task set and immutable revisions can be prepared', () =>
   );
   assert.throws(() =>
     validatePlan({ ...plan, guides: ['../../secret'] }, 'all'),
+  );
+});
+
+test('another reviewed comparison can reuse the runner without Activity names', (t) => {
+  const repo = mkdtempSync(join(tmpdir(), 'pr-manifest-'));
+  t.after(() => rmSync(repo, { recursive: true, force: true }));
+  mkdirSync(join(repo, 'comparisons'));
+  const other = {
+    ...plan,
+    name: 'navigation-docs',
+    tasks: ['agent-099-navigation'],
+    defaultTask: 'agent-099-navigation',
+    guides: ['01-app/03-api-reference/functions/navigation'],
+  };
+  writeFileSync(
+    join(repo, 'comparisons/navigation-docs.json'),
+    JSON.stringify(other),
+  );
+  assert.deepEqual(
+    validatePlan(loadPlan(repo, 'navigation-docs'), ''),
+    other.tasks,
+  );
+  assert.throws(() => loadPlan(repo, '../navigation-docs'));
+  assert.throws(() => loadPlan(repo, 'missing'));
+  assert.throws(() => validatePlan(other, plan.defaultTask));
+  assert.throws(() =>
+    validatePlan({ ...other, defaultTask: plan.defaultTask }, 'all'),
+  );
+  symlinkSync(
+    join(repo, 'comparisons/navigation-docs.json'),
+    join(repo, 'comparisons/alias.json'),
+  );
+  assert.throws(() => loadPlan(repo, 'alias'));
+  writeFileSync(
+    join(repo, 'comparisons/wrong-name.json'),
+    JSON.stringify(other),
+  );
+  assert.throws(() => loadPlan(repo, 'wrong-name'));
+});
+
+test('before/after package artifacts support another framework and reject mismatched bytes', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'framework-pair-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fixture = join(root, 'source');
+  const task = 'build-a-framework-app';
+  mkdirSync(join(fixture, 'evals/evals', task), { recursive: true });
+  mkdirSync(join(fixture, 'evals/lib'), { recursive: true });
+  writeFileSync(
+    join(fixture, 'evals/evals', task, 'PROMPT.md'),
+    'Build an app',
+  );
+  writeFileSync(
+    join(fixture, 'evals/lib/setup.ts'),
+    'export async function installFramework() {}',
+  );
+  const artifacts: Record<string, { url: string; sha256: string }> = {};
+  for (const condition of ['base', 'head']) {
+    const dir = join(root, `input-${condition}`);
+    mkdirSync(join(dir, 'package'), { recursive: true });
+    writeFileSync(
+      join(dir, 'package/package.json'),
+      JSON.stringify({
+        name: '@example/framework',
+        version: condition === 'base' ? '1.0.0' : '1.0.1',
+      }),
+    );
+    writeFileSync(
+      join(dir, 'package/index.js'),
+      `export const revised = ${condition === 'head'}`,
+    );
+    execFileSync('tar', [
+      '-czf',
+      join(root, `download-${condition}.tgz`),
+      '-C',
+      dir,
+      'package',
+    ]);
+    artifacts[condition] = {
+      url: `https://packages.example.test/${condition}.tgz`,
+      sha256: fileHashes(root)[`download-${condition}.tgz`],
+    };
+  }
+  const other: ComparisonPlan = {
+    ...plan,
+    name: 'framework-change',
+    repository: 'example/framework',
+    taskRepository: 'example/evals',
+    pullRequest: 'https://github.com/example/framework/pull/1',
+    treatment: 'packages',
+    packageName: '@example/framework',
+    tarballEnv: 'FRAMEWORK_EVAL_TARBALL',
+    setupSteps: ['installFramework'],
+    ignoredFiles: ['framework.tgz'],
+    runtime: undefined,
+    tasks: [task],
+    defaultTask: task,
+    guides: [],
+    packageArtifacts: artifacts as NonNullable<
+      ComparisonPlan['packageArtifacts']
+    >,
+  };
+  assert.deepEqual(validatePlan(other, ''), [task]);
+  assert.throws(() =>
+    validatePlan({ ...other, packageArtifacts: undefined }, 'all'),
+  );
+  assert.throws(() => validatePlan({ ...other, tarballEnv: 'HOME' }, 'all'));
+  prepareWorkspace(process.cwd(), root, other, [task], {
+    base: '',
+    head: '',
+    fixture,
+  });
+  const provenance = JSON.parse(
+    readFileSync(join(root, 'provenance.json'), 'utf8'),
+  );
+  assert.equal(provenance.packages.base.sha256, artifacts.base.sha256);
+  assert.equal(provenance.packages.head.sha256, artifacts.head.sha256);
+  assert.equal(provenance.packages.head.version, '1.0.1');
+  assert.ok(provenance.changedFiles.includes('package/index.js'));
+  assert.equal(provenance.tarballEnv, 'FRAMEWORK_EVAL_TARBALL');
+  assert.equal(provenance.registryIntegrity, null);
+  const badRoot = join(root, 'bad');
+  mkdirSync(badRoot);
+  writeFileSync(join(badRoot, 'download-base.tgz'), 'changed bytes');
+  assert.throws(
+    () =>
+      prepareWorkspace(process.cwd(), badRoot, other, [task], {
+        base: '',
+        head: '',
+        fixture,
+      }),
+    /hash mismatch/,
   );
 });
 
@@ -110,7 +245,7 @@ test('summaries retain failures, provider tokens, cached pricing and missing evi
 
 test('workflow is manual, main-only, bounded, and uploads only scanned evidence', () => {
   const yaml = readFileSync(
-    new URL('../.github/workflows/pr-docs-comparison.yml', import.meta.url),
+    new URL('../.github/workflows/pr-comparison.yml', import.meta.url),
     'utf8',
   );
   assert.match(yaml, /workflow_dispatch:/);
@@ -138,7 +273,12 @@ test('retained evidence is sanitized and incomplete comparisons cannot look comp
   const root = mkdtempSync(join(tmpdir(), 'pr-evidence-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const task = plan.tasks[3];
-  const provenance = { ...plan, tasks: [task], pricing };
+  const provenance = {
+    ...plan,
+    name: 'another-docs-change',
+    tasks: [task],
+    pricing,
+  };
   writeFileSync(join(root, 'provenance.json'), JSON.stringify(provenance));
   mkdirSync(join(root, 'evals/evals', task), { recursive: true });
   mkdirSync(join(root, 'evals/lib'), { recursive: true });
@@ -200,6 +340,10 @@ test('retained evidence is sanitized and incomplete comparisons cannot look comp
       /safe=true\ncomplete=false/,
     );
     assert.match(readFileSync(join(artifact, 'README.md'), 'utf8'), /90 days/);
+    assert.match(
+      readFileSync(join(artifact, 'README.md'), 'utf8'),
+      /# another-docs-change comparison/,
+    );
   } finally {
     for (const [key, value] of Object.entries({
       COMPARISON_TEST_API_KEY: previous.key,
