@@ -93,9 +93,10 @@ export const MODEL_PRICING: Record<string, Pricing | null> = {
   'kimi-k2.7-code': { input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0 },
   'kimi-k3': { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
   'glm-5.1-opencode': { input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 0 },
-  // Cut from 1.4/4.4/0.26 (zai's own rate); gateway and models.dev vercel
-  // entry agree as of 2026-08-26.
-  'glm-5.2': { input: 0.8, output: 2.55, cacheRead: 0.16, cacheWrite: 0 },
+  // The 0.8/2.55/0.16 cut (2026-08-26) has ended. AI Gateway catalog,
+  // 2026-11-04: 1.4/4.4/0.14, the same card as glm-5.3. Z.ai's own pricing
+  // page agrees on input/output and lists a 0.26 cache read.
+  'glm-5.2': { input: 1.4, output: 4.4, cacheRead: 0.14, cacheWrite: 0 },
   'grok-4.5': { input: 2, output: 6, cacheRead: 0.3, cacheWrite: 0 },
   'grok-4.6': { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 }, // same in/out as 4.5, pricier cache reads
   // AI Gateway base-context prices, verified 2026-10-02. No cache-write rate.
