@@ -106,3 +106,27 @@ test('release jobs use short-lived scoped credentials without a stored token', a
   assert.match(intake, /https:\/\/token\.actions\.githubusercontent\.com/);
   assert.match(intake, /repo:vercel\/next-evals-oss:ref:refs\/heads\/main/);
 });
+
+
+test('release artifacts preserve token and cost inputs through the report handoff', async (t) => {
+  const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises');
+  const { execFileSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { readEvalEffort } = await import('./effort.js');
+  const root = await mkdtemp(join(tmpdir(), 'release-usage-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'sol/task/run-1'), { recursive: true });
+  await mkdir(join(root, 'report'));
+  await writeFile(join(root, 'sol/task/summary.json'), JSON.stringify({totalRuns:1,passedRuns:1}));
+  await writeFile(join(root, 'sol/task/run-1/transcript-raw.jsonl'), JSON.stringify({type:'turn.completed', usage:{input_tokens:1000,cached_input_tokens:800,output_tokens:50}}));
+  const workflow = await readFile(workflowPath, 'utf8');
+  const archive = workflow.match(/find "\$EXPERIMENT"[^\n]+\n\s+\| tar[^\n]+/)?.[0];
+  assert.ok(archive);
+  execFileSync('bash', ['-c', archive], {cwd:root,env:{...process.env,EXPERIMENT:'sol',RUNNER_TEMP:root}});
+  execFileSync('tar', ['-C', join(root,'report'), '-xzf', join(root,'sol.tar.gz')]);
+  const effort = await readEvalEffort(join(root,'report/sol/task'),1,{input:1,output:2,cacheRead:0.1,cacheWrite:1.25});
+  assert.equal(effort.tokenUsage.inputTokens,1000);
+  assert.equal(effort.tokenUsage.measuredRuns,1);
+  assert.equal(effort.costUsd,0.00038);
+});
