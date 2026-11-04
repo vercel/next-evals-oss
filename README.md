@@ -567,3 +567,11 @@ pins change within the same suite revision. Reports list those tasks in
 the shared runner lock, setup or model experiments still require a new baseline.
 The retained 16.4.4 measurement records its original execution inputs from #175;
 this does not relabel its saved attempts as runs of a newer prompt or grader.
+
+Release Slack reports compare estimated coding cost as well as pass/fail results.
+Cost comparisons pair unchanged tasks that passed in both releases, separately
+for each model and Base/AGENTS.md condition. Both sides use provider token counts
+and the same recorded `MODEL_PRICING` rates, including cache pricing. Reports
+show increases, savings, coverage, and missing data. These are observed pass@1
+cost differences, excluding grading, Sandbox, retries, and confirmations. They
+are not actual invoices or evidence of a framework-caused cost regression.

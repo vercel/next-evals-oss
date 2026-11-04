@@ -32,6 +32,13 @@ The renderer removes the separators and posts the replies under the root.
   fail→pass changes. Use `reproducible` to distinguish confirmed failures from
   unverified changes. These do not by themselves prove a framework defect.
   If both lists are empty, say there were no pass/fail changes from that baseline.
+- Include an `Estimated coding cost` bullet from `comparison.costs` when supplied.
+  Name the previous release and show each model's Base and AGENTS.md mean cost
+  per matched successful task: `$before → $after (+X% more expensive)` or
+  `(-X% cheaper)`. Report unchanged costs too. Include `matchedTasks/totalTasks`
+  coverage. When `matchedTasks` is zero, say cost comparison is unavailable.
+  If no comparable baseline exists, say cost change is unavailable too.
+  A null percentage with a real zero baseline means show dollar amounts only.
 - Keep suspected grader problems separate under `Evals to investigate`. Give the
   specific evidence, such as an API-name mismatch. A low score alone does not
   prove an eval is broken.
@@ -113,6 +120,17 @@ Omit empty difference lists. With several models, keep each model's two scores
 on one line and list condition differences below. Use explicit Slack links for
 URLs, especially nextjs.org/evals, so automatic linking does not absorb bold
 formatting.
+
+Include the cost comparison for each model and condition, with matched-task
+counts, excluded failed tasks, and missing-usage counts. List per-task increases
+and decreases from `comparison.costs[].tasks`, so an overall saving does not hide
+an expensive task. Use the supplied figures, not the board's blended cost average.
+Both releases are priced using the same recorded rates. These are estimated
+coding-model costs, excluding graders, Sandbox, infrastructure retries, and
+failure confirmations. Only tasks passing in both releases enter this efficiency
+comparison. Keep pass/fail changes visible separately. With one attempt per task,
+call price differences observed changes, not confirmed regressions or proven
+framework savings. Do not suggest automatic paid reruns.
 
 State which earlier measurement was used and any changes in the model, harness,
 eval, or grader versions. When no comparison is available, repeat the supplied

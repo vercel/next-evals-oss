@@ -12,6 +12,14 @@ could not be determined. The workflow supplies changes against the latest
 compatible earlier measurement merged into `main`. Open and closed unmerged
 PRs are not baselines. Routine infrastructure retries stay out of the summary.
 
+The root also reports estimated coding cost increases or savings against that
+baseline, separately for Base and AGENTS.md. Costs use the same tasks passing in
+both releases, with complete provider token usage, priced at one recorded rate
+snapshot. Changed tasks, failures, and missing usage are excluded with coverage
+counts. Per-task changes appear in the model-results reply. Without comparable
+usage, the report says cost change is unavailable. A single pass@1 comparison
+is an observed difference, not proof that the framework caused it.
+
 Release measurements are separate from the public pass@4 leaderboard. Their
 draft PRs retain pass@1 scores, release provenance, failure confirmations, and
 sanitized transcripts, evaluator output, and command logs.
