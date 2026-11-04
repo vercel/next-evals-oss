@@ -1,0 +1,128 @@
+{
+  "status": "passed",
+  "duration": 145.525,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 45,
+    "outputTokens": 8673,
+    "cacheReadTokens": 231375,
+    "cacheWriteTokens": 23895,
+    "reasoningTokens": 5714,
+    "totalTokens": 263988
+  },
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 4,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 14,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 14,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'app/**' -g 'src/**' -g 'pages/**' -g 'components/**' -g '\"'!node_modules'\"' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'analytics|page.?view|Welcome|after\\\\(' . -g '\"'!node_modules'\"' -g '\"'!package-lock.json'\"' -g '\"'!pnpm-lock.yaml'\"' -g '\"'!yarn.lock'\"'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json && cat app/page.tsx && cat app/layout.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"find .. -name AGENTS.md -print && rg --files -g '\"'!node_modules'\"' -g '\"'!*.lock'\"' | head -100 && ls -la\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat next.config.ts && cat tsconfig.json && rg --files __agent_eval__'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git log -1 --oneline'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/page.tsx && cat app/analytics.ts && cat .env.example && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- tsconfig.json && cat tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'EOF'\nimport { createServer } from 'node:http'\nimport { spawn } from 'node:child_process'\nimport { setTimeout as delay } from 'node:timers/promises'\n\nlet resolveEvent\nconst eventReceived = new Promise((resolve) => { resolveEvent = resolve })\nconst analytics = createServer(async (request, response) => {\n  let body = ''\n  for await (const chunk of request) body += chunk\n  resolveEvent(JSON.parse(body))\n  await delay(2000)\n  response.writeHead(204).end()\n})\nawait new Promise((resolve) => analytics.listen(0, '127.0.0.1', resolve))\nconst analyticsPort = analytics.address().port\nconst app = spawn('npm', ['run', 'start', '--', '-p', '34123'], {\n  cwd: '/workspace',\n  env: { ...process.env, ANALYTICS_ENDPOINT: \"'`http://127.0.0.1:${analyticsPort}/events` },\n  stdio: ['\"'ignore', 'pipe', 'pipe'],\n})\nlet output = ''\napp.stdout.on('data', (chunk) => { output += chunk })\napp.stderr.on('data', (chunk) => { output += chunk })\ntry {\n  for (let attempt = 0; attempt < 100 && \"'!output.includes('\"'Ready in'); attempt++) {\n    if (app.exitCode \"'!== null) throw new Error(`App exited: ${output}`)\n    await delay(100)\n  }\n  if (!output.includes('\"'Ready in')) throw new Error(\"'`App did not start: ${output}`)\n  const start = performance.now()\n  const response = await fetch('\"'http://127.0.0.1:34123/')\n  const html = await response.text()\n  const elapsed = Math.round(performance.now() - start)\n  const event = await Promise.race([eventReceived, delay(5000).then(() => { throw new Error('No analytics event received') })])\n  if (\"'!response.ok || !html.includes('\"'Thanks for visiting\"'!'\"')) throw new Error('Welcome response missing')\n  if (elapsed >= 2000) throw new Error(\"'`Response was blocked by analytics: ${elapsed} ms`)\n  if (event.event !== '\"'page_view' || event.path \"'!== '\"'/') throw new Error(\"'`Unexpected event: ${JSON.stringify(event)}`)\n  process.stdout.write(`Welcome response: ${elapsed} ms; analytics endpoint delay: 2000 ms; event: ${JSON.stringify(event)}'\"\\\\n\"'`)\n} finally {\n  app.kill('\"'SIGTERM')\n  analytics.close()\n}\nEOF\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat .gitignore && git status --short && ps aux | rg 'next start|34123' | head -10\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- .gitignore app/page.tsx tsconfig.json && git check-ignore .next next-env.d.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la app && cat .env.example && cat app/analytics.ts'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'nl -ba app/page.tsx && nl -ba app/analytics.ts && nl -ba .env.example && git status --short'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 45,
+      "outputTokens": 8673,
+      "cacheReadTokens": 231375,
+      "cacheWriteTokens": 23895,
+      "reasoningTokens": 5714,
+      "totalTokens": 263988
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

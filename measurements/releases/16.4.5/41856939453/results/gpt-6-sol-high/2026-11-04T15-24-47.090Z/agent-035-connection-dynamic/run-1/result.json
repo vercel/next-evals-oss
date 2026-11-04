@@ -1,0 +1,154 @@
+{
+  "status": "passed",
+  "duration": 251.999,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.166.0"
+  },
+  "usage": {
+    "inputTokens": 66,
+    "outputTokens": 5847,
+    "cacheReadTokens": 346639,
+    "cacheWriteTokens": 23029,
+    "reasoningTokens": 2627,
+    "totalTokens": 375581
+  },
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 20,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 20,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc 'ls -la'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/app/**' -g 'pages/**' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'for f in /AGENTS.md /workspace/AGENTS.md /workspace/app/AGENTS.md /workspace/components/AGENTS.md; do if test -f \"$f\"; then printf '\"'%s\\\\n' \\\"\"'$f\"; cat \"$f\"; fi; done'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json next.config.ts app/layout.tsx app/page.tsx components/* tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && rg -n 'dynamic|force-dynamic|revalidate|unstable_noStore|connection\\\\(|headers\\\\(|cookies\\\\(|Date\\\\(|Math\\\\.random|randomUUID|cache|Suspense|fetch\\\\(' app components next.config.ts package.json\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git diff -- app/layout.tsx components/request-metadata.tsx next.config.ts && git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- -p 3100'"
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nimport re\nimport urllib.request\n\nvalues = []\nfor _ in range(2):\n    with urllib.request.urlopen('http://localhost:3100/') as response:\n        html = response.read().decode()\n        assert response.status == 200\n    assert '<nav>Operations</nav>' in html\n    assert 'Loading request details' in html\n    match = re.search(r'<aside>Request ([0-9a-f-]+) generated at ([\"'^<]+) '\"\\\\(sample ([\"'^)]+)'\"\\\\)</aside>', html)\n    assert match, 'request metadata missing from response'\n    values.append(match.groups())\n\nassert values[0][0] \"'!= values[1][0], '\"'request identifiers were reused'\nassert values[0][2] \"'!= values[1][2], '\"'sampling values were reused'\nprint('Navigation and fallback present in both responses.')\nprint('Request 1:', values[0])\nprint('Request 2:', values[1])\nPY\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nimport urllib.request\nhtml = urllib.request.urlopen('http://localhost:3100/').read().decode()\nfor term in ['<nav>', 'Loading request details', 'Request ', '<aside']:\n    pos = html.find(term)\n    print(term, pos, repr(html[max(0,pos-100):pos+250]))\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nimport urllib.request\nhtml = urllib.request.urlopen('http://localhost:3100/').read().decode()\nprint('length', len(html))\npos = 0\nwhile (pos := html.find('<aside', pos)) >= 0:\n    print(pos, repr(html[pos:pos+200]))\n    pos += 1\nprint('tail:', repr(html[-700:]))\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom datetime import datetime, timezone\nimport re\nimport time\nimport urllib.request\n\nvalues = []\nfor _ in range(2):\n    before = datetime.now(timezone.utc)\n    with urllib.request.urlopen('http://localhost:3100/') as response:\n        html = response.read().decode()\n        assert response.status == 200\n    after = datetime.now(timezone.utc)\n    assert '<nav>Operations</nav>' in html\n    assert '<aside>Loading request details…</aside>' in html\n    html = html.replace('<\"'!-- -->'\"', '')\n    match = re.search(r'<aside>Request ([0-9a-f-]+) generated at ([\"'^<]+) '\"\\\\(sample ([\"'^)]+)'\"\\\\)</aside>', html)\n    assert match, 'request metadata missing from response'\n    request_id, generated_at, sample = match.groups()\n    assert before <= datetime.fromisoformat(generated_at.replace('Z', '+00:00')) <= after\n    values.append((request_id, generated_at, sample))\n    time.sleep(0.02)\n\nassert values[0][0] \"'!= values[1][0], '\"'request identifiers were reused'\nassert values[0][1] \"'!= values[1][1], '\"'timestamps were reused'\nassert values[0][2] \"'!= values[1][2], '\"'sampling values were reused'\nprint('Navigation and fallback present in both responses.')\nprint('Request 1:', values[0])\nprint('Request 2:', values[1])\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'nl -ba next.config.ts && nl -ba app/layout.tsx && nl -ba components/request-metadata.tsx'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'dynamic\\\\s*=|force-dynamic|revalidate\\\\s*=|fetchCache\\\\s*=|unstable_noStore|noStore\\\\(' app components next.config.ts || true\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff -- app/layout.tsx components/request-metadata.tsx next.config.ts tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat .gitignore && cat next-env.d.ts && du -sh .next'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"rg -n 'dynamic\\\\s*=|force-dynamic|revalidate\\\\s*=|fetchCache\\\\s*=|unstable_noStore|noStore\\\\(' app components next.config.ts || true\""
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && git status --short && git diff --stat && git diff -- .gitignore tsconfig.json'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 66,
+      "outputTokens": 5847,
+      "cacheReadTokens": 346639,
+      "cacheWriteTokens": 23029,
+      "reasoningTokens": 2627,
+      "totalTokens": 375581
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}
