@@ -13,7 +13,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { TIER_ONE_RELEASE_MATRIX } from '../lib/tier-one.js';
 import { nonPublicEvalNames } from '../lib/published-evals.js';
-import { comparisonKey, loadReleaseComparison } from './release-comparison.js';
+import { comparisonInputs, comparisonKey, loadReleaseComparison } from './release-comparison.js';
 import type { ReleaseComparison } from './release-comparison.js';
 
 export interface ReleaseTarget {
@@ -201,9 +201,11 @@ export interface ExportedReleaseData {
       suite: string;
       suiteRef: string;
       comparisonKey: string;
+      comparisonInputs?: { executionKey: string; graders: Record<string, string> };
       publicationComparison?: {
         originalComparisonKey: string;
         comparisonKey: string;
+      comparisonInputs?: { executionKey: string; graders: Record<string, string> };
         excludedEvals: string[];
         note: string;
       };
@@ -694,6 +696,7 @@ async function main(): Promise<void> {
           suite: 'published',
           suiteRef: await readReleaseSuiteRef(),
           comparisonKey: await comparisonKey(process.cwd(), TIER_ONE_RELEASE_MATRIX),
+          comparisonInputs: await comparisonInputs(process.cwd(), TIER_ONE_RELEASE_MATRIX),
         },
         null,
         2,
@@ -725,6 +728,12 @@ async function main(): Promise<void> {
       policy,
       data.metadata.evaluationTarget?.suiteRef ?? '',
     );
+    const measuredTarget = data.metadata.evaluationTarget;
+    // Retained measurements can be reported again only with their exact execution inputs.
+    if (measuredTarget && !measuredTarget.comparisonInputs &&
+        measuredTarget.comparisonKey === await comparisonKey(process.cwd(), TIER_ONE_RELEASE_MATRIX)) {
+      measuredTarget.comparisonInputs = await comparisonInputs(process.cwd(), TIER_ONE_RELEASE_MATRIX);
+    }
     const report = buildReleaseReport(data, diagnostics, excluded);
     report.comparison = await loadReleaseComparison(
       requiredEnv('RELEASE_BASELINE_ROOT'), data, report, excluded,

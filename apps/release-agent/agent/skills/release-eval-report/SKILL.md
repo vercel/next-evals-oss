@@ -137,3 +137,5 @@ reasoning traces. The PR link must also appear in the root.
   run's percentages. One model passing once does not establish saturation.
 - Keep workflow metadata and raw logs out of the root. Use the measurement PR
   as the entry point for investigation.
+
+When comparison.changedEvals is nonempty, name those tasks as changed graders/prompts and excluded from release-to-release comparison. Report regressions and improvements only for the unchanged tasks. Do not describe an empty change list as no changes across the entire suite when tasks were excluded.

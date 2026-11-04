@@ -14,6 +14,42 @@ interface Change {
   reproducible: boolean;
 }
 
+export interface ComparisonInputs {
+  executionKey: string;
+  graders: Record<string, string>;
+}
+
+export async function comparisonInputs(
+  root: string,
+  experiments: readonly string[],
+): Promise<ComparisonInputs> {
+  const hash = createHash('sha256').update('release-execution-v1');
+  for (const path of [
+    'pnpm-lock.yaml',
+    'lib/setup.ts',
+    'lib/release-runs.ts',
+    ...[...experiments].sort().map((name) => `experiments/${name}.ts`),
+  ]) {
+    hash
+      .update(path)
+      .update('\0')
+      .update(await readFile(join(root, path)))
+      .update('\0');
+  }
+  const overrides = JSON.parse(
+    await readFile(join(root, 'eval-grader-overrides.json'), 'utf8'),
+  );
+  return {
+    executionKey: hash.digest('hex'),
+    graders: Object.fromEntries(
+      Object.entries(overrides.graders).map(([name, value]) => [
+        name,
+        JSON.stringify(value),
+      ]),
+    ),
+  };
+}
+
 export type ReleaseComparison =
   | { available: false; note: string }
   | {
@@ -25,6 +61,7 @@ export type ReleaseComparison =
       };
       regressions: Change[];
       improvements: Change[];
+      changedEvals?: string[];
       note: string;
     };
 
@@ -188,6 +225,7 @@ export async function loadReleaseComparison(
     data: ExportedReleaseData;
     path: string;
     order: number[];
+    changedEvals: string[];
   }> = [];
   for (const version of versions) {
     const prior = versionOrder(version);
@@ -212,18 +250,41 @@ export async function loadReleaseComparison(
           previous.version !== version ||
           previous.suite !== target.suite ||
           previous.suiteRef !== target.suiteRef ||
-          !matchesComparisonKey(previous, target.comparisonKey, excluded) ||
           !Number.isFinite(Date.parse(previous.evaluatedAt)) ||
           Date.parse(previous.evaluatedAt) >= Date.parse(target.evaluatedAt)
         )
           continue;
-        const previousCells = cells(data, excluded);
+        const before = previous.comparisonInputs;
+        const after = target.comparisonInputs;
+        let changedEvals: string[] = [];
+        if (before && after) {
+          if (
+            !/^[a-f0-9]{64}$/.test(before.executionKey) ||
+            before.executionKey !== after.executionKey
+          )
+            continue;
+          changedEvals = [
+            ...new Set([
+              ...Object.keys(before.graders),
+              ...Object.keys(after.graders),
+            ]),
+          ]
+            .filter((name) => before.graders[name] !== after.graders[name])
+            .sort();
+        } else if (
+          !matchesComparisonKey(previous, target.comparisonKey, excluded)
+        ) {
+          continue;
+        }
+        const comparisonExcluded = new Set([...excluded, ...changedEvals]);
+        const previousCells = cells(data, comparisonExcluded);
+        const comparableCurrent = cells(current, comparisonExcluded);
         if (
-          previousCells.size !== currentCells.size ||
-          [...currentCells.keys()].some((key) => !previousCells.has(key))
+          previousCells.size !== comparableCurrent.size ||
+          [...comparableCurrent.keys()].some((key) => !previousCells.has(key))
         )
           continue;
-        candidates.push({ data, path, order: prior });
+        candidates.push({ data, path, order: prior, changedEvals });
       } catch (error) {
         // Older/partial measurements cannot become a baseline.
         if (
@@ -245,9 +306,10 @@ export async function loadReleaseComparison(
   if (!baseline) return unavailable;
   const regressions: Change[] = [],
     improvements: Change[] = [];
-  const previousCells = cells(baseline.data, excluded);
+  const comparisonExcluded = new Set([...excluded, ...baseline.changedEvals]);
+  const previousCells = cells(baseline.data, comparisonExcluded);
   for (const [key, value] of currentCells) {
-    if (excluded.has(value.evalName)) continue;
+    if (comparisonExcluded.has(value.evalName)) continue;
     if (value.success === previousCells.get(key)!.success) continue;
     const { success, ...change } = value;
     const reproducible = report.failures.some(
@@ -269,6 +331,7 @@ export async function loadReleaseComparison(
     },
     regressions,
     improvements,
-    note: 'Same release line, suite revision, declared model/harness, execution configuration, and pass@1 conditions. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
+    changedEvals: baseline.changedEvals,
+    note: 'Same release line, suite revision, declared model/harness, execution configuration, and pass@1 conditions. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
   };
 }

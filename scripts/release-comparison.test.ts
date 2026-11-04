@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { comparisonKey, loadReleaseComparison } from './release-comparison.js';
+import { comparisonInputs, comparisonKey, loadReleaseComparison } from './release-comparison.js';
 import { buildReleaseReport } from './release-automation.js';
 import type { ExportedReleaseData } from './release-automation.js';
 
@@ -421,6 +421,7 @@ test('the retained 16.4.4 run supports its reviewed setup, not changed graders',
   }
   assert.notEqual(currentKey, target.comparisonKey);
   target.comparisonKey = currentKey;
+  delete target.comparisonInputs; // Legacy records still require their reviewed key.
   assert.equal(
     (
       await loadReleaseComparison(
@@ -433,4 +434,101 @@ test('the retained 16.4.4 run supports its reviewed setup, not changed graders',
     false,
   );
   assert.equal(await readFile(baselinePath, 'utf8'), saved);
+});
+
+test("grader changes exclude only affected tasks; unrelated changes still compare", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "release-partial-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const old = measurement();
+  old.results.sol.push({ evalPath: "changed", result: { success: true } });
+  old.metadata.evaluationTarget!.comparisonInputs = {
+    executionKey: "a".repeat(64),
+    graders: { changed: "old" },
+  };
+  const dir = join(root, "16.4.2/123");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "measurement.json"), JSON.stringify(old));
+  const current = structuredClone(old);
+  Object.assign(current.metadata.evaluationTarget!, {
+    version: "16.4.5",
+    evaluatedAt: "2026-11-04T00:00:00.000Z",
+    comparisonKey: "d".repeat(64),
+    comparisonInputs: {
+      executionKey: "a".repeat(64),
+      graders: { changed: "new" },
+    },
+  });
+  current.results.sol.forEach((row) => (row.result.success = false));
+  let comparison = await loadReleaseComparison(
+    root,
+    current,
+    buildReleaseReport(current, diagnostics),
+  );
+  assert.ok(comparison.available);
+  if (comparison.available) {
+    assert.deepEqual(comparison.changedEvals, ["changed"]);
+    assert.deepEqual(
+      comparison.regressions.map((c) => c.evalName),
+      ["task", "task"],
+    );
+  }
+  current.metadata.evaluationTarget!.comparisonInputs!.executionKey =
+    "b".repeat(64);
+  comparison = await loadReleaseComparison(
+    root,
+    current,
+    buildReleaseReport(current, diagnostics),
+  );
+  assert.equal(
+    comparison.available,
+    false,
+    "runner changes must still invalidate comparison",
+  );
+});
+
+test("reviewed 16.4.4 baseline remains useful after React and prefetch grader updates", async () => {
+  const repo = fileURLToPath(new URL("..", import.meta.url));
+  const old: ExportedReleaseData = JSON.parse(
+    await readFile(
+      join(repo, "measurements/releases/16.4.4/41470970834/measurement.json"),
+      "utf8",
+    ),
+  );
+  const current = structuredClone(old);
+  const target = current.metadata.evaluationTarget!;
+  Object.assign(target, {
+    version: "16.4.5",
+    evaluatedAt: "2026-11-04T00:00:00.000Z",
+    comparisonKey: await comparisonKey(repo, [
+      "gpt-6-sol-high",
+      "gpt-6-sol-high--agents-md",
+    ]),
+    comparisonInputs: await comparisonInputs(repo, [
+      "gpt-6-sol-high",
+      "gpt-6-sol-high--agents-md",
+    ]),
+  });
+  const excluded = [
+    "agent-026-no-serial-await",
+    "agent-030-app-router-migration-hard",
+    "agent-044-uses-nextjs",
+  ];
+  for (const name of Object.keys(current.results))
+    current.results[name] = current.results[name].filter(
+      (row) => !excluded.includes(row.evalPath),
+    );
+  const result = await loadReleaseComparison(
+    join(repo, "measurements/releases"),
+    current,
+    buildReleaseReport(current, diagnostics, excluded),
+    excluded,
+  );
+  assert.ok(result.available);
+  if (result.available) {
+    assert.deepEqual(result.changedEvals, [
+      "agent-043-view-transitions",
+      "agent-049-prefetch-stage",
+    ]);
+    assert.deepEqual(result.regressions, []);
+  }
 });
