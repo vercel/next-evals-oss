@@ -180,6 +180,10 @@ export function buildReleaseNotification(options: {
 }
 
 interface ExportedResult {
+  effort?: {
+    base: import('./effort.js').EffortMetrics;
+    agentsMd?: import('./effort.js').EffortMetrics;
+  };
   evalPath: string;
   notAvailable?: boolean;
   result: { success: boolean };

@@ -532,3 +532,121 @@ test("reviewed 16.4.4 baseline remains useful after React and prefetch grader up
     assert.deepEqual(result.regressions, []);
   }
 });
+
+test('costs compare matched successful tasks by condition at the same rates', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-costs-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const old = measurement();
+  const experiment = old.metadata.experiments[0];
+  experiment.name = 'gpt-6-sol-high';
+  old.results[experiment.name] = old.results.sol;
+  delete old.results.sol;
+  const effort = (input: number) => ({
+    avgInputTokens: input,
+    avgOutputTokens: 1000,
+    avgCacheReadTokens: 500,
+    avgCacheWriteTokens: 100,
+    avgDuration: 1,
+    avgCostUsd: 999,
+    measuredRuns: 1,
+    totalRuns: 1,
+  });
+  const rows = old.results[experiment.name];
+  rows[0].effort = { base: effort(1000), agentsMd: effort(2000) };
+  for (const name of ['failed', 'missing', 'changed', 'unpublished']) {
+    rows.push({
+      evalPath: name,
+      result: { success: name !== 'failed' },
+      effort: { base: effort(10000), agentsMd: effort(10000) },
+    });
+  }
+  old.metadata.evaluationTarget!.comparisonInputs = {
+    executionKey: 'a'.repeat(64),
+    graders: { changed: 'old' },
+  };
+  const current = structuredClone(old);
+  Object.assign(current.metadata.evaluationTarget!, {
+    version: '16.4.5',
+    evaluatedAt: '2026-11-04T00:00:00.000Z',
+    comparisonInputs: {
+      executionKey: 'a'.repeat(64),
+      graders: { changed: 'new' },
+    },
+  });
+  const newRows = current.results[experiment.name];
+  newRows[0].effort = { base: effort(2000), agentsMd: effort(1000) };
+  newRows[1].result.success = true; // A repaired task must not change the cost cohort.
+  newRows[2].effort!.base.measuredRuns = 0;
+  newRows[2].effort!.agentsMd!.avgInputTokens = null;
+  const dir = join(root, '16.4.2/123');
+  await mkdir(dir, { recursive: true });
+  const save = () =>
+    writeFile(join(dir, 'measurement.json'), JSON.stringify(old));
+  await save();
+  const compare = () =>
+    loadReleaseComparison(
+      root,
+      current,
+      buildReleaseReport(current, diagnostics, ['unpublished']),
+      ['unpublished'],
+    );
+  const result = await compare();
+  assert.ok(result.available);
+  if (!result.available) return;
+  const [base, docs] = result.costs!;
+  assert.equal(base.matchedTasks, 1);
+  assert.equal(base.totalTasks, 3);
+  assert.equal(base.excludedFailedTasks, 1);
+  assert.equal(base.missingUsageTasks, 1);
+  assert.deepEqual(
+    base.tasks.map((t) => t.evalName),
+    ['task'],
+  );
+  assert.ok(base.afterUsd! > base.beforeUsd!);
+  assert.ok(docs.afterUsd! < docs.beforeUsd!);
+  assert.ok(base.changePercent! > 0);
+  assert.ok(docs.changePercent! < 0);
+  assert.equal(base.beforeUsd, docs.afterUsd);
+  const p = base.pricing!;
+  assert.equal(
+    base.beforeUsd,
+    (400 * p.input + 1000 * p.output + 500 * p.cacheRead + 100 * p.cacheWrite) /
+      1e6,
+  );
+  assert.notEqual(
+    base.beforeUsd,
+    999,
+    'saved monetary estimates must not override measured usage',
+  );
+
+  // Old records without usage cannot generate a savings claim or a $0 baseline.
+  delete rows[0].effort;
+  await save();
+  const missing = await compare();
+  assert.ok(missing.available);
+  if (missing.available) {
+    assert.equal(missing.costs![0].matchedTasks, 0);
+    assert.equal(missing.costs![0].beforeUsd, null);
+    assert.equal(missing.costs![0].afterUsd, null);
+    assert.equal(missing.costs![0].changePercent, null);
+  }
+
+  // A real zero baseline is usable, but percentage growth is undefined.
+  rows[0].effort = {
+    base: {
+      ...effort(0),
+      avgOutputTokens: 0,
+      avgCacheReadTokens: 0,
+      avgCacheWriteTokens: 0,
+    },
+    agentsMd: effort(2000),
+  };
+  await save();
+  const zero = await compare();
+  assert.ok(zero.available);
+  if (zero.available) {
+    assert.equal(zero.costs![0].beforeUsd, 0);
+    assert.equal(zero.costs![0].changePercent, null);
+    assert.equal(zero.costs![0].matchedTasks, 1);
+  }
+});

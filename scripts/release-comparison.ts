@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { MODEL_PRICING, priceUsage, type Pricing } from './cost.js';
+import type { EffortMetrics } from './effort.js';
 import type {
   ExportedReleaseData,
   ReleaseReport,
@@ -62,6 +64,7 @@ export type ReleaseComparison =
       regressions: Change[];
       improvements: Change[];
       changedEvals?: string[];
+      costs?: ReleaseCostComparison[];
       note: string;
     };
 
@@ -110,6 +113,7 @@ function cells(data: ExportedReleaseData, excluded: ReadonlySet<string>) {
       model: string;
       evalName: string;
       agentsMd: boolean;
+      effort?: EffortMetrics;
     }
   >();
   let tasks: string | undefined;
@@ -153,6 +157,7 @@ function cells(data: ExportedReleaseData, excluded: ReadonlySet<string>) {
           model: experiment.modelName,
           evalName: result.evalPath,
           agentsMd,
+          effort: agentsMd ? result.effort?.agentsMd : result.effort?.base,
         });
       }
     }
@@ -311,7 +316,7 @@ export async function loadReleaseComparison(
   for (const [key, value] of currentCells) {
     if (comparisonExcluded.has(value.evalName)) continue;
     if (value.success === previousCells.get(key)!.success) continue;
-    const { success, ...change } = value;
+    const { success, effort: _effort, ...change } = value;
     const reproducible = report.failures.some(
       (failure) =>
         failure.experiment === value.experiment &&
@@ -332,6 +337,133 @@ export async function loadReleaseComparison(
     regressions,
     improvements,
     changedEvals: baseline.changedEvals,
+    costs: compareReleaseCosts(previousCells, cells(current, comparisonExcluded)),
     note: 'Same release line, suite revision, declared model/harness, execution configuration, and pass@1 conditions. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
   };
+}
+
+interface CostChange {
+  beforeUsd: number;
+  afterUsd: number;
+  changePercent: number | null;
+}
+
+export interface ReleaseCostComparison
+  extends Omit<CostChange, 'beforeUsd' | 'afterUsd'> {
+  beforeUsd: number | null;
+  afterUsd: number | null;
+  experiment: string;
+  model: string;
+  agentsMd: boolean;
+  totalTasks: number;
+  matchedTasks: number;
+  excludedFailedTasks: number;
+  missingUsageTasks: number;
+  pricing: Pricing | null;
+  tasks: Array<CostChange & { evalName: string }>;
+}
+
+// Reprice both releases at one recorded rate table, so pricing updates cannot
+// masquerade as a change in agent effort. Never use text-length cost estimates.
+function measuredCost(
+  effort: EffortMetrics | undefined,
+  pricing: Pricing | null,
+) {
+  if (
+    !effort ||
+    !pricing ||
+    effort.measuredRuns !== 1 ||
+    effort.totalRuns !== 1
+  )
+    return null;
+  const {
+    avgInputTokens: input,
+    avgOutputTokens: output,
+    avgCacheReadTokens: cacheRead,
+    avgCacheWriteTokens: cacheWrite,
+  } = effort;
+  if (
+    [input, output, cacheRead, cacheWrite].some(
+      (n) => typeof n !== 'number' || !Number.isFinite(n) || n < 0,
+    )
+  )
+    return null;
+  if (input! < cacheRead! + cacheWrite!) return null;
+  return priceUsage(
+    {
+      input: input! - cacheRead! - cacheWrite!,
+      output: output!,
+      cacheRead: cacheRead!,
+      cacheWrite: cacheWrite!,
+    },
+    pricing,
+  );
+}
+
+function costChange(beforeUsd: number, afterUsd: number): CostChange {
+  return {
+    beforeUsd,
+    afterUsd,
+    changePercent: beforeUsd > 0 ? (afterUsd / beforeUsd - 1) * 100 : null,
+  };
+}
+
+function compareReleaseCosts(
+  before: ReturnType<typeof cells>,
+  after: ReturnType<typeof cells>,
+) {
+  const groups = new Map<string, ReleaseCostComparison>();
+  for (const [key, current] of after) {
+    const previous = before.get(key)!;
+    const groupKey = JSON.stringify([current.experiment, current.agentsMd]);
+    let group = groups.get(groupKey);
+    if (!group) {
+      group = {
+        experiment: current.experiment,
+        model: current.model,
+        agentsMd: current.agentsMd,
+        totalTasks: 0,
+        matchedTasks: 0,
+        excludedFailedTasks: 0,
+        missingUsageTasks: 0,
+        pricing: MODEL_PRICING[current.experiment] ?? null,
+        tasks: [],
+        beforeUsd: null,
+        afterUsd: null,
+        changePercent: null,
+      };
+      groups.set(groupKey, group);
+    }
+    group.totalTasks++;
+    // A cheaper failure is not an efficiency improvement. Compare the same
+    // successful tasks on both sides, and expose how many tasks were excluded.
+    if (!previous.success || !current.success) {
+      group.excludedFailedTasks++;
+      continue;
+    }
+    const oldCost = measuredCost(previous.effort, group.pricing);
+    const newCost = measuredCost(current.effort, group.pricing);
+    if (oldCost === null || newCost === null) {
+      group.missingUsageTasks++;
+      continue;
+    }
+    group.tasks.push({
+      evalName: current.evalName,
+      ...costChange(oldCost, newCost),
+    });
+  }
+  for (const group of groups.values()) {
+    group.matchedTasks = group.tasks.length;
+    if (group.matchedTasks)
+      Object.assign(
+        group,
+        costChange(
+          group.tasks.reduce((sum, task) => sum + task.beforeUsd, 0) /
+            group.matchedTasks,
+          group.tasks.reduce((sum, task) => sum + task.afterUsd, 0) /
+            group.matchedTasks,
+        ),
+      );
+  }
+  return [...groups.values()];
 }
