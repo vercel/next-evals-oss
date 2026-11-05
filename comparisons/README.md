@@ -6,10 +6,12 @@ and traces from both conditions together.
 
 ## Configure a comparison
 
-Add `comparisons/<name>.json` in an evals OSS PR. It can stay unmerged while
-you run the comparison. The manifest pins:
+Reusable presets live in `comparisons/<name>.json` on the runner
+repository's `main`. A preset defines the framework setup and default eval set.
+It is not a new configuration PR required for each framework/docs change.
+The preset contains:
 
-- The PR and before/after source commits.
+- Historical/default PR and source commits, overridden when selecting an open PR.
 - A public task repository and fixture commit. This can differ from the PR repo.
 - The package name, model and pricing key, selected tasks and default task.
 - Named setup exports from the task repository's `evals/lib/setup.ts`, validation
@@ -48,35 +50,44 @@ package artifacts only; held-out tasks and customer data require private storage
 
 ## Run
 
-Once this runner is merged, open a comparison PR in evals OSS containing the
-manifest. It points to the open framework/docs PR and pins its current base/head
-commits and package artifacts. The framework/docs PR and comparison PR can both
-remain unmerged. The request PR must be a branch in evals OSS targeting `main`.
+Once the reusable runner is merged, dispatch **PR eval comparison** from evals
+OSS `main` and select the framework/docs PR directly. No second PR is required:
 
-A maintainer reviews the manifest and its pinned executable tasks/helpers, then
-dispatches **PR eval comparison** from `main` with:
+- **pull_request:** the framework/docs PR URL, such as Next.js #100208.
+- **reviewed_head:** that PR's exact reviewed head SHA.
+- **comparison:** the reusable preset, such as `activity-docs`.
+- **task:** default, `all`, or comma-separated task names (maximum four).
+- **tasks_from_pr:** use tasks/helpers from the reviewed PR head. Enable this
+  for new or changed evals in that PR. Those same evals grade both conditions.
+- **package_artifacts:** optional JSON containing `base`/`head` package `url`
+  and `sha256` values, built from the selected commits. Supplying this switches
+  to full package comparison, including framework and bundled-docs changes.
 
-- **request_pr:** the evals OSS comparison PR number.
-- **reviewed_head:** that comparison PR's exact reviewed head SHA.
-- **comparison:** its manifest name, without `.json`.
-- **task:** leave empty for the manifest default, enter a listed task, or `all`.
-
-For example, after reviewing PR 200 at its current head:
+For Activity, after reviewing its current head:
 
 ```sh
 gh workflow run pr-comparison.yml --repo vercel/next-evals-oss --ref main \
-  -f request_pr=200 -f reviewed_head=FULL_REVIEWED_HEAD_SHA \
-  -f comparison=activity-docs -f task=all
+  -f pull_request=https://github.com/vercel/next.js/pull/100208 \
+  -f reviewed_head=FULL_REVIEWED_HEAD_SHA -f comparison=activity-docs \
+  -f tasks_from_pr=true -f task=all
 ```
 
-The trusted runner reads the unmerged manifest as data through GitHub's API.
-It rejects a different request head, fork, closed PR or changed framework/docs
-base/head before obtaining Vercel credentials. It does not check out the request
-PR's workflow or runner scripts. Update/review the manifest after either PR
-changes, then dispatch again; pushes never automatically start paid runs.
+The trusted main runner reads PR metadata, verifies the reviewed head, and pins
+its current base/head before obtaining Vercel credentials. The target must be
+an open branch PR in the preset's repository. Its workflow and runner scripts
+are never checked out for execution. Review the pinned executable tasks/helpers
+and package code before dispatching. Pushes do not start paid runs; select and
+review the new head before dispatching again.
 
-Existing predefined comparisons can still run from `main`: leave **request_pr**
-and **reviewed_head** empty. One attempt runs per selected task per condition.
+Without **tasks_from_pr**, tasks stay at the preset's pinned fixture commit.
+With it, explicit task names can select newly added tasks without changing the
+preset. `all` uses the preset's list, not automatic discovery of every fixture.
+Before/after package builds must be supplied for the selected source commits;
+the runner checks package bytes against the supplied hashes, not build attestation.
+The Activity guide-overlay option uses the preset's guide list and one runtime.
+
+Existing pinned comparisons can still run by leaving **pull_request** and
+**reviewed_head** empty. One attempt runs per selected task per condition.
 Activity's default task costs two attempts; all four tasks cost eight.
 The 15-minute attempt timeout includes setup and validation; the job limit is
 150 minutes. These limits are not a dollar spending cap.
@@ -96,11 +107,12 @@ is provided.
 
 ## Evidence and retention
 
-The request PR receives a **PR eval comparison** check on the reviewed commit,
-with the results table and a link to the Actions run and traces. No PR comment
-is posted. The check is neutral when the comparison completes, so model failures
-are visible without turning a research comparison into a merge gate. Incomplete
-comparisons fail the check.
+Results and traces are retained in the evals OSS Actions run, with the target
+framework/docs PR and exact commits recorded. The job summary is the initial
+review surface for cross-repository runs. Posting a check directly to a Next.js
+or another framework PR requires a GitHub App with write access there; the
+repository Actions token cannot do that. When the target PR is in evals OSS
+itself, a result check is attached to the reviewed commit. No PR comment is posted.
 
 The Actions run has a summary and `pr-comparison-<run>-<attempt>` artifact:
 

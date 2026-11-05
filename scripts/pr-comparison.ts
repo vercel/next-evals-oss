@@ -59,58 +59,82 @@ export function loadPlan(repo: string, name: string): ComparisonPlan {
   return plan;
 }
 
-// Read PR JSON as data; never check out or run the request PR's runner code.
+// Resolve the framework/docs PR directly; runner and presets stay on main.
 export async function resolveRequest(
-  number: string,
+  url: string,
   reviewedHead: string,
-  name: string,
+  preset: ComparisonPlan,
   read: (endpoint: string) => Promise<any>,
   actor: string,
+  options: {
+    tasksFromPr?: boolean;
+    task?: string;
+    packageArtifacts?: string;
+  } = {},
 ) {
-  if (
-    !/^[1-9][0-9]*$/.test(number) ||
-    !/^[a-f0-9]{40}$/.test(reviewedHead) ||
-    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)
-  )
+  const match = url.match(
+    /^https:\/\/github.com\/([a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+)\/pull\/([1-9][0-9]*)$/,
+  );
+  if (!match || !/^[a-f0-9]{40}$/.test(reviewedHead))
     throw new Error(
-      'Provide a comparison PR number, exact reviewed head SHA and manifest name',
+      'Provide the framework/docs PR URL and its exact reviewed head SHA',
     );
-  const repository = 'vercel/next-evals-oss';
+  const [, repository, number] = match;
+  if (repository !== preset.repository)
+    throw new Error('Choose a preset for this PR repository');
   const pr = await read(`/repos/${repository}/pulls/${number}`);
   if (
     pr.state !== 'open' ||
     pr.base.repo.full_name !== repository ||
-    pr.base.ref !== 'main' ||
     pr.head.repo?.full_name !== repository ||
     pr.head.sha !== reviewedHead
   )
     throw new Error(
-      'Comparison PR must be open, in this repository, target main and match the reviewed SHA',
+      'Framework/docs PR must be open, use a branch in its repository and match the reviewed SHA',
     );
-  const file = await read(
-    `/repos/${repository}/contents/comparisons/${name}.json?ref=${reviewedHead}`,
-  );
-  if (file.type !== 'file' || file.encoding !== 'base64' || file.size > 65536)
-    throw new Error('Expected a small comparison manifest file');
-  const plan = JSON.parse(
-    Buffer.from(file.content, 'base64').toString('utf8'),
-  ) as ComparisonPlan;
-  if (plan.name !== name) throw new Error('Comparison name mismatch');
-  validatePlan(plan, '');
-  const match = plan.pullRequest.match(
-    /^https:\/\/github.com\/([^/]+\/[^/]+)\/pull\/(\d+)$/,
-  )!;
-  if (match[1] !== plan.repository)
-    throw new Error('PR repository does not match the manifest');
-  const source = await read(`/repos/${plan.repository}/pulls/${match[2]}`);
-  if (
-    source.state !== 'open' ||
-    source.base.sha !== plan.base ||
-    source.head.sha !== plan.head
-  )
+  let plan = {
+    ...preset,
+    pullRequest: url,
+    base: pr.base.sha,
+    head: pr.head.sha,
+  };
+  if (options.packageArtifacts) {
+    if (options.packageArtifacts.length > 65536)
+      throw new Error('Package artifact input is too large');
+    plan = {
+      ...plan,
+      treatment: 'packages',
+      guides: [],
+      packageArtifacts: JSON.parse(options.packageArtifacts),
+    };
+  } else if (
+    plan.treatment === 'packages' &&
+    (preset.base !== plan.base || preset.head !== plan.head)
+  ) {
     throw new Error(
-      'Framework/docs PR changed; update and review the manifest base/head before running',
+      'Provide before/after package artifacts for the current PR commits',
     );
+  }
+  if (options.tasksFromPr) {
+    const tasks =
+      !options.task || options.task === 'all'
+        ? preset.tasks
+        : options.task.split(',').map((name) => name.trim());
+    plan = {
+      ...plan,
+      taskRepository: repository,
+      fixtureRef: reviewedHead,
+      tasks,
+      defaultTask: tasks[0],
+    };
+  }
+  validatePlan(plan, options.task ?? '');
+  if (
+    url !== preset.pullRequest ||
+    plan.tasks.some((task) => !preset.tasks.includes(task))
+  )
+    plan.limitations =
+      'One attempt per task and condition. Review task overlap with guidance and actual docs use before attributing differences to the PR. This does not establish repeatable savings.';
   return {
     ...plan,
     request: { repository, number: Number(number), head: reviewedHead, actor },
@@ -167,9 +191,16 @@ export function validatePlan(plan: ComparisonPlan, task: string) {
   ) {
     throw new Error('Invalid reviewed comparison manifest');
   }
-  if (task !== 'all' && !plan.tasks.includes(task))
-    throw new Error('Task is not in the reviewed manifest');
-  return task === 'all' ? plan.tasks : [task];
+  const selected =
+    task === 'all' ? plan.tasks : task.split(',').map((name) => name.trim());
+  if (
+    !selected.length ||
+    selected.length > 4 ||
+    new Set(selected).size !== selected.length ||
+    selected.some((name) => !plan.tasks.includes(name))
+  )
+    throw new Error('Tasks are not in the selected comparison');
+  return selected;
 }
 
 export function files(root: string, prefix = ''): string[] {
@@ -521,7 +552,7 @@ export async function retain(root: string) {
       ? 'Same runtime, fixtures, graders, model and AGENTS.md pointer. Only bundled guide contents differ.'
       : 'Same fixtures, graders, model and setup. Before/after package artifacts differ; inspect the recorded source and package hashes.',
     '',
-    '| Task | Docs | Outcome | Input tokens | Estimated coding cost | Run seconds |',
+    '| Task | Condition | Outcome | Input tokens | Estimated coding cost | Run seconds |',
     '| --- | --- | --- | ---: | ---: | ---: |',
     ...records.map(
       (row) =>
@@ -559,7 +590,7 @@ async function main() {
     const plan = await resolveRequest(
       process.env.COMPARISON_PR ?? '',
       process.env.COMPARISON_REVIEWED_HEAD ?? '',
-      process.env.COMPARISON_NAME ?? 'activity-docs',
+      loadPlan(repo, process.env.COMPARISON_NAME ?? 'activity-docs'),
       async (endpoint) => {
         const response = await fetch(`https://api.github.com${endpoint}`, {
           redirect: 'error',
@@ -573,6 +604,11 @@ async function main() {
         return response.json();
       },
       process.env.GITHUB_ACTOR ?? 'local',
+      {
+        tasksFromPr: process.env.COMPARISON_TASKS_FROM_PR === 'true',
+        task: process.env.COMPARISON_TASK ?? '',
+        packageArtifacts: process.env.COMPARISON_PACKAGES ?? '',
+      },
     );
     save(process.env.COMPARISON_REQUEST_FILE, plan);
   } else if (command === 'prepare') {

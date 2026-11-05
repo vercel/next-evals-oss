@@ -176,84 +176,127 @@ test('before/after package artifacts support another framework and reject mismat
   );
 });
 
-test('an open PR supplies unmerged tasks without executing its runner code', async () => {
+test('a framework PR supplies new tasks without a second comparison PR', async () => {
   const reviewed = 'b'.repeat(40);
-  const candidate = {
-    ...plan,
-    tasks: ['new-docs-task'],
-    defaultTask: 'new-docs-task',
-    fixtureRef: plan.head,
-  };
-  const request = {
-    state: 'open',
-    base: { ref: 'main', repo: { full_name: 'vercel/next-evals-oss' } },
-    head: { sha: reviewed, repo: { full_name: 'vercel/next-evals-oss' } },
-  };
   const source = {
     state: 'open',
-    base: { sha: plan.base },
-    head: { sha: plan.head },
-  };
-  const file = {
-    type: 'file',
-    encoding: 'base64',
-    size: 2000,
-    content: Buffer.from(JSON.stringify(candidate)).toString('base64'),
+    base: { sha: 'a'.repeat(40), repo: { full_name: 'vercel/next.js' } },
+    head: { sha: reviewed, repo: { full_name: 'vercel/next.js' } },
   };
   const endpoints: string[] = [];
   const read = async (endpoint: string) => {
     endpoints.push(endpoint);
-    if (endpoint.includes('/contents/')) return file;
-    if (endpoint.includes('/next-evals-oss/')) return request;
     return source;
   };
-  const result = await resolveRequest(
-    '200',
-    reviewed,
-    plan.name,
-    read,
-    'maintainer',
-  );
-  assert.deepEqual(result.tasks, ['new-docs-task']);
-  assert.equal(result.fixtureRef, plan.head);
+  const url = 'https://github.com/vercel/next.js/pull/100208';
+  const result = await resolveRequest(url, reviewed, plan, read, 'maintainer', {
+    tasksFromPr: true,
+    task: 'new-task-one,new-task-two',
+  });
+  assert.deepEqual(result.tasks, ['new-task-one', 'new-task-two']);
+  assert.equal(result.fixtureRef, reviewed);
+  assert.equal(result.base, source.base.sha);
+  assert.equal(result.head, reviewed);
   assert.deepEqual(result.request, {
-    repository: 'vercel/next-evals-oss',
-    number: 200,
+    repository: 'vercel/next.js',
+    number: 100208,
     head: reviewed,
     actor: 'maintainer',
   });
-  assert.equal(endpoints.length, 3);
-  assert.ok(endpoints[1].endsWith(`?ref=${reviewed}`));
+  assert.deepEqual(endpoints, ['/repos/vercel/next.js/pulls/100208']);
+  const existing = await resolveRequest(
+    url,
+    reviewed,
+    plan,
+    read,
+    'maintainer',
+  );
+  assert.equal(existing.fixtureRef, plan.fixtureRef);
   await assert.rejects(
-    resolveRequest('200', 'c'.repeat(40), plan.name, read, 'maintainer'),
+    resolveRequest(url, 'c'.repeat(40), plan, read, 'maintainer'),
     /reviewed SHA/,
   );
   await assert.rejects(
-    resolveRequest('200', reviewed, '../unsafe', read, 'maintainer'),
-    /manifest name/,
+    resolveRequest(
+      'https://github.com/other/framework/pull/1',
+      reviewed,
+      plan,
+      read,
+      'maintainer',
+    ),
+    /preset/,
   );
-  request.head.repo.full_name = 'someone/fork';
   await assert.rejects(
-    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
+    resolveRequest(url, reviewed, plan, read, 'maintainer', {
+      tasksFromPr: true,
+      task: '../unsafe',
+    }),
+    /manifest/,
+  );
+  source.head.repo.full_name = 'someone/fork';
+  await assert.rejects(
+    resolveRequest(url, reviewed, plan, read, 'maintainer'),
     /reviewed SHA/,
   );
-  request.head.repo.full_name = 'vercel/next-evals-oss';
-  source.head.sha = 'd'.repeat(40);
-  await assert.rejects(
-    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
-    /PR changed/,
-  );
-  source.head.sha = plan.head;
+  source.head.repo.full_name = 'vercel/next.js';
   source.state = 'closed';
   await assert.rejects(
-    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
-    /PR changed/,
+    resolveRequest(url, reviewed, plan, read, 'maintainer'),
+    /reviewed SHA/,
   );
-  source.state = 'open';
-  file.type = 'symlink';
+});
+
+test('framework builds can be supplied at dispatch and are hash-pinned', async () => {
+  const reviewed = 'b'.repeat(40);
+  const read = async () => ({
+    state: 'open',
+    base: { sha: 'a'.repeat(40), repo: { full_name: plan.repository } },
+    head: { sha: reviewed, repo: { full_name: plan.repository } },
+  });
+  const artifacts = {
+    base: {
+      url: 'https://packages.example.test/base.tgz',
+      sha256: '1'.repeat(64),
+    },
+    head: {
+      url: 'https://packages.example.test/head.tgz',
+      sha256: '2'.repeat(64),
+    },
+  };
+  const result = await resolveRequest(
+    plan.pullRequest,
+    reviewed,
+    plan,
+    read,
+    'maintainer',
+    { packageArtifacts: JSON.stringify(artifacts) },
+  );
+  assert.equal(result.treatment, 'packages');
+  assert.deepEqual(result.guides, []);
+  assert.deepEqual(result.packageArtifacts, artifacts);
   await assert.rejects(
-    resolveRequest('200', reviewed, plan.name, read, 'maintainer'),
-    /manifest file/,
+    resolveRequest(
+      plan.pullRequest,
+      reviewed,
+      {
+        ...plan,
+        treatment: 'packages',
+        guides: [],
+        packageArtifacts: artifacts,
+      },
+      read,
+      'maintainer',
+    ),
+    /current PR commits/,
+  );
+  await assert.rejects(
+    resolveRequest(plan.pullRequest, reviewed, plan, read, 'maintainer', {
+      packageArtifacts: JSON.stringify({
+        base: { ...artifacts.base, sha256: 'wrong' },
+        head: artifacts.head,
+      }),
+    }),
+    /manifest/,
   );
 });
 
@@ -343,7 +386,7 @@ test('workflow is manual, main-only, bounded, and uploads only scanned evidence'
   assert.match(yaml, /COMPARISON_REVIEWED_HEAD/);
   assert.match(yaml, /head_sha: request.head/);
   assert.ok(
-    yaml.indexOf('Resolve the reviewed open comparison PR') <
+    yaml.indexOf('Resolve the reviewed framework/docs PR') <
       yaml.indexOf('Pull scoped eval credentials'),
   );
   assert.doesNotMatch(yaml, /ref: \$\{\{ inputs.reviewed_head/);
