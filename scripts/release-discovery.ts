@@ -5,6 +5,9 @@ import type { ReleaseTarget } from './release-automation.js';
 
 const stableVersionPattern = /^\d+\.\d+\.\d+$/;
 const canaryVersionPattern = /^\d+\.\d+\.\d+-canary\.\d+$/;
+export function isMonitoredRelease(version: string): boolean {
+  return /^16\.\d+\.\d+(?:-canary\.\d+)?$/.test(version);
+}
 const shaPattern = /^[0-9a-f]{40}$/;
 const repository = 'vercel/next-evals-oss';
 const nextRepository = 'vercel/next.js';
@@ -81,7 +84,9 @@ export function selectScheduledVersions(options: {
   return Object.entries(options.publishedAt)
     .filter(
       ([version, published]) =>
-        stableVersionPattern.test(version) && Date.parse(published) > threshold,
+        stableVersionPattern.test(version) &&
+        isMonitoredRelease(version) &&
+        Date.parse(published) > threshold,
     )
     .sort(([, left], [, right]) => Date.parse(left) - Date.parse(right))
     .map(([version]) => version);
@@ -357,6 +362,11 @@ async function main(): Promise<void> {
       !canaryVersionPattern.test(requestedVersion)
     ) {
       throw new Error('nextVersion must be an exact stable or canary version');
+    }
+    if (!isMonitoredRelease(requestedVersion)) {
+      throw new Error(
+        'Release measurements are limited to Next.js 16.x; older releases are not backfilled',
+      );
     }
     candidates = [requestedVersion];
   } else {

@@ -46,6 +46,27 @@ const diagnostics = {
   experiments: [],
 };
 
+test('missing baseline names the requested line despite history on other lines', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-lines-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const dir = join(root, '16.4.5/123');
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    join(dir, 'measurement.json'),
+    JSON.stringify(measurement('16.4.5')),
+  );
+  const current = measurement('15.5.29');
+  current.metadata.evaluationTarget!.evaluatedAt = '2026-11-06T00:00:00.000Z';
+  const comparison = await loadReleaseComparison(
+    root,
+    current,
+    buildReleaseReport(current, diagnostics),
+  );
+  assert.equal(comparison.available, false);
+  assert.match(comparison.note, /15\.5\.x/);
+  assert.match(comparison.note, /Other release lines/);
+});
+
 test('first reviewed run becomes usable; both condition changes reach the Slack payload', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'release-baselines-'));
   t.after(() => rm(root, { recursive: true, force: true }));
