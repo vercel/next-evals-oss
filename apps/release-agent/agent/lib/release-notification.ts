@@ -127,7 +127,7 @@ export function releaseSummaryPrompt(
   notification: ReleaseNotification,
 ): string {
   return [
-    "Load the release-eval-report skill, then format this validated release report as one team-adx-science root post and exactly three detail replies. Lead with regressions supported by comparison evidence and evals to investigate. Link measurementUrl in the root. If no comparable baseline is supplied, say regressions could not be determined.",
+    "Load the release-eval-report skill, then format this validated release report as one team-adx-science root post and exactly three detail replies. Lead with regressions supported by comparison evidence and evals to investigate. Link measurementUrl in the root. State target.kind (release, backport or canary) and the major.minor release line. When comparison.available is false, use comparison.note to explain which line has no compatible baseline; do not imply no earlier measurements exist anywhere.",
     "Include estimated coding cost increases AND decreases from comparison.costs in the root, separately for Base and AGENTS.md. Name the baseline and matched-task coverage. Zero matched tasks means unavailable, not zero cost. Report per-task cost changes in the model-results reply, including increases hidden by an overall decrease. These are observed pass@1 differences, not confirmed cost regressions.",
     "Return all four parts in one response, separated by the exact marker required by the skill. The Slack renderer will create the thread.",
     "The report is retained in a human-reviewed measurement pull request that cannot update or publish the pass@4 nextjs.org/evals leaderboard.",

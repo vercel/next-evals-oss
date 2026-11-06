@@ -208,11 +208,12 @@ export async function loadReleaseComparison(
   excludedEvals: readonly string[] = [],
 ): Promise<ReleaseComparison> {
   const excluded = new Set(excludedEvals);
+  const target = current.metadata.evaluationTarget;
+  const releaseLine = target?.version.match(/^(\d+\.\d+)\./)?.[1];
   const unavailable = {
     available: false as const,
-    note: 'No reviewed, compatible earlier measurement is merged. This run establishes a baseline once its measurement PR is reviewed and merged.',
+    note: `No reviewed compatible earlier ${releaseLine ? `Next.js ${releaseLine}.x` : 'release-line'} pass@1 measurement is merged. Other release lines are not used as baselines. This run can establish this line's baseline after review and merge.`,
   };
-  const target = current.metadata.evaluationTarget;
   if (
     !target ||
     target.suite !== 'published' ||

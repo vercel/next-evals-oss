@@ -22,6 +22,11 @@ The renderer removes the separators and posts the replies under the root.
 
 ## Root message
 
+State the supplied release kind (release, backport or canary) and major.minor
+line explicitly. A backport run compares with an earlier compatible measurement
+on that same line. If unavailable, explain `comparison.note`, naming the line;
+do not imply that measurements on other lines do not exist.
+
 - Title: `Next.js <version> · regression run complete`.
 - Start with the release kind, models measured, and a link to `measurementUrl`
   labeled `Measurement PR`. For a large matrix, give the model count.
@@ -43,7 +48,7 @@ The renderer removes the separators and posts the replies under the root.
   specific evidence, such as an API-name mismatch. A low score alone does not
   prove an eval is broken.
 - If no comparable previous run is supplied, say `Regressions not determined:
-  no comparable previous run supplied.` Current failures can still be listed as
+no comparable previous run supplied.` Current failures can still be listed as
   failures to investigate. Do not say `No regressions` or call it the first run.
 - Mention incomplete verification only when it prevents confirming a finding.
   Keep retry counts and infrastructure details in the thread.

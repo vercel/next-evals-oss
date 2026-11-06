@@ -304,9 +304,9 @@ refreshing, and record the rest in `ACCEPTED_STALE`.
 ### Release, backport, and canary automation
 
 [`release-evals.yml`](.github/workflows/release-evals.yml) runs entirely in this
-repository. A daily check discovers stable releases and backports published
+repository. A daily check discovers Next.js 16.x stable releases and backports published
 after the monitor baseline in [`release-monitor.json`](release-monitor.json).
-Manual dispatch accepts one exact published stable or canary version, so canary
+Manual dispatch accepts one exact published 16.x stable or canary version, so canary
 measurements run only when a maintainer explicitly requests one. Discovery
 resolves the matching public tag, commit SHA, successful `vercel/next.js`
 build-and-deploy run, and source branch before any model job starts. Existing

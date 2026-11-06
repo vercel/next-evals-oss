@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   classifyReleaseRuns,
+  isMonitoredRelease,
   isVerifiedMeasurementPull,
   selectScheduledVersions,
   sourceBranchesForRelease,
@@ -28,7 +29,11 @@ function sourceDiscoveryClient(options: {
         } as T;
       }
       const prefix = `/repos/vercel/next.js/compare/${parent}...`;
-      assert.equal(path.startsWith(prefix), true, `unexpected request: ${path}`);
+      assert.equal(
+        path.startsWith(prefix),
+        true,
+        `unexpected request: ${path}`,
+      );
       const branch = decodeURIComponent(path.slice(prefix.length));
       const status = options.statuses?.[branch] ?? 'diverged';
       if (status === 'missing') {
@@ -39,19 +44,35 @@ function sourceDiscoveryClient(options: {
   };
 }
 
-test('scheduled stable discovery includes backports and proceeds oldest first', () => {
+test('scheduled discovery includes only 16.x backports and proceeds oldest first', () => {
   assert.deepEqual(
     selectScheduledVersions({
       publishedAt: {
         '16.2.3': '2026-10-13T10:00:00.000Z',
         '15.5.9': '2026-10-14T10:00:00.000Z',
+        '14.2.99': '2026-10-14T10:30:00.000Z',
+        '16.1.9': '2026-10-14T11:00:00.000Z',
+        '17.0.0': '2026-10-14T11:30:00.000Z',
         '16.2.4': '2026-10-14T12:00:00.000Z',
         '16.3.0-canary.1': '2026-10-14T09:00:00.000Z',
       },
       stablePublishedAfter: '2026-10-14T00:00:00.000Z',
     }),
-    ['15.5.9', '16.2.4'],
+    ['16.1.9', '16.2.4'],
   );
+});
+
+test('manual release policy accepts exact 16.x stable and canary versions only', () => {
+  for (const version of ['16.1.0', '16.4.5', '16.5.0-canary.42'])
+    assert.equal(isMonitoredRelease(version), true);
+  for (const version of [
+    '15.5.29',
+    '14.2.99',
+    '17.0.0',
+    '^16',
+    '16.5.0-beta.1',
+  ])
+    assert.equal(isMonitoredRelease(version), false);
 });
 
 test('release provenance distinguishes releases, backports, and canaries', () => {
