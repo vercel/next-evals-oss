@@ -1,0 +1,59 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (5 tests | 3 failed) 42627ms
+   ✓ enables Partial Prefetching globally or for the project route 1ms
+   ✓ opts the project link into per-link prefetching 0ms
+   × uses the navigation cache stage 5ms
+     → expected null not to be null
+   × includes the project title in the selected prefetch 26014ms
+     → [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind navigation(), disable prefetching, or prefetch the entire page.
+  reason: app/projects/[slug]/page.tsx places the cached, params-dependent title inside Suspense, but its ProjectDetails boundary is a sibling whose component calls getProjectDetails without awaiting navigation(). The required title-before-nested-navigation-boundary structure is absent.
+   × waits until navigation for project details 16605ms
+     → [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits navigation() before loading or rendering them.
+
+The navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: In app/projects/[slug]/page.tsx, the nested Suspense renders ProjectDetails, but that component awaits getProjectDetails(slug) without first awaiting navigation(). The detail loader in lib/data.ts is uncached, and no navigation() call exists in the project code, so the required navigation-stage gate is absent.
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 2 passed (5)
+   Start at  15:27:09
+   Duration  42.91s (transform 52ms, setup 21ms, collect 32ms, tests 42.63s, environment 0ms, prepare 82ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > uses the navigation cache stage
+AssertionError: expected null not to be null
+ ❯ EVAL.ts:68:32
+     66|     /import\s*\{[^}]*\bnavigation\b(?:\s+as\s+([A-Za-z_$][\w$]*))?[^}]…
+     67|   )
+     68|   expect(navigationImport).not.toBeNull()
+       |                                ^
+     69| 
+     70|   const localName = navigationImport?.[1] ?? 'navigation'
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  EVAL.ts > includes the project title in the selected prefetch
+Error: [judge:environment] FAIL — The selected project's title must be available before the click from the dashboard's per-link prefetch. Keep the params-dependent title inside Suspense so the reusable App Shell can show a fallback while the selected prefetch resolves the title. The title must render before the nested boundary that waits for navigation.
+
+Accept equivalent component and file organization. Reject solutions that leave the title behind the reusable shell fallback, put it behind navigation(), disable prefetching, or prefetch the entire page.
+  reason: app/projects/[slug]/page.tsx places the cached, params-dependent title inside Suspense, but its ProjectDetails boundary is a sibling whose component calls getProjectDetails without awaiting navigation(). The required title-before-nested-navigation-boundary structure is absent.
+ ❯ EVAL.ts:75:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  EVAL.ts > waits until navigation for project details
+Error: [judge:environment] FAIL — Project activity, deployments, description, and other detail content must not join the prefetch. Render those details inside a nested Suspense boundary through an async component that awaits navigation() before loading or rendering them.
+
+The navigation() call must remain outside every use cache scope; cached data functions may be called after it. Reject solutions that fetch project details before reaching navigation(), replace it with connection() or an uncached fetch, or prefetch the entire page. Accept equivalent component and file organization.
+  reason: In app/projects/[slug]/page.tsx, the nested Suspense renders ProjectDetails, but that component awaits getProjectDetails(slug) without first awaiting navigation(). The detail loader in lib/data.ts is uncached, and no navigation() call exists in the project code, so the required navigation-stage gate is absent.
+ ❯ EVAL.ts:83:3
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

@@ -1,0 +1,211 @@
+{
+  "status": "passed",
+  "duration": 353.614,
+  "provenance": {
+    "agentEvalVersion": "2.5.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.167.0"
+  },
+  "usage": {
+    "inputTokens": 120,
+    "outputTokens": 34155,
+    "cacheReadTokens": 1377946,
+    "cacheWriteTokens": 49697,
+    "reasoningTokens": 9167,
+    "totalTokens": 1461918
+  },
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 6,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 33,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 33,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g '\"'!node_modules'\"' -g '\"'!dist'\"' -g '\"'!build'\"' | head -80\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'find /workspace -name AGENTS.md -print'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'ls -la /workspace'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat .gitignore'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'node --version && npm --version'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm install next react react-dom'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm uninstall -D vitest'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start'"
+      },
+      {
+        "command": "/bin/bash -lc \"curl -sS -o /dev/null -w '%{http_code} %{size_download}\\\\n' http://localhost:3000/\""
+      },
+      {
+        "command": "/bin/bash -lc \"curl -sS -o /dev/null -w '%{http_code} %{size_download}\\\\n' http://localhost:3000/books/new\""
+      },
+      {
+        "command": "/bin/bash -lc \"curl -sS -o /dev/null -w '%{http_code} %{size_download}\\\\n' http://localhost:3000/books/not-a-book\""
+      },
+      {
+        "command": "/bin/bash -lc \"curl -sS http://localhost:3000/books/new | rg -o '\\\\\"'$ACTION_[A-Za-z0-9_]+'\"' | head\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"curl -sS http://localhost:3000/books/new | rg -o '<form[\"'^>]*>|<input[''^>]*>'\"' | head -15\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python - <<'PY'\nfrom html.parser import HTMLParser\nfrom pathlib import Path\nfrom urllib.parse import urlencode\nfrom urllib.request import Request, urlopen\nimport json\n\nbase = 'http://localhost:3000'\ndata_file = Path('data/books.json')\noriginal = data_file.read_bytes()\n\nclass FormParser(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.forms = []\n        self.current = None\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        if tag == 'form':\n            self.current = {}\n            self.forms.append(self.current)\n        elif tag == 'input' and self.current is not None:\n            self.current[attrs.get('name', '')] = attrs.get('value', '')\n    def handle_endtag(self, tag):\n        if tag == 'form':\n            self.current = None\n\ndef get(path):\n    with urlopen(base + path) as response:\n        return response.read().decode()\n\ndef post(path, fields):\n    body = urlencode(fields).encode()\n    request = Request(base + path, body, headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')\n    with urlopen(request) as response:\n        return response.status, response.url, response.read().decode()\n\ntry:\n    parser = FormParser()\n    parser.feed(get('/books/new'))\n    fields = dict(parser.forms[0])\n    fields.update(title='A Smoke Test Book', author='Example Author', notes='A note that should persist.')\n    status, destination, _ = post('/books/new', fields)\n    books = json.loads(data_file.read_text())\n    assert len(books) == 1 and books[0]['title'] == 'A Smoke Test Book', books\n    book_id = books[0]['id']\n    detail = get('/books/' + book_id)\n    assert 'Example Author' in detail and 'A note that should persist.' in detail\n    home = get('/')\n    assert 'A Smoke Test Book' in home and 'Currently reading' in home\n    parser = FormParser()\n    parser.feed(detail)\n    finish_form = next(form for form in parser.forms if form.get('id') == book_id)\n    post('/books/' + book_id, finish_form)\n    books = json.loads(data_file.read_text())\n    assert books[0]['status'] == 'finished' and books[0]['finishedAt']\n    assert 'Finished' in get('/books/' + book_id)\n    print(f'PASS: add -> detail -> finish; book ID {book_id}; add returned {status} at {destination}')\nfinally:\n    data_file.write_bytes(original)\nPY\"",
+        "success": false,
+        "exitCode": 127
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom html.parser import HTMLParser\nfrom pathlib import Path\nfrom urllib.parse import urlencode\nfrom urllib.request import Request, urlopen\nimport json\n\nbase = 'http://localhost:3000'\ndata_file = Path('data/books.json')\noriginal = data_file.read_bytes()\n\nclass FormParser(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.forms = []\n        self.current = None\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        if tag == 'form':\n            self.current = {}\n            self.forms.append(self.current)\n        elif tag == 'input' and self.current is not None:\n            self.current[attrs.get('name', '')] = attrs.get('value', '')\n    def handle_endtag(self, tag):\n        if tag == 'form':\n            self.current = None\n\ndef get(path):\n    with urlopen(base + path) as response:\n        return response.read().decode()\n\ndef post(path, fields):\n    body = urlencode(fields).encode()\n    request = Request(base + path, body, headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')\n    with urlopen(request) as response:\n        return response.status, response.url, response.read().decode()\n\ntry:\n    parser = FormParser()\n    parser.feed(get('/books/new'))\n    fields = dict(parser.forms[0])\n    fields.update(title='A Smoke Test Book', author='Example Author', notes='A note that should persist.')\n    status, destination, _ = post('/books/new', fields)\n    books = json.loads(data_file.read_text())\n    assert len(books) == 1 and books[0]['title'] == 'A Smoke Test Book', books\n    book_id = books[0]['id']\n    detail = get('/books/' + book_id)\n    assert 'Example Author' in detail and 'A note that should persist.' in detail\n    home = get('/')\n    assert 'A Smoke Test Book' in home and 'Currently reading' in home\n    parser = FormParser()\n    parser.feed(detail)\n    finish_form = next(form for form in parser.forms if form.get('id') == book_id)\n    post('/books/' + book_id, finish_form)\n    books = json.loads(data_file.read_text())\n    assert books[0]['status'] == 'finished' and books[0]['finishedAt']\n    assert 'Finished' in get('/books/' + book_id)\n    print(f'PASS: add -> detail -> finish; book ID {book_id}; add returned {status} at {destination}')\nfinally:\n    data_file.write_bytes(original)\nPY\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom html.parser import HTMLParser\nfrom urllib.request import Request, urlopen\nfrom urllib.parse import urlencode\nfrom pathlib import Path\nclass P(HTMLParser):\n def __init__(self): super().__init__(); self.current=None; self.forms=[]\n def handle_starttag(self,t,a):\n  d=dict(a)\n  if t=='form': self.current={}; self.forms.append(self.current)\n  elif t=='input' and self.current is not None: self.current[d.get('name')]=d.get('value','')\n def handle_endtag(self,t):\n  if t=='form': self.current=None\np=P(); p.feed(urlopen('http://localhost:3000/books/new').read().decode()); print(p.forms)\nf=p.forms[0]; f.update(title='A Smoke Test Book',author='Example Author',notes='A note')\nr=Request('http://localhost:3000/books/new',urlencode(f).encode(),headers={'Content-Type':'application/x-www-form-urlencoded'},method='POST')\nwith urlopen(r) as x:\n print('status',x.status,'url',x.url,'headers',dict(x.headers)); html=x.read().decode(); print('contains error', 'Add a title' in html, 'A Smoke Test Book' in html); print(html[:500])\nprint('file',Path('data/books.json').read_text())\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom html.parser import HTMLParser\nfrom urllib.request import Request, urlopen\nfrom pathlib import Path\nfrom uuid import uuid4\nclass P(HTMLParser):\n def __init__(self): super().__init__(); self.current=None; self.forms=[]\n def handle_starttag(self,t,a):\n  d=dict(a)\n  if t=='form': self.current={}; self.forms.append(self.current)\n  elif t=='input' and self.current is not None: self.current[d.get('name')]=d.get('value','')\n def handle_endtag(self,t):\n  if t=='form': self.current=None\np=P(); p.feed(urlopen('http://localhost:3000/books/new').read().decode()); f=p.forms[0];f.update(title='A Smoke Test Book',author='Example Author',notes='A note')\nboundary='----BookTest'+uuid4().hex\nbody=b''\nfor k,v in f.items(): body += f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{k}\\\"\\\\r\\\\n\\\\r\\\\n{v}\\\\r\\\\n'.encode()\nbody += f'--{boundary}--\\\\r\\\\n'.encode()\nr=Request('http://localhost:3000/books/new',body,headers={'Content-Type':f'multipart/form-data; boundary={boundary}'},method='POST')\nwith urlopen(r) as x: print('status',x.status,'url',x.url, 'size',len(x.read()))\nprint('file',Path('data/books.json').read_text())\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"python3 - <<'PY'\nfrom html.parser import HTMLParser\nfrom pathlib import Path\nfrom urllib.request import Request, urlopen\nfrom uuid import uuid4\nimport json\n\nbase = 'http://localhost:3000'\ndata_file = Path('data/books.json')\nclass Forms(HTMLParser):\n    def __init__(self): super().__init__(); self.forms = []; self.current = None\n    def handle_starttag(self, tag, attrs):\n        attrs = dict(attrs)\n        if tag == 'form': self.current = {}; self.forms.append(self.current)\n        elif tag == 'input' and self.current is not None: self.current[attrs.get('name', '')] = attrs.get('value', '')\n    def handle_endtag(self, tag):\n        if tag == 'form': self.current = None\n\ndef get(path):\n    with urlopen(base + path) as response: return response.read().decode()\n\ndef post(path, fields):\n    boundary = '----FolioTest' + uuid4().hex\n    parts = [f'--{boundary}\\\\r\\\\nContent-Disposition: form-data; name=\\\"{name}\\\"\\\\r\\\\n\\\\r\\\\n{value}\\\\r\\\\n'.encode() for name, value in fields.items()]\n    body = b''.join(parts) + f'--{boundary}--\\\\r\\\\n'.encode()\n    request = Request(base + path, body, headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}, method='POST')\n    with urlopen(request) as response: return response.url\n\ntry:\n    data_file.write_text('[]\\\\n')\n    forms = Forms(); forms.feed(get('/books/new'))\n    fields = forms.forms[0]; fields.update(title='A Smoke Test Book', author='Example Author', notes='A note that should persist.')\n    destination = post('/books/new', fields)\n    books = json.loads(data_file.read_text())\n    assert len(books) == 1 and books[0]['status'] == 'reading'\n    book_id = books[0]['id']\n    detail = get('/books/' + book_id)\n    assert 'A Smoke Test Book' in detail and 'Example Author' in detail and 'A note that should persist.' in detail\n    assert 'A Smoke Test Book' in get('/')\n    forms = Forms(); forms.feed(detail)\n    finish_form = next(form for form in forms.forms if form.get('id') == book_id)\n    post('/books/' + book_id, finish_form)\n    books = json.loads(data_file.read_text())\n    assert books[0]['status'] == 'finished' and books[0]['finishedAt']\n    assert 'Finished' in get('/books/' + book_id)\n    assert 'A Smoke Test Book' in get('/')\n    print(f'PASS: form add, direct book page, mark finished, and JSON persistence ({destination})')\nfinally:\n    data_file.write_text('[]\\\\n')\nPY\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat package.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'git status --short && git diff --stat && cat data/books.json'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'rg --files app components lib data'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport { addBook, updateBookNotes, getBook } from './lib/books.js';\nconst book = addBook({ title: 'Restart Check', author: 'Test Author', notes: '' });\nupdateBookNotes(book.id, 'Saved after creation.');\nif (getBook(book.id)?.notes \"'!== '\"'Saved after creation.') throw new Error('Notes were not saved');\nprocess.stdout.write(book.id);\nJS\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"curl -sS -o /dev/null -w '%{http_code}\\\\n' http://localhost:3000/books/bdcea7b0-33ee-4797-a7ed-812b70882521\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'JS'\nimport { readFileSync, writeFileSync } from 'node:fs';\nconst file = 'data/books.json';\ntry {\n  const books = JSON.parse(readFileSync(file, 'utf8'));\n  const book = books.find((item) => item.title === 'Restart Check');\n  if (\"'!book) throw new Error('\"'Book missing from JSON after restart');\n  const response = await fetch(\"'`http://localhost:3000/books/${book.id}`);\n  const html = await response.text();\n  if (response.status !== 200 || !html.includes('\"'Saved after creation.')) {\n    throw new Error('Book or edited notes missing from page after restart');\n  }\n  process.stdout.write('PASS: book and edited notes survived server restart\\\\n');\n} finally {\n  writeFileSync(file, '[]\\\\n');\n}\nJS\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'"
+      },
+      {
+        "command": "/bin/bash -lc 'git diff --check && cat data/books.json && npm audit --omit=dev --audit-level=moderate'",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 120,
+      "outputTokens": 34155,
+      "cacheReadTokens": 1377946,
+      "cacheWriteTokens": 49697,
+      "reasoningTokens": 9167,
+      "totalTokens": 1461918
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

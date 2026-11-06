@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "metric": "pass@1",
+  "confirmationAttemptsPerFailure": 2,
+  "experiments": [
+    {
+      "schemaVersion": 1,
+      "experiment": "gpt-6-sol-high",
+      "metric": "pass@1",
+      "confirmationAttempts": 2,
+      "tasks": [
+        {
+          "evalName": "agent-029-use-cache-directive",
+          "scoredFailureReason": "The model implemented caching using unstable_cache() instead of the required 'use cache' directive. The test expects the literal 'use cache' string in the code, which the model did not include.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model implemented cache revalidation using `unstable_cache()` and `revalidateTag()` instead of the `\"use cache\"` directive that the test expects. The test looks for a `\"use cache\"` string in the source code (/['\"]use cache['\"];?/), which is not present in the generated code."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-031-proxy-middleware",
+          "scoredFailureReason": "The model created middleware.ts (Next.js 15 pattern) instead of proxy.ts with a proxy handler (Next.js 16+ pattern). While the middleware code functioned correctly, it doesn't meet the eval requirements which explicitly expect a proxy file.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model generated working middleware code but created it in `middleware.ts` instead of the required `proxy.ts` file (Next.js 16+). Tests explicitly expect a proxy file, not the deprecated middleware pattern."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model created a deprecated middleware.ts file with a middleware() export instead of creating a proxy.ts file with a proxy() export as required by Next.js 16+. The eval tests explicitly check for the proxy file pattern and reject the middleware pattern."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-032-use-cache-directive",
+          "scoredFailureReason": "The model implemented a working caching solution but used unstable API exports (unstable_cacheLife, unstable_cacheTag) and didn't enable cacheComponents in next.config as the tests expected. While the implementation works and builds successfully with Next.js 15.5, it fails 2 of 6 tests due to using the wrong API surface.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model generated code that implements the 'use cache' directive but used unstable/experimental APIs (unstable_cacheLife, unstable_cacheTag) instead of the stable APIs (cacheLife, cacheTag). Additionally, the model enabled 'useCache' in next.config instead of 'cacheComponents'. The code compiles and builds successfully, but fails the eval tests due to these incorrect implementation choices."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model implemented caching using the older `unstable_cache` API instead of the required modern `'use cache'` directive with `cacheLife` and `cacheTag` functions. While the code builds successfully, it fails all 6 evaluation tests because it doesn't match the expected Next.js 16+ cache directive patterns."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-039-indirect-proxy",
+          "scoredFailureReason": "The model created middleware.ts instead of proxy.ts (the Next.js 16+ convention). While the middleware implementation was functionally correct, it failed the test requirement that expects the file to be named proxy.ts in the root directory.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model created middleware.ts instead of proxy.ts as required for Next.js 16+. While the logging code is correct and passes 3/4 tests, it uses the deprecated middleware pattern rather than the required proxy.ts convention for Next.js 16."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model created a `middleware.ts` file instead of the required `proxy.ts` file (Next.js 16+ convention). While the logging functionality works correctly (3 of 4 tests pass), the model used the deprecated middleware pattern rather than the proxy pattern expected for the Next.js version being tested."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-040-instant",
+          "scoredFailureReason": "The model generated code that downgraded Next.js from ^16 to ^15.5.29 in package.json, causing the cacheComponents config option to become unrecognized. This broke the requirement to keep the framework's default instant validation enabled. While 3 of 4 tests passed, the solution fails because it doesn't preserve the necessary Next.js version.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model implemented a Suspense-based solution correctly but left an unrecognized `cacheComponents: true` option in next.config.ts. This broke the test's requirement that \"the framework's default instant validation remains enabled\" and that the solution work with proper configuration, not unsupported options."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model generated code but failed to correctly implement the requirements. While it created the right file structure (layout.tsx, loading.tsx), it kept the getInventory() await at the top level of page.tsx, preventing the page from returning immediately. The tests explicitly reject solutions where the page awaits inventory before returning—the async work must be in a child component wrapped in Suspense."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-041-optimize-ppr-shell",
+          "scoredFailureReason": "The model wrote code but implemented incorrect logic. It wrapped all three data-driven sections (CardStats, RevenueChart, LatestInvoices) in a single Suspense boundary waiting for one fetch, rather than giving each section its own independent Suspense boundary with individual async data fetching. This collapses the PPR shell back to an all-or-nothing loading state instead of allowing sections to suspend independently.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model created working Suspense boundaries for PPR but incorrectly wrapped all three data-driven sections in a single shared Suspense boundary instead of giving each section its own independent Suspense boundary for independent streaming."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model wrote code that implements Suspense and PPR but with incorrect architecture: all three dashboard sections (CardStats, RevenueChart, LatestInvoices) suspend together under a single Suspense boundary instead of suspending independently. The eval requires each section to have its own independent suspension boundary."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-048-prefetch-url-data",
+          "scoredFailureReason": "The model implemented prefetch URL data functionality but used `await prefetch()` inside the component, which explicitly violates the test requirement that forbids using prefetch() as a boundary that defers category content. The correct solution should read searchParams and render the cached products without calling prefetch().",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model added prefetch={true} to the links but failed to enable Partial Prefetching in next.config.ts and failed to use the 'use cache' directive to cache the category data. The test explicitly requires both partialPrefetching config and 'use cache' scoping to make the selected heading and products available in the per-link prefetch before navigation."
+            },
+            {
+              "attempt": 2,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            }
+          ]
+        },
+        {
+          "evalName": "agent-049-prefetch-stage",
+          "scoredFailureReason": "The model wrote code but implemented it incorrectly. It used connection() instead of the required prefetch() function for the prefetch cache stage, and failed to enable partialPrefetching in the config. The test judge explicitly states the solution should use prefetch() outside the cache scope, not connection(). Additionally, it never imported prefetch().",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model spent the entire run (378s) analyzing Next.js source code through shell commands but failed to write any application code. No files were modified, and all three test assertions failed because the required prefetching configuration and prefetch() calls were never added to the codebase."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "experiment": "gpt-6-sol-high--agents-md",
+      "metric": "pass@1",
+      "confirmationAttempts": 2,
+      "tasks": [
+        {
+          "evalName": "agent-031-proxy-middleware",
+          "scoredFailureReason": "The model created a middleware.ts file with the correct functionality (pathname logging and X-Request-Id header), but the eval required a proxy.ts file following Next.js 16+ conventions. The model used the deprecated middleware naming convention instead of the new proxy handler.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The agent created middleware.ts with deprecated middleware API instead of the proxy.ts file using the proxy handler API expected for Next.js 16+. The tests explicitly require \"proxy\" handler, not \"middleware\"."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The agent created a middleware.ts file with a middleware function instead of a proxy file with a proxy function. The tests explicitly expected Next.js 16+ proxy convention, not the deprecated middleware convention."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-032-use-cache-directive",
+          "scoredFailureReason": "The model wrote code but failed 2 of 6 eval tests: (1) Used `useCache: true` in config instead of `cacheComponents: true`, and (2) Used `unstable_cacheLife` and `unstable_cacheTag` which match the deprecated pattern test regex.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model investigated the Next.js 15.5.29 APIs and caching patterns through 19 shell commands but never actually wrote any code. Despite running the build successfully (no errors), it made 0 file modifications. The code still uses the deprecated `unstable_cache` pattern instead of the new `\"use cache\"` directive, and all 6 required tests failed because the model never implemented the necessary changes to next.config.ts, the cache directive, cacheLife, and cacheTag imports."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model implemented caching using the deprecated `unstable_cache` API instead of the required `use cache` directive. The eval expects the newer Next.js 15+ `use cache` pattern with `cacheComponents` config, `cacheLife`, and `cacheTag` functions, but the model chose the older approach despite having access to documentation on the correct pattern."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-039-indirect-proxy",
+          "scoredFailureReason": "The agent created middleware.ts instead of the required proxy.ts file (Next.js 16+ convention). While the proxy function code is correct and all function-level tests pass, the critical file naming requirement was not met.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model created middleware.ts instead of proxy.ts. While the generated code is functional (logging requests, imports correct modules), it fails the primary test requirement to have a proxy.ts file in the root directory following Next.js 16+ conventions."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model created middleware.ts instead of proxy.ts, using the deprecated middleware convention rather than the Next.js 16+ proxy convention required by the test. The test explicitly expects a proxy.ts file in the root directory."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-040-instant",
+          "scoredFailureReason": "The model wrote functionally correct streaming code (Suspense boundary around inventory), but inadvertently downgraded Next.js from ^16 to ^15.5.29 in package.json, which disabled Cache Components and broke the instant validation requirement that the test requires to be preserved.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model wrote code but it was incorrect. It removed `cacheComponents: true` from next.config.ts and downgraded Next.js from ^16 to ^15.5.29, which disabled the framework's required default instant validation. The test explicitly states the solution must keep cacheComponents enabled and not remove it as a workaround."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model implemented correct Suspense streaming code that passed 3 of 4 tests, but downgraded Next.js from ^16 to ^15.5.29 in package.json. This made the cacheComponents: true setting in next.config.ts unrecognized, breaking the requirement to keep Cache Components (instant validation) enabled."
+            }
+          ]
+        },
+        {
+          "evalName": "agent-051-prefetch-until-navigation",
+          "scoredFailureReason": "The model attempted to implement prefetch-until-navigation functionality but failed to correctly structure the component hierarchy to use the navigation() function as a gating mechanism. The build succeeded, but EVAL.ts tests fail because: (1) navigation() import is missing, (2) the title is not gated properly for prefetch, and (3) project details are fetched before navigation() instead of after. The model spent significant effort researching the pattern but did not correctly apply it in the code.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model wrote code that compiled successfully but failed all 5 eval tests. It missed enabling per-link prefetching on the dashboard links, failed to enable partial prefetching in config, used connection() instead of navigation(), and didn't structure components to support the required prefetch pattern."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model researched Next.js 15 prefetching and navigation features extensively but failed to actually modify the code files. No changes were made to the route structure: the Link component still lacks prefetch, navigation() boundaries and Suspense splits were never implemented, and the title still waits for slow details within the same boundary."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+
+ RUN  v3.2.7 /workspace
+
+ ❯ EVAL.ts (6 tests | 2 failed) 9ms
+   × next.config enables cacheComponents 6ms
+     → expected 'import type { NextConfig } from \'nex…' to match /cacheComponents\s*:\s*true/
+   ✓ Page or component uses "use cache" directive 0ms
+   ✓ Component uses cacheLife function for cache duration 0ms
+   ✓ Component uses cacheTag function for on-demand invalidation 0ms
+   ✓ Page fetches posts using getPosts 0ms
+   × Does NOT use deprecated caching patterns 1ms
+     → expected 'import { unstable_cacheLife, unstable…' not to match /unstable_cache/
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)
+   Start at  15:35:27
+   Duration  254ms (transform 45ms, setup 20ms, collect 27ms, tests 9ms, environment 0ms, prepare 66ms)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  EVAL.ts > next.config enables cacheComponents
+AssertionError: expected 'import type { NextConfig } from \'nex…' to match /cacheComponents\s*:\s*true/
+
+[32m- Expected:[39m 
+/cacheComponents\s*:\s*true/
+
+[31m+ Received:[39m 
+"import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  experimental: {
+    useCache: true,
+  },
+}
+
+export default nextConfig
+"
+
+ ❯ EVAL.ts:21:21
+     19| 
+     20|     // In Next.js 16+, cacheComponents must be enabled for 'use cache'…
+     21|     expect(content).toMatch(/cacheComponents\s*:\s*true/)
+       |                     ^
+     22|   }
+     23| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  EVAL.ts > Does NOT use deprecated caching patterns
+AssertionError: expected 'import { unstable_cacheLife, unstable…' not to match /unstable_cache/
+
+[32m- Expected:[39m 
+/unstable_cache/
+
+[31m+ Received:[39m 
+"import { unstable_cacheLife, unstable_cacheTag } from 'next/cache'
+import { getPosts } from '@/lib/api'
+
+async function getCachedPosts() {
+  'use cache'
+
+  unstable_cacheLife('hours')
+  unstable_cacheTag('posts')
+
+  return getPosts()
+}
+
+export default async function Home() {
+  const posts = await getCachedPosts()
+
+  return (
+    <main>
+      <h1>Blog Posts</h1>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.id}>
+            <h2>{post.title}</h2>
+            <p>By {post.author}</p>
+          </li>
+        ))}
+      </ul>
+    </main>
+  )
+}
+"
+
+ ❯ EVAL.ts:86:25
+     84| 
+     85|     // Should NOT use unstable_cache
+     86|     expect(content).not.toMatch(/unstable_cache/)
+       |                         ^
+     87|   }
+     88| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
