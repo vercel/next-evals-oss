@@ -32,8 +32,8 @@ import { minimatch } from 'minimatch';
 dotenvConfig({ path: '.env.local', override: true });
 dotenvConfig({ override: true });
 
-/** Hard floor: @vercel/agent-eval declares engines.node >= 18. */
-const MIN_NODE_MAJOR = 18;
+/** Hard floor: @vercel/agent-eval declares engines.node >= 22. */
+const MIN_NODE_MAJOR = 22;
 /** Soft floor: what .github/workflows/eval-cache-check.yml actually runs. */
 const CI_NODE_MAJOR = 22;
 

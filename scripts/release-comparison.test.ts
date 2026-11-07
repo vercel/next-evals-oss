@@ -507,7 +507,7 @@ test("grader changes exclude only affected tasks; unrelated changes still compar
   );
 });
 
-test("reviewed 16.4.4 baseline remains useful after React and prefetch grader updates", async () => {
+test("reviewed grader updates retain the baseline only with the same runner", async () => {
   const repo = fileURLToPath(new URL("..", import.meta.url));
   const old: ExportedReleaseData = JSON.parse(
     await readFile(
@@ -529,6 +529,12 @@ test("reviewed 16.4.4 baseline remains useful after React and prefetch grader up
       "gpt-6-sol-high--agents-md",
     ]),
   });
+  const upgradedExecutionKey = target.comparisonInputs!.executionKey;
+  const baselineExecutionKey =
+    old.metadata.evaluationTarget!.comparisonInputs!.executionKey;
+  assert.notEqual(upgradedExecutionKey, baselineExecutionKey);
+  // Isolate grader-only compatibility from the runner upgrade in this checkout.
+  target.comparisonInputs!.executionKey = baselineExecutionKey;
   const excluded = [
     "agent-026-no-serial-await",
     "agent-030-app-router-migration-hard",
@@ -552,6 +558,19 @@ test("reviewed 16.4.4 baseline remains useful after React and prefetch grader up
     ]);
     assert.deepEqual(result.regressions, []);
   }
+
+  target.comparisonInputs!.executionKey = upgradedExecutionKey;
+  const afterUpgrade = await loadReleaseComparison(
+    join(repo, "measurements/releases"),
+    current,
+    buildReleaseReport(current, diagnostics, excluded),
+    excluded,
+  );
+  assert.equal(
+    afterUpgrade.available,
+    false,
+    "the upgraded runner needs a new baseline",
+  );
 });
 
 test('costs compare matched successful tasks by condition at the same rates', async (t) => {
