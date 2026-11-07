@@ -39,6 +39,8 @@ export interface Pricing {
  * When adding a model, add its price here or /evals shows N/A for that row.
  */
 export const MODEL_PRICING: Record<string, Pricing | null> = {
+  // AI Gateway catalog, 2026-11-02, standard base-context rates.
+  'claude-sonnet-5.5': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   // Same in/out/cache-write as Fable 5, but cache reads are a quarter of it
   // ($0.25 vs $1 per 1M) — the gateway catalog's `anthropic/claude-fable-5.1`
   // entry as of 2026-09-09. Claude Code caches heavily, so that difference
