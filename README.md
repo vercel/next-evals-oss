@@ -21,6 +21,8 @@ order, because the middle one is easy to miss.
 
 ### 1. Install
 
+Requires Node.js 22 or later, matching `@vercel/agent-eval` 3 and CI.
+
 ```bash
 pnpm install --frozen-lockfile
 ```
