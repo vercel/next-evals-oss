@@ -6,6 +6,7 @@ import { afterEach, test } from 'node:test';
 
 import {
   findScoredModelFailures,
+  evaluatorFailureReason,
   mergeDiagnostics,
   type ExperimentDiagnostics,
 } from './release-diagnostics.js';
@@ -144,4 +145,21 @@ test('diagnostic merge rejects an incomplete matrix', async () => {
       }),
     /missing \[b\]/,
   );
+});
+
+
+test('actual evaluator evidence takes priority over an unsupported no-edits classification', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'release-diagnostic-evidence-'));
+  tempDirs.push(root);
+  const directory = join(root, 'run-1', 'outputs');
+  await mkdir(directory, { recursive: true });
+  const fallback = 'The model changed no files.';
+  assert.equal(await evaluatorFailureReason(root, fallback), fallback);
+  await writeFile(join(directory, 'eval.txt'), `
+   × keeps the product title in the static shell 19258ms
+     reason: The layout renders the title, but the rubric rejects an await in page.tsx.
+`);
+  const reason = await evaluatorFailureReason(root, fallback);
+  assert.match(reason, /layout renders the title/);
+  assert.doesNotMatch(reason, /changed no files/);
 });

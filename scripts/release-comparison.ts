@@ -19,6 +19,7 @@ interface Change {
 export interface ComparisonInputs {
   executionKey: string;
   configurationKey?: string;
+  gradingRuntimeKey?: string;
   graders: Record<string, string>;
 }
 
@@ -43,9 +44,14 @@ export async function comparisonInputs(
   const overrides = JSON.parse(
     await readFile(join(root, 'eval-grader-overrides.json'), 'utf8'),
   );
+  const judgeHelper = await readFile(join(root,
+    'node_modules/@vercel/agent-eval/dist/lib/agents/eval-helper.mjs'));
   return {
     executionKey: hash.digest('hex'),
     configurationKey: configuration.digest('hex'),
+    // The judge's prompt and verdict parser are grading code, even when shipped
+    // inside a runner dependency. Hash them independently of that package version.
+    gradingRuntimeKey: createHash('sha256').update(judgeHelper).digest('hex'),
     graders: Object.fromEntries(
       Object.entries(overrides.graders).map(([name, value]) => [
         name,
@@ -277,6 +283,14 @@ export async function loadReleaseComparison(
             rejected.push(`${version}/${run}: model or setup configuration differs, or legacy configuration metadata is missing`);
             continue;
           }
+          const sameGradingRuntime = before.gradingRuntimeKey || after.gradingRuntimeKey
+            ? /^[a-f0-9]{64}$/.test(before.gradingRuntimeKey ?? '') &&
+              before.gradingRuntimeKey === after.gradingRuntimeKey
+            : before.executionKey === after.executionKey;
+          if (!sameGradingRuntime) {
+            rejected.push(`${version}/${run}: judge runtime changed or its historical fingerprint is missing`);
+            continue;
+          }
           changedEvals = [
             ...new Set([
               ...Object.keys(before.graders),
@@ -351,7 +365,7 @@ export async function loadReleaseComparison(
     improvements,
     changedEvals: baseline.changedEvals,
     costs: compareReleaseCosts(previousCells, cells(current, comparisonExcluded)),
-    note: 'Same release line, suite revision, model/harness settings, setup and pass@1 conditions. Runner dependency upgrades are retained in provenance and do not block comparison. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
+    note: 'Same release line, suite revision, model/harness settings, setup and pass@1 conditions. Runner dependency upgrades are retained in provenance. Judge runtime fingerprints must match; legacy runs without them require matching execution fingerprints. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
   };
 }
 

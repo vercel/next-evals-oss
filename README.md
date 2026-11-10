@@ -572,7 +572,12 @@ Release comparisons retain unchanged tasks when reviewed grader or companion-fil
 pins change within the same suite revision. Reports list those tasks in
 `changedEvals` and exclude them from regression/improvement counts. Changes to
 task setup or model experiments still require a new baseline. Runner dependency
-versions are provenance rather than a compatibility gate.
+versions are provenance rather than a compatibility gate. The judge helper is
+grading code: its fingerprint must match separately. Historical records without
+that fingerprint require matching execution fingerprints unless reviewed
+provenance establishes the original grading code. Changing a prompt requires
+new coding trials; a grader-only correction may regrade retained submissions
+under one grader, preserving the original evidence.
 The retained 16.4.4 measurement records its original execution inputs from #175;
 this does not relabel its saved attempts as runs of a newer prompt or grader.
 

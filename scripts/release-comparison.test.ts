@@ -530,6 +530,7 @@ test("legacy records without configuration metadata require the original executi
     ]),
   });
   delete target.comparisonInputs!.configurationKey; // Exercise the strict legacy fallback.
+  delete target.comparisonInputs!.gradingRuntimeKey;
   const upgradedExecutionKey = target.comparisonInputs!.executionKey;
   const baselineExecutionKey =
     old.metadata.evaluationTarget!.comparisonInputs!.executionKey;
@@ -697,7 +698,7 @@ test('runner dependency upgrades preserve matching configuration while model cha
   const root = await mkdtemp(join(tmpdir(), 'release-runner-upgrade-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const old = measurement('16.4.5');
-  old.metadata.evaluationTarget!.comparisonInputs = { executionKey: 'a'.repeat(64), configurationKey: 'b'.repeat(64), graders: {} };
+  old.metadata.evaluationTarget!.comparisonInputs = { executionKey: 'a'.repeat(64), configurationKey: 'b'.repeat(64), gradingRuntimeKey: 'e'.repeat(64), graders: {} };
   // Earlier releases can be measured after the release being analysed.
   old.metadata.evaluationTarget!.evaluatedAt = '2026-11-12T00:00:00.000Z';
   const dir = join(root, '16.4.5/1');
@@ -722,7 +723,7 @@ test('runner dependency upgrades preserve matching configuration while model cha
 test('dependency lock changes affect provenance, not the configuration key', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'release-inputs-'));
   t.after(() => rm(root, { recursive: true, force: true }));
-  for (const path of ['pnpm-lock.yaml', 'lib/setup.ts', 'lib/release-runs.ts', 'experiments/sol.ts', 'eval-grader-overrides.json']) {
+  for (const path of ['pnpm-lock.yaml', 'lib/setup.ts', 'lib/release-runs.ts', 'experiments/sol.ts', 'eval-grader-overrides.json', 'node_modules/@vercel/agent-eval/dist/lib/agents/eval-helper.mjs']) {
     const file = join(root, path); await mkdir(join(file, '..'), { recursive: true });
     await writeFile(file, path.endsWith('.json') ? '{"graders":{}}' : 'original');
   }
@@ -731,6 +732,11 @@ test('dependency lock changes affect provenance, not the configuration key', asy
   const after = await comparisonInputs(root, ['sol']);
   assert.notEqual(before.executionKey, after.executionKey);
   assert.equal(before.configurationKey, after.configurationKey);
+  assert.equal(before.gradingRuntimeKey, after.gradingRuntimeKey);
+  await writeFile(join(root, 'node_modules/@vercel/agent-eval/dist/lib/agents/eval-helper.mjs'), 'changed judge prompt');
+  const changedJudge = await comparisonInputs(root, ['sol']);
+  assert.notEqual(changedJudge.gradingRuntimeKey, after.gradingRuntimeKey);
+  assert.equal(changedJudge.configurationKey, after.configurationKey);
   await writeFile(join(root, 'experiments/sol.ts'), 'changed model settings');
   assert.notEqual((await comparisonInputs(root, ['sol'])).configurationKey, before.configurationKey);
 });
@@ -744,4 +750,35 @@ test('retained 16.4.5 metadata supports newer runner dependencies without a manu
   const result = await loadReleaseComparison(join(repo, 'measurements/releases'), current, buildReleaseReport(current, diagnostics));
   assert.ok(result.available);
   if (result.available) { assert.equal(result.baseline.version, '16.4.5'); assert.equal(result.changedEvals?.length, 0); }
+});
+
+
+test('a changed or unverified judge runtime cannot cross a runner upgrade', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-judge-runtime-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const old = measurement();
+  old.metadata.evaluationTarget!.comparisonInputs = {
+    executionKey: 'a'.repeat(64), configurationKey: 'b'.repeat(64),
+    gradingRuntimeKey: 'c'.repeat(64), graders: {},
+  };
+  const directory = join(root, '16.4.2/1');
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, 'measurement.json'), JSON.stringify(old));
+  const current = structuredClone(old);
+  current.metadata.evaluationTarget!.version = '16.4.6';
+  const inputs = current.metadata.evaluationTarget!.comparisonInputs!;
+  inputs.executionKey = 'd'.repeat(64);
+  inputs.gradingRuntimeKey = 'e'.repeat(64);
+  const compare = () => loadReleaseComparison(root, current, buildReleaseReport(current, diagnostics));
+  let result = await compare();
+  assert.equal(result.available, false);
+  assert.match(result.note, /judge runtime/);
+  delete inputs.gradingRuntimeKey;
+  result = await compare();
+  assert.equal(result.available, false);
+  assert.match(result.note, /historical fingerprint/);
+  inputs.executionKey = 'a'.repeat(64);
+  assert.equal((await compare()).available, false, 'one-sided grading metadata is not proof of compatibility');
+  inputs.gradingRuntimeKey = 'c'.repeat(64);
+  assert.equal((await compare()).available, true);
 });
