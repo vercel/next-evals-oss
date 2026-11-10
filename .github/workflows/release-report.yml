@@ -1,0 +1,72 @@
+name: Rebuild a release report
+on:
+  workflow_dispatch:
+    inputs:
+      measurementPr:
+        description: Existing open measurement PR to report again (no coding trials)
+        required: true
+        type: string
+concurrency:
+  group: release-report-${{ inputs.measurementPr }}
+  cancel-in-progress: false
+permissions: {}
+jobs:
+  report:
+    if: github.repository == 'vercel/next-evals-oss' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - name: Read retained measurement at its exact PR head
+        id: source
+        env:
+          MEASUREMENT_PR: ${{ inputs.measurementPr }}
+        run: pnpm tsx scripts/replay-release-report.ts "$MEASUREMENT_PR"
+      - name: Recalculate against current merged history
+        env:
+          RELEASE_BASELINE_ROOT: ${{ github.workspace }}/measurements/releases
+        run: pnpm tsx scripts/release-automation.ts agent-notification
+      - name: Verify the regenerated evidence
+        run: node scripts/assert-no-secrets.mjs "$AGENT_PAYLOAD_PATH"
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ steps.source.outputs.head }}
+          path: measurement-repository
+          persist-credentials: false
+      - name: Save the comparison on the same measurement PR
+        env:
+          BRANCH: ${{ steps.source.outputs.branch }}
+          DESTINATION: ${{ steps.source.outputs.destination }}
+        run: |
+          cp "$AGENT_PAYLOAD_PATH" "measurement-repository/$DESTINATION/report.json"
+          cd measurement-repository
+          git add "$DESTINATION/report.json"
+          node "$GITHUB_WORKSPACE/scripts/commit-results.mjs" "$BRANCH" \
+            "Rebuild release comparison from retained trials" "$DESTINATION/report.json"
+      - name: Obtain the release project's short-lived identity
+        env:
+          VERCEL_CLI_CLIENT_ID: ${{ vars.VERCEL_CLI_CLIENT_ID }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_NEXT_UPGRADE_EVALS_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_NEXT_UPGRADE_EVALS_PROJECT_ID }}
+        run: node scripts/ci-auth.mjs
+      - name: Publish the corrected Slack report
+        env:
+          RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
+        run: |
+          curl --fail-with-body \
+            -H "authorization: Bearer $RELEASE_WORKFLOW_OIDC_TOKEN" \
+            -H "x-vercel-trusted-oidc-idp-token: $RELEASE_WORKFLOW_OIDC_TOKEN" \
+            -H 'content-type: application/json' \
+            --data-binary "@$AGENT_PAYLOAD_PATH" "${RELEASE_AGENT_URL%/}/release-evals"

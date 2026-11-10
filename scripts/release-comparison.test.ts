@@ -139,7 +139,7 @@ test('first reviewed run becomes usable; both condition changes reach the Slack 
     );
 });
 
-test('incompatible, incomplete, same-version, future, and unrelated releases are excluded', async (t) => {
+test('incompatible, incomplete, same-version, invalid-date, and unrelated releases are excluded', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'release-baselines-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const current = measurement('16.4.4');
@@ -168,7 +168,7 @@ test('incompatible, incomplete, same-version, future, and unrelated releases are
       d.results.sol[0].evalPath = 'different-task';
     },
     (d: ExportedReleaseData) => {
-      d.metadata.evaluationTarget!.evaluatedAt = '2026-11-03T00:00:00.000Z';
+      d.metadata.evaluationTarget!.evaluatedAt = 'invalid';
     },
   ];
   const dir = join(root, '16.4.2/123');
@@ -507,7 +507,7 @@ test("grader changes exclude only affected tasks; unrelated changes still compar
   );
 });
 
-test("reviewed grader updates retain the baseline only with the same runner", async () => {
+test("legacy records without configuration metadata require the original execution key", async () => {
   const repo = fileURLToPath(new URL("..", import.meta.url));
   const old: ExportedReleaseData = JSON.parse(
     await readFile(
@@ -529,6 +529,7 @@ test("reviewed grader updates retain the baseline only with the same runner", as
       "gpt-6-sol-high--agents-md",
     ]),
   });
+  delete target.comparisonInputs!.configurationKey; // Exercise the strict legacy fallback.
   const upgradedExecutionKey = target.comparisonInputs!.executionKey;
   const baselineExecutionKey =
     old.metadata.evaluationTarget!.comparisonInputs!.executionKey;
@@ -689,4 +690,58 @@ test('costs compare matched successful tasks by condition at the same rates', as
     assert.equal(zero.costs![0].changePercent, null);
     assert.equal(zero.costs![0].matchedTasks, 1);
   }
+});
+
+
+test('runner dependency upgrades preserve matching configuration while model changes do not', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-runner-upgrade-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const old = measurement('16.4.5');
+  old.metadata.evaluationTarget!.comparisonInputs = { executionKey: 'a'.repeat(64), configurationKey: 'b'.repeat(64), graders: {} };
+  // Earlier releases can be measured after the release being analysed.
+  old.metadata.evaluationTarget!.evaluatedAt = '2026-11-12T00:00:00.000Z';
+  const dir = join(root, '16.4.5/1');
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'measurement.json'), JSON.stringify(old));
+  const current = structuredClone(old);
+  current.metadata.evaluationTarget!.version = '16.4.6';
+  current.metadata.evaluationTarget!.evaluatedAt = '2026-11-10T00:00:00.000Z';
+  current.metadata.evaluationTarget!.comparisonInputs!.executionKey = 'c'.repeat(64);
+  current.results.sol[0].result.success = false;
+  const compare = () => loadReleaseComparison(root, current, buildReleaseReport(current, diagnostics));
+  const result = await compare();
+  assert.ok(result.available);
+  if (result.available) assert.equal(result.regressions.length, 2);
+  current.metadata.evaluationTarget!.comparisonInputs!.configurationKey = 'd'.repeat(64);
+  const rejected = await compare();
+  assert.equal(rejected.available, false);
+  assert.match(rejected.note, /Earlier measurements exist/);
+  assert.match(rejected.note, /configuration differs/);
+});
+
+test('dependency lock changes affect provenance, not the configuration key', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-inputs-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const path of ['pnpm-lock.yaml', 'lib/setup.ts', 'lib/release-runs.ts', 'experiments/sol.ts', 'eval-grader-overrides.json']) {
+    const file = join(root, path); await mkdir(join(file, '..'), { recursive: true });
+    await writeFile(file, path.endsWith('.json') ? '{"graders":{}}' : 'original');
+  }
+  const before = await comparisonInputs(root, ['sol']);
+  await writeFile(join(root, 'pnpm-lock.yaml'), 'agent-eval upgrade');
+  const after = await comparisonInputs(root, ['sol']);
+  assert.notEqual(before.executionKey, after.executionKey);
+  assert.equal(before.configurationKey, after.configurationKey);
+  await writeFile(join(root, 'experiments/sol.ts'), 'changed model settings');
+  assert.notEqual((await comparisonInputs(root, ['sol'])).configurationKey, before.configurationKey);
+});
+
+
+test('retained 16.4.5 metadata supports newer runner dependencies without a manual exception', async () => {
+  const repo = fileURLToPath(new URL('..', import.meta.url));
+  const old: ExportedReleaseData = JSON.parse(await readFile(join(repo, 'measurements/releases/16.4.5/41856939453/measurement.json'), 'utf8'));
+  const current = structuredClone(old);
+  Object.assign(current.metadata.evaluationTarget!, { version: '16.4.6', evaluatedAt: '2026-11-10T00:00:00.000Z', comparisonInputs: await comparisonInputs(repo, ['gpt-6-sol-high','gpt-6-sol-high--agents-md']) });
+  const result = await loadReleaseComparison(join(repo, 'measurements/releases'), current, buildReleaseReport(current, diagnostics));
+  assert.ok(result.available);
+  if (result.available) { assert.equal(result.baseline.version, '16.4.5'); assert.equal(result.changedEvals?.length, 0); }
 });

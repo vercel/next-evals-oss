@@ -327,13 +327,18 @@ The suite stays pinned by [`eval-suite-ref.txt`](eval-suite-ref.txt), including
 that revision and a comparison key covering experiment configs, setup helpers,
 the suite sync script, and the locked runner dependencies.
 
+To rebuild a report from saved trials, dispatch [Rebuild a release report](.github/workflows/release-report.yml)
+with the existing measurement PR number. It uses current merged history, saves
+`report.json` on that same PR and posts a new Slack thread without coding-model calls.
+Original measurements, confirmations and traces stay unchanged.
+
 Future reports compare against the latest compatible earlier version retained
 in a measurement PR **merged into main**. The same major/minor release line,
-stable/canary track, suite revision, execution key, model, harness, tasks, and
+stable/canary track, suite revision, model/harness settings, setup, tasks, and
 pass@1 conditions must match. Open or closed unmerged measurement PRs are not
 baselines. The first matching measurement becomes a baseline after review and
-merge. A changed setup starts a new baseline rather than producing a misleading
-delta. Pass→fail and fail→pass changes are reported separately for Base and
+merge. Runner dependency upgrades, including `agent-eval`, remain recorded but do not
+block comparisons. Changes to model settings, guidance or task setup still do. Pass→fail and fail→pass changes are reported separately for Base and
 AGENTS.md, with failure-confirmation status. Remote model and CLI aliases may
 still change; a score change alone does not prove a framework regression.
 
@@ -566,7 +571,8 @@ See [LICENSE](LICENSE).
 Release comparisons retain unchanged tasks when reviewed grader or companion-file
 pins change within the same suite revision. Reports list those tasks in
 `changedEvals` and exclude them from regression/improvement counts. Changes to
-the shared runner lock, setup or model experiments still require a new baseline.
+task setup or model experiments still require a new baseline. Runner dependency
+versions are provenance rather than a compatibility gate.
 The retained 16.4.4 measurement records its original execution inputs from #175;
 this does not relabel its saved attempts as runs of a newer prompt or grader.
 
