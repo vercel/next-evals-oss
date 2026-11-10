@@ -263,8 +263,10 @@ export async function loadReleaseComparison(
           previous.suite !== target.suite ||
           previous.suiteRef !== target.suiteRef ||
           !Number.isFinite(Date.parse(previous.evaluatedAt))
-        )
+        ) {
+          rejected.push(`${version}/${run}: release metadata or suite revision differs`);
           continue;
+        }
         const before = previous.comparisonInputs;
         const after = target.comparisonInputs;
         let changedEvals: string[] = [];
@@ -307,6 +309,7 @@ export async function loadReleaseComparison(
           (error as NodeJS.ErrnoException).code !== 'ENOENT'
         )
           throw error;
+        rejected.push(`${version}/${run}: incomplete or invalid pass@1 evidence`);
       }
     }
   }

@@ -55,12 +55,22 @@ jobs:
           git add "$DESTINATION/report.json"
           node "$GITHUB_WORKSPACE/scripts/commit-results.mjs" "$BRANCH" \
             "Rebuild release comparison from retained trials" "$DESTINATION/report.json"
-      - name: Obtain the release project's short-lived identity
-        env:
-          VERCEL_CLI_CLIENT_ID: ${{ vars.VERCEL_CLI_CLIENT_ID }}
-          VERCEL_ORG_ID: ${{ vars.VERCEL_NEXT_UPGRADE_EVALS_TEAM_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_NEXT_UPGRADE_EVALS_PROJECT_ID }}
-        run: node scripts/ci-auth.mjs
+      - name: Obtain the GitHub identity accepted by the reporter
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs';
+          const url = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          url.searchParams.set('audience', 'https://github.com/vercel');
+          const response = await fetch(url, { redirect: 'error', headers: {
+            authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`,
+          } });
+          if (!response.ok) throw new Error(`GitHub OIDC failed: ${response.status}`);
+          const { value } = await response.json();
+          if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value))
+            throw new Error('Invalid GitHub identity');
+          console.log(`::add-mask::${value}`);
+          appendFileSync(process.env.GITHUB_ENV, `RELEASE_WORKFLOW_OIDC_TOKEN=${value}\n`);
+          JS
       - name: Publish the corrected Slack report
         env:
           RELEASE_AGENT_URL: ${{ vars.VERCEL_NEXT_EVALS_AGENT_URL }}
