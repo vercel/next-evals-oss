@@ -29,8 +29,13 @@ const exactVersionPattern = /^\d+\.\d+\.\d+(?:-canary\.\d+)?$/;
 const shaPattern = /^[0-9a-f]{40}$/i;
 
 export function validateReleaseTarget(input: ReleaseTarget): ReleaseTarget {
+  const fields = ['kind', 'version', 'ref', 'sha', 'sourceRunUrl', 'evaluatedAt'] as const;
   const target = Object.fromEntries(
-    Object.entries(input).map(([key, value]) => [key, value.trim()]),
+    fields.map((key) => {
+      const value = input?.[key];
+      if (typeof value !== 'string') throw new Error(`${key} must be a string`);
+      return [key, value.trim()];
+    }),
   ) as unknown as ReleaseTarget;
 
   if (!['release', 'backport', 'canary'].includes(target.kind)) {
