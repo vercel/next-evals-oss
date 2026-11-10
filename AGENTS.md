@@ -6,6 +6,10 @@ Read [README.md](README.md) first — it is the spec for this repo, not a summar
 "Adding a new model", "Reasoning effort", "Model retention policy", and "Scoring and
 cost methodology" are the rules the board is published under.
 
+Check the recorded framework, runner and agent CLI versions before interpreting
+a comparison. Retain version differences as provenance. Runner dependency upgrades
+alone do not invalidate matching task, grader, model and guidance configurations.
+
 ## Skills
 
 Skills live in [`.agents/skills/`](.agents/skills/), with `.claude/skills` symlinked to

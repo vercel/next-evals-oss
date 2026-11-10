@@ -18,6 +18,7 @@ interface Change {
 
 export interface ComparisonInputs {
   executionKey: string;
+  configurationKey?: string;
   graders: Record<string, string>;
 }
 
@@ -26,23 +27,25 @@ export async function comparisonInputs(
   experiments: readonly string[],
 ): Promise<ComparisonInputs> {
   const hash = createHash('sha256').update('release-execution-v1');
+  const configuration = createHash('sha256').update('release-configuration-v1');
   for (const path of [
     'pnpm-lock.yaml',
     'lib/setup.ts',
     'lib/release-runs.ts',
     ...[...experiments].sort().map((name) => `experiments/${name}.ts`),
   ]) {
-    hash
-      .update(path)
-      .update('\0')
-      .update(await readFile(join(root, path)))
-      .update('\0');
+    const content = await readFile(join(root, path));
+    hash.update(path).update('\0').update(content).update('\0');
+    // Runner dependency versions remain provenance, not a comparison gate.
+    if (path !== 'pnpm-lock.yaml')
+      configuration.update(path).update('\0').update(content).update('\0');
   }
   const overrides = JSON.parse(
     await readFile(join(root, 'eval-grader-overrides.json'), 'utf8'),
   );
   return {
     executionKey: hash.digest('hex'),
+    configurationKey: configuration.digest('hex'),
     graders: Object.fromEntries(
       Object.entries(overrides.graders).map(([name, value]) => [
         name,
@@ -210,16 +213,19 @@ export async function loadReleaseComparison(
   const excluded = new Set(excludedEvals);
   const target = current.metadata.evaluationTarget;
   const releaseLine = target?.version.match(/^(\d+\.\d+)\./)?.[1];
-  const unavailable = {
+  const rejected: string[] = [];
+  const unavailable = () => ({
     available: false as const,
-    note: `No reviewed compatible earlier ${releaseLine ? `Next.js ${releaseLine}.x` : 'release-line'} pass@1 measurement is merged. Other release lines are not used as baselines. This run can establish this line's baseline after review and merge.`,
-  };
+    note: rejected.length
+      ? `Earlier measurements exist but none matched: ${rejected.slice(0, 4).join('; ')}. No release regression or cost delta was calculated.`
+      : `No reviewed earlier ${releaseLine ? `Next.js ${releaseLine}.x` : 'release-line'} pass@1 measurement was found. Other release lines are not used as baselines.`,
+  });
   if (
     !target ||
     target.suite !== 'published' ||
     !/^[a-f0-9]{64}$/.test(target.comparisonKey ?? '')
   )
-    return unavailable;
+    return unavailable();
   const order = versionOrder(target.version);
   if (!order) throw new Error('Invalid current release version');
   const currentCells = cells(current, excluded);
@@ -256,19 +262,21 @@ export async function loadReleaseComparison(
           previous.version !== version ||
           previous.suite !== target.suite ||
           previous.suiteRef !== target.suiteRef ||
-          !Number.isFinite(Date.parse(previous.evaluatedAt)) ||
-          Date.parse(previous.evaluatedAt) >= Date.parse(target.evaluatedAt)
-        )
+          !Number.isFinite(Date.parse(previous.evaluatedAt))
+        ) {
+          rejected.push(`${version}/${run}: release metadata or suite revision differs`);
           continue;
+        }
         const before = previous.comparisonInputs;
         const after = target.comparisonInputs;
         let changedEvals: string[] = [];
         if (before && after) {
-          if (
-            !/^[a-f0-9]{64}$/.test(before.executionKey) ||
-            before.executionKey !== after.executionKey
-          )
+          const beforeKey = before.configurationKey ?? before.executionKey;
+          const afterKey = after.configurationKey ?? after.executionKey;
+          if (!/^[a-f0-9]{64}$/.test(beforeKey) || beforeKey !== afterKey) {
+            rejected.push(`${version}/${run}: model or setup configuration differs, or legacy configuration metadata is missing`);
             continue;
+          }
           changedEvals = [
             ...new Set([
               ...Object.keys(before.graders),
@@ -280,6 +288,7 @@ export async function loadReleaseComparison(
         } else if (
           !matchesComparisonKey(previous, target.comparisonKey, excluded)
         ) {
+          rejected.push(`${version}/${run}: legacy comparison metadata differs`);
           continue;
         }
         const comparisonExcluded = new Set([...excluded, ...changedEvals]);
@@ -288,8 +297,10 @@ export async function loadReleaseComparison(
         if (
           previousCells.size !== comparableCurrent.size ||
           [...comparableCurrent.keys()].some((key) => !previousCells.has(key))
-        )
+        ) {
+          rejected.push(`${version}/${run}: task or model conditions differ`);
           continue;
+        }
         candidates.push({ data, path, order: prior, changedEvals });
       } catch (error) {
         // Older/partial measurements cannot become a baseline.
@@ -298,6 +309,7 @@ export async function loadReleaseComparison(
           (error as NodeJS.ErrnoException).code !== 'ENOENT'
         )
           throw error;
+        rejected.push(`${version}/${run}: incomplete or invalid pass@1 evidence`);
       }
     }
   }
@@ -309,7 +321,7 @@ export async function loadReleaseComparison(
         Date.parse(a.data.metadata.evaluationTarget!.evaluatedAt),
   );
   const baseline = candidates[0];
-  if (!baseline) return unavailable;
+  if (!baseline) return unavailable();
   const regressions: Change[] = [],
     improvements: Change[] = [];
   const comparisonExcluded = new Set([...excluded, ...baseline.changedEvals]);
@@ -339,7 +351,7 @@ export async function loadReleaseComparison(
     improvements,
     changedEvals: baseline.changedEvals,
     costs: compareReleaseCosts(previousCells, cells(current, comparisonExcluded)),
-    note: 'Same release line, suite revision, declared model/harness, execution configuration, and pass@1 conditions. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
+    note: 'Same release line, suite revision, model/harness settings, setup and pass@1 conditions. Runner dependency upgrades are retained in provenance and do not block comparison. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
   };
 }
 

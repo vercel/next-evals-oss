@@ -205,11 +205,11 @@ export interface ExportedReleaseData {
       suite: string;
       suiteRef: string;
       comparisonKey: string;
-      comparisonInputs?: { executionKey: string; graders: Record<string, string> };
+      comparisonInputs?: { executionKey: string; configurationKey?: string; graders: Record<string, string> };
       publicationComparison?: {
         originalComparisonKey: string;
         comparisonKey: string;
-      comparisonInputs?: { executionKey: string; graders: Record<string, string> };
+      comparisonInputs?: { executionKey: string; configurationKey?: string; graders: Record<string, string> };
         excludedEvals: string[];
         note: string;
       };
@@ -734,7 +734,7 @@ async function main(): Promise<void> {
     );
     const measuredTarget = data.metadata.evaluationTarget;
     // Retained measurements can be reported again only with their exact execution inputs.
-    if (measuredTarget && !measuredTarget.comparisonInputs &&
+    if (measuredTarget && !measuredTarget.comparisonInputs?.configurationKey &&
         measuredTarget.comparisonKey === await comparisonKey(process.cwd(), TIER_ONE_RELEASE_MATRIX)) {
       measuredTarget.comparisonInputs = await comparisonInputs(process.cwd(), TIER_ONE_RELEASE_MATRIX);
     }
