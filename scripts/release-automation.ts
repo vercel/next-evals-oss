@@ -13,7 +13,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import { TIER_ONE_RELEASE_MATRIX } from '../lib/tier-one.js';
 import { nonPublicEvalNames } from '../lib/published-evals.js';
-import { comparisonInputs, comparisonKey, loadReleaseComparison } from './release-comparison.js';
+import { comparisonInputs, comparisonKey, loadReleaseComparison, type ComparisonInputs } from './release-comparison.js';
 import type { ReleaseComparison } from './release-comparison.js';
 
 export interface ReleaseTarget {
@@ -210,11 +210,11 @@ export interface ExportedReleaseData {
       suite: string;
       suiteRef: string;
       comparisonKey: string;
-      comparisonInputs?: { executionKey: string; configurationKey?: string; graders: Record<string, string> };
+      comparisonInputs?: ComparisonInputs;
       publicationComparison?: {
         originalComparisonKey: string;
         comparisonKey: string;
-      comparisonInputs?: { executionKey: string; configurationKey?: string; graders: Record<string, string> };
+        comparisonInputs?: ComparisonInputs;
         excludedEvals: string[];
         note: string;
       };

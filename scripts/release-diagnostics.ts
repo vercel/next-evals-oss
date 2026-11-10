@@ -97,6 +97,22 @@ async function currentEvalDirectories(options: {
   return evalDirs;
 }
 
+// Classifier summaries may omit Codex file_change events. Prefer the actual
+// failed assertions when explaining a score; never infer "no edits" from o11y.
+export async function evaluatorFailureReason(
+  evalDir: string,
+  fallback: string,
+): Promise<string> {
+  const path = join(evalDir, 'run-1', 'outputs', 'eval.txt');
+  if (!(await exists(path)) || (await stat(path)).size > 512 * 1024) return fallback;
+  const output = (await readFile(path, 'utf8')).replace(/\u001b\[[0-9;]*m/g, '');
+  const lines = output.split('\n').map((line) => line.trim());
+  const failures = lines.filter((line) => /^(?:×|FAIL\s+EVAL)/.test(line)).slice(0, 4);
+  if (!failures.length) return fallback;
+  const reasons = [...new Set(lines.filter((line) => line.startsWith('reason:')))];
+  return ['Evaluator output:', ...failures, ...reasons.slice(0, 4)].join('\n').slice(0, 6000);
+}
+
 export async function findScoredModelFailures(options: {
   root: string;
   experiment: string;
@@ -119,7 +135,10 @@ export async function findScoredModelFailures(options: {
         `${options.experiment}/${evalName}: a non-model failure remained in the scored results`,
       );
     }
-    failures.push({ evalName, reason: classification.failureReason });
+    failures.push({
+      evalName,
+      reason: await evaluatorFailureReason(evalDir, classification.failureReason),
+    });
   }
 
   return failures.sort((a, b) => a.evalName.localeCompare(b.evalName));
@@ -234,7 +253,7 @@ async function runValidConfirmation(options: {
         attempt: options.attempt,
         outcome: 'failed',
         infrastructureRetries,
-        failureReason: classification.failureReason,
+        failureReason: await evaluatorFailureReason(evalDir, classification.failureReason),
       };
     }
     infrastructureRetries++;

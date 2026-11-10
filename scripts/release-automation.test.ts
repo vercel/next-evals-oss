@@ -28,7 +28,7 @@ test('durable provenance records the published suite and execution configuration
   tempDirs.push(root);
   const suiteRef = 'b'.repeat(40);
   await writeFile(join(root, 'eval-suite-ref.txt'), suiteRef);
-  for (const path of ['eval-grader-overrides.json', 'eval-publication-overrides.json', 'lib/published-evals.ts', 'scripts/sync-evals.ts', 'scripts/grader-overrides.ts', 'pnpm-lock.yaml', 'lib/setup.ts', 'lib/release-runs.ts', 'experiments/gpt-6-sol-high.ts', 'experiments/gpt-6-sol-high--agents-md.ts']) {
+  for (const path of ['eval-grader-overrides.json', 'eval-publication-overrides.json', 'lib/published-evals.ts', 'scripts/sync-evals.ts', 'scripts/grader-overrides.ts', 'pnpm-lock.yaml', 'lib/setup.ts', 'lib/release-runs.ts', 'experiments/gpt-6-sol-high.ts', 'experiments/gpt-6-sol-high--agents-md.ts', 'node_modules/@vercel/agent-eval/dist/lib/agents/eval-helper.mjs']) {
     await mkdir(dirname(join(root, path)), { recursive: true });
     await writeFile(join(root, path), await readFile(new URL(`../${path}`, import.meta.url)));
   }
