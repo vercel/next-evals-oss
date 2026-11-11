@@ -1,0 +1,116 @@
+{
+  "status": "passed",
+  "duration": 251.003,
+  "provenance": {
+    "agentEvalVersion": "3.0.0",
+    "sandboxBackend": "vercel",
+    "agentCliVersion": "codex-cli 0.167.0"
+  },
+  "usage": {
+    "inputTokens": 51,
+    "outputTokens": 7864,
+    "cacheReadTokens": 262140,
+    "cacheWriteTokens": 23337,
+    "reasoningTokens": 4400,
+    "totalTokens": 293392
+  },
+  "model": "openai/gpt-6-sol?reasoningEffort=high",
+  "transcriptPath": "./transcript.json",
+  "transcriptRawPath": "./transcript-raw.jsonl",
+  "o11y": {
+    "totalTurns": 5,
+    "toolCalls": {
+      "file_read": 0,
+      "file_write": 0,
+      "file_edit": 0,
+      "shell": 12,
+      "web_fetch": 0,
+      "web_search": 0,
+      "glob": 0,
+      "grep": 0,
+      "list_dir": 0,
+      "agent_task": 0,
+      "unknown": 0
+    },
+    "totalToolCalls": 12,
+    "webFetches": [],
+    "filesRead": [],
+    "filesModified": [],
+    "shellCommands": [
+      {
+        "command": "/bin/bash -lc \"pwd && rg --files -g 'AGENTS.md' -g 'package.json' -g 'next.config.*' -g 'app/**' -g 'src/**' -g 'pages/**' | head -200\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"ls -la && rg --files | head -200 && cat package.json && cat next.config.ts && cat app/layout.tsx && cat app/page.tsx && cat 'app/products/[slug]/page.tsx'\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"cat lib/products.ts && cat tsconfig.json && rg -n \\\"cacheComponents|use cache|cacheLife|cacheTag|Suspense|connection|dynamic|revalidate|fetch\\\" . --glob '\"'!node_modules/**'\"' --glob '\"'!package-lock.json'\"' && git status --short && find __agent_eval__ -maxdepth 2 -type f -print\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run start -- -p 3123'"
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nconst base = 'http://localhost:3123'\nfor (const [path, expectedName, expectedPrice] of [\n  ['/products/lamp?currency=EUR', 'Brass lamp', 'EUR 110.40'],\n  ['/products/lamp?currency=USD', 'Brass lamp', 'USD 120.00'],\n  ['/products/vase?currency=EUR', 'Stone vase', 'EUR 73.60'],\n  ['/products/lamp?currency=EUR', 'Brass lamp', 'EUR 110.40'],\n]) {\n  const start = Date.now()\n  const response = await fetch(base + path)\n  const reader = response.body.getReader()\n  const decoder = new TextDecoder()\n  let html = ''\n  const seen = new Map()\n  for (;;) {\n    const { value, done } = await reader.read()\n    if (done) break\n    html += decoder.decode(value, { stream: true })\n    for (const marker of ['Loading product', expectedName, expectedPrice, 'Finding more items', 'Related products']) {\n      if (\"'!seen.has(marker) && html.includes(marker)) seen.set(marker, Date.now() - start)\n    }\n  }\n  if (response.status !== 200 || !html.includes(expectedName) || !html.includes(expectedPrice)) {\n    throw new Error(`${path}: status ${response.status}, missing expected product or price`)\n  }\n  console.log(path, `status=${response.status}`, `markers=${JSON.stringify(Object.fromEntries(seen))}`)\n}\nconst missing = await fetch(base + '\"'/products/missing?currency=EUR')\nconsole.log('/products/missing?currency=EUR', \"'`status=${missing.status}`)\nif (missing.status !== 404) throw new Error('\"'Unknown product did not return 404')\nNODE\"",
+        "success": false,
+        "exitCode": 1
+      },
+      {
+        "command": "/bin/bash -lc \"node --input-type=module <<'NODE'\nconst response = await fetch('http://localhost:3123/products/vase?currency=USD')\nconst reader = response.body.getReader()\nconst decoder = new TextDecoder()\nconst start = Date.now()\nlet html = ''\nconst markers = ['Signal Shop collection', 'Loading product', 'Stone vase', 'USD 80.00', 'Finding more items', 'Brass lamp']\nconst seen = new Map()\nfor (;;) {\n  const { value, done } = await reader.read()\n  if (done) break\n  html += decoder.decode(value, { stream: true })\n  for (const marker of markers) {\n    if (\"'!seen.has(marker) && html.includes(marker)) seen.set(marker, Date.now() - start)\n  }\n}\nconsole.log(`status=${response.status}`, Object.fromEntries(seen))\nif (markers.some((marker) => !seen.has(marker))) throw new Error('\"'Missing streamed content')\nif (\"'!(seen.get('\"'Loading product') <= seen.get('Stone vase') && seen.get('Stone vase') < seen.get('Brass lamp'))) {\n  throw new Error('Product and related content did not arrive in order')\n}\nif (\"'!html.includes('\"'/products/lamp?currency=USD')) throw new Error('Related product link did not preserve currency')\nconst missing = await fetch('http://localhost:3123/products/missing?currency=EUR')\nconst missingHtml = await missing.text()\nconsole.log(\"'`missing status=${missing.status}`, `notFoundUI=${missingHtml.includes('\"'This page could not be found')}\"'`)\nNODE'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git diff -- app/products/'[slug]'/page.tsx lib/products.ts next.config.ts tsconfig.json && git status --short && rg -n 'dynamic\\\\s*=|dynamicParams\\\\s*=|revalidate\\\\s*=|fetchCache\\\\s*=' app lib next.config.ts || true\"",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'cat .gitignore && git diff -- package.json next-env.d.ts && git ls-files package-lock.json .next && git status --porcelain=v1 --untracked-files=normal | head -80 && ls -la .next | head'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc 'npm run build'",
+        "success": true,
+        "exitCode": 0
+      },
+      {
+        "command": "/bin/bash -lc \"git status --short && git diff --stat && git diff -- tsconfig.json next-env.d.ts .gitignore && rg -n 'dynamic\\\\s*=|dynamicParams\\\\s*=|revalidate\\\\s*=|fetchCache\\\\s*=' app lib next.config.ts || true\"",
+        "success": true,
+        "exitCode": 0
+      }
+    ],
+    "errors": [],
+    "thinkingBlocks": 0,
+    "usage": {
+      "inputTokens": 51,
+      "outputTokens": 7864,
+      "cacheReadTokens": 262140,
+      "cacheWriteTokens": 23337,
+      "reasoningTokens": 4400,
+      "totalTokens": 293392
+    }
+  },
+  "outputPaths": {
+    "eval": "./outputs/eval.txt",
+    "scripts": {
+      "build": "./outputs/scripts/build.txt"
+    }
+  }
+}

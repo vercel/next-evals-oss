@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "metric": "pass@1",
+  "confirmationAttemptsPerFailure": 2,
+  "experiments": [
+    {
+      "schemaVersion": 1,
+      "experiment": "gpt-6-sol-high",
+      "metric": "pass@1",
+      "confirmationAttempts": 2,
+      "tasks": [
+        {
+          "evalName": "agent-029-use-cache-directive",
+          "scoredFailureReason": "The model implemented cache invalidation using unstable_cache() and revalidateTag(), but the eval specifically required using the \"use cache\" directive. The test expects /[\"']use cache[\"'];?/ to appear in the source code, which the model failed to implement.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            },
+            {
+              "attempt": 2,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            }
+          ]
+        },
+        {
+          "evalName": "agent-041-optimize-ppr-shell",
+          "scoredFailureReason": "The model generated code that creates a partial prerender shell, but all three dashboard sections (CardStats, RevenueChart, LatestInvoices) are wrapped in a single Suspense boundary, so they suspend together rather than independently. The test requires each section to have its own Suspense boundary for independent streaming.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model produced code that uses Suspense but wrapped all data sections under a single Suspense boundary instead of giving each section independent suspension boundaries. The eval explicitly requires sections to suspend independently, which the current implementation does not achieve."
+            },
+            {
+              "attempt": 2,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "experiment": "gpt-6-sol-high--agents-md",
+      "metric": "pass@1",
+      "confirmationAttempts": 2,
+      "tasks": [
+        {
+          "evalName": "agent-040-instant",
+          "scoredFailureReason": "Model gathered information about the Next.js streaming/Suspense patterns for 329 seconds but never wrote any code. The eval tests failed because app/product/page.tsx still awaits getInventory() before returning, blocking the static shell. No files were modified (filesModified: [], file_write: 0, file_edit: 0).",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            },
+            {
+              "attempt": 2,
+              "outcome": "passed",
+              "infrastructureRetries": 0
+            }
+          ]
+        },
+        {
+          "evalName": "agent-041-optimize-ppr-shell",
+          "scoredFailureReason": "The model implemented Suspense boundaries incorrectly. It wrapped all data-driven sections (CardStats, RevenueChart, LatestInvoices) into a single DashboardContent component that awaits all data at once, rather than creating independent Suspense boundaries for each section. This results in all-or-nothing loading instead of independent streaming.",
+          "confirmations": [
+            {
+              "attempt": 1,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model analyzed the requirements and Next.js documentation, correctly identifying that it needed to move the data fetch into a Suspense-wrapped child component. However, it never actually implemented these code changes. It only executed shell commands to read files and run builds, but produced zero file modifications. The test confirms the Page component still blocks on data instead of rendering synchronously with independent Suspense boundaries for each section."
+            },
+            {
+              "attempt": 2,
+              "outcome": "failed",
+              "infrastructureRetries": 0,
+              "failureReason": "The model wrote incorrect code for optimizing PPR shell. It wrapped all data-driven sections in a single Suspense boundary around DashboardContent, causing them to suspend together as an all-or-nothing state, instead of creating separate Suspense boundaries so each section can suspend independently."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
