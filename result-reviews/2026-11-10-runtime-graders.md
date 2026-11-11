@@ -61,3 +61,15 @@ setup. Each rerun produces new evidence; it does not overwrite these records.
 
 The unpublished Playwright docs research task in #101523 is excluded from this
 record and from the public results pipeline.
+
+## Dependency security update
+
+The replayable apps and runner pin Tinypool to 2.1.2 to address
+[the worker-options advisory](https://github.com/advisories/GHSA-5gmw-xhrv-c9v3)
+and [the run-options advisory](https://github.com/advisories/GHSA-85c8-ppgw-ccpr).
+The runner applies the override before installing a temporary fixture copy.
+
+This patch was applied after the recorded trials. It does not change their
+verdicts, transcripts, costs or durations. The
+[dependency record](2026-11-10-runtime-graders/dependency-security-update.json)
+links the original commit and records hashes before and after the patch.

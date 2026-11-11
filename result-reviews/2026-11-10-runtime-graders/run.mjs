@@ -1,7 +1,9 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { parse } from "dotenv";
 import {
+  copyFixtureFiles,
   loadFixture,
   resolveConfig,
   runExperiment,
@@ -32,10 +34,20 @@ async function checked(sandbox, cmd, args, root = false) {
 }
 for (const task of tasks)
   for (const condition of ["base", "agents-md"]) {
-    const fixture = loadFixture(
-      resolve(process.env.NEXT_CHECKOUT, "evals/evals"),
-      task,
+    // Patch a temporary copy before the runner installs dependencies.
+    const fixtureRoot = mkdtempSync(
+      resolve(tmpdir(), "runtime-grader-fixture-"),
     );
+    const fixturePath = resolve(fixtureRoot, task);
+    copyFixtureFiles(
+      resolve(process.env.NEXT_CHECKOUT, "evals/evals", task),
+      fixturePath,
+    );
+    const packagePath = resolve(fixturePath, "package.json");
+    const pkg = JSON.parse(readFileSync(packagePath, "utf8"));
+    pkg.overrides = { ...pkg.overrides, tinypool: "2.1.2" };
+    writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + "\n");
+    const fixture = loadFixture(fixtureRoot, task);
     const config = resolveConfig({
       agent: "vercel-ai-gateway/codex",
       model: "openai/gpt-6-sol?reasoningEffort=high",
@@ -82,17 +94,21 @@ for (const task of tasks)
       },
     });
     console.log("START", task, condition, new Date().toISOString());
-    await runExperiment({
-      config,
-      fixtures: [fixture],
-      apiKey,
-      resultsDir: resolve("results"),
-      experimentName: `sol-high-${condition}-${task}`,
-      fingerprints: { [task]: computeFingerprint(fixture.path, config) },
-      onProgress: (event) => {
-        if (["attempt:complete", "experiment:complete"].includes(event.type))
-          console.log(JSON.stringify(event));
-      },
-    });
+    try {
+      await runExperiment({
+        config,
+        fixtures: [fixture],
+        apiKey,
+        resultsDir: resolve("results"),
+        experimentName: `sol-high-${condition}-${task}`,
+        fingerprints: { [task]: computeFingerprint(fixture.path, config) },
+        onProgress: (event) => {
+          if (["attempt:complete", "experiment:complete"].includes(event.type))
+            console.log(JSON.stringify(event));
+        },
+      });
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
     console.log("DONE", task, condition, new Date().toISOString());
   }
