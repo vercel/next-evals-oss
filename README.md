@@ -500,8 +500,9 @@ attempt and its summary. A `grading-review.json` beside the summary records the
 original outcome, evidence, and corrected checks. Original transcripts, grader
 logs, fingerprints, costs, and durations stay intact. A grader replay records
 its own output and judge usage separately from the original coding attempt.
-See the [prefetch review](result-reviews/2026-10-30-prefetch-graders.md) and
-[React/prefetch replays](result-reviews/2026-11-03-react-prefetch.md).
+See the [prefetch review](result-reviews/2026-10-30-prefetch-graders.md),
+[React/prefetch replays](result-reviews/2026-11-03-react-prefetch.md), and
+[runtime grader verification](result-reviews/2026-11-10-runtime-graders.md).
 
 For that grader-only update, `grader-result-retention.json` lets CI retain
 existing measurements without marking them fresh. Retention requires the exact

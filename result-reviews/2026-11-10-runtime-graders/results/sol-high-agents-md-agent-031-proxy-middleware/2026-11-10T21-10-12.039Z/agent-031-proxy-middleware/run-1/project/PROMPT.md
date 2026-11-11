@@ -1,0 +1,1 @@
+Add request handling that gives every response a unique "X-Request-Id" header and logs the request pathname to the server console. Use the current Next.js convention rather than its deprecated compatibility API.
