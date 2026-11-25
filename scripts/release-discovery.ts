@@ -20,11 +20,53 @@ interface MonitorConfig {
 }
 
 interface WorkflowRun {
+  id?: number;
   conclusion: string | null;
   event: string;
   head_branch: string;
   head_sha: string;
   html_url: string;
+}
+
+interface WorkflowJob {
+  name: string;
+  status: string;
+  conclusion: string | null;
+}
+
+export function classifyPublishedCanaryRun(options: {
+  version: string;
+  sha: string;
+  run: WorkflowRun;
+  jobs: WorkflowJob[];
+  totalCount: number;
+}): Pick<ReleaseTarget, 'kind' | 'sourceRunUrl'> | undefined {
+  const { run, jobs } = options;
+  if (
+    !canaryVersionPattern.test(options.version) ||
+    run.event !== 'push' ||
+    run.head_branch !== `v${options.version}` ||
+    run.head_sha !== options.sha ||
+    run.conclusion !== 'failure' ||
+    jobs.length !== options.totalCount ||
+    !jobs.some((job) => job.name === 'build' && job.conclusion === 'success') ||
+    !jobs.some(
+      (job) =>
+        job.name === 'Potentially publish release' &&
+        job.conclusion === 'failure',
+    ) ||
+    !jobs.every(
+      (job) =>
+        job.status === 'completed' &&
+        (job.conclusion === 'success' ||
+          job.conclusion === 'skipped' ||
+          (job.name === 'Potentially publish release' &&
+            job.conclusion === 'failure')),
+    )
+  ) {
+    return undefined;
+  }
+  return { kind: 'canary', sourceRunUrl: run.html_url };
 }
 
 interface GitReference {
@@ -130,18 +172,22 @@ export function classifyReleaseRuns(options: {
 
   const exactSourceBranches = [
     ...new Set(
-      successfulRuns.map((run) => run.head_branch).filter(
-        (branch) => branch === 'canary' || /^next-\d+-\d+$/.test(branch),
-      ),
+      successfulRuns
+        .map((run) => run.head_branch)
+        .filter(
+          (branch) => branch === 'canary' || /^next-\d+-\d+$/.test(branch),
+        ),
     ),
   ];
   const exactLtsBranches = [
     ...new Set(
-      successfulRuns.map((run) => run.head_branch).filter(
-        (branch) =>
-          branch === 'releases/lts/active' ||
-          branch === 'releases/lts/maintenance',
-      ),
+      successfulRuns
+        .map((run) => run.head_branch)
+        .filter(
+          (branch) =>
+            branch === 'releases/lts/active' ||
+            branch === 'releases/lts/maintenance',
+        ),
     ),
   ];
   const inferredBranches = options.sourceBranches ?? [];
@@ -151,8 +197,7 @@ export function classifyReleaseRuns(options: {
       : [
           ...new Set(
             inferredBranches.filter(
-              (branch) =>
-                branch === 'canary' || /^next-\d+-\d+$/.test(branch),
+              (branch) => branch === 'canary' || /^next-\d+-\d+$/.test(branch),
             ),
           ),
         ];
@@ -177,10 +222,9 @@ export function classifyReleaseRuns(options: {
         : undefined;
   if (!sourceBranch) {
     throw new Error(
-      `Could not identify one source branch for ${options.sha}; found: ${[
-        ...sourceBranches,
-        ...ltsBranches,
-      ].join(', ') || 'none'}`,
+      `Could not identify one source branch for ${options.sha}; found: ${
+        [...sourceBranches, ...ltsBranches].join(', ') || 'none'
+      }`,
     );
   }
 
@@ -294,7 +338,8 @@ export async function sourceBranchesForRelease(
         const comparison = await github.get<CommitComparison>(
           `/repos/${nextRepository}/compare/${parent}...${encodeURIComponent(branch)}`,
         );
-        return comparison.status === 'ahead' || comparison.status === 'identical'
+        return comparison.status === 'ahead' ||
+          comparison.status === 'identical'
           ? branch
           : undefined;
       } catch (error) {
@@ -308,7 +353,7 @@ export async function sourceBranchesForRelease(
   return matches.filter((branch): branch is string => branch !== undefined);
 }
 
-async function resolveTarget(
+export async function resolveTarget(
   github: GithubClient,
   version: string,
 ): Promise<Omit<ReleaseTarget, 'evaluatedAt'> | undefined> {
@@ -327,12 +372,46 @@ async function resolveTarget(
   const sourceBranches = stableVersionPattern.test(version)
     ? await sourceBranchesForRelease(github, version, sha)
     : [];
-  const provenance = classifyReleaseRuns({
+  let provenance = classifyReleaseRuns({
     version,
     sha,
     runs,
     sourceBranches,
   });
+  // npm publication is checked before resolving the target. A workspace
+  // publish can fail after next itself was published (for example when a
+  // sibling package already exists). Require the exact tag's completed builds
+  // and reject every failure outside the publication job.
+  if (!provenance && canaryVersionPattern.test(version)) {
+    for (const run of runs) {
+      if (
+        !run.id ||
+        run.event !== 'push' ||
+        run.head_branch !== ref ||
+        run.head_sha !== sha ||
+        run.conclusion !== 'failure'
+      ) {
+        continue;
+      }
+      const result = await github.get<{
+        total_count: number;
+        jobs: WorkflowJob[];
+      }>(`/repos/${nextRepository}/actions/runs/${run.id}/jobs?per_page=100`);
+      provenance = classifyPublishedCanaryRun({
+        version,
+        sha,
+        run,
+        jobs: result.jobs,
+        totalCount: result.total_count,
+      });
+      if (provenance) {
+        console.log(
+          `Next.js v${version} is published; its tag builds succeeded but workspace publication failed: ${run.html_url}`,
+        );
+        break;
+      }
+    }
+  }
   if (!provenance) return undefined;
   return { version, ref, sha, ...provenance };
 }
@@ -409,11 +488,13 @@ async function main(): Promise<void> {
   if (!target) {
     if (mode === 'manual') {
       throw new Error(
-        `next@${version} is published, but its successful build-and-deploy tag run is not available`,
+        `next@${version} is published, but a completed build-and-deploy tag run with successful builds is not available`,
       );
     }
     await writeOutput('should-run', 'false');
-    console.log(`Next.js v${version} is published but not ready for measurement.`);
+    console.log(
+      `Next.js v${version} is published but not ready for measurement.`,
+    );
     return;
   }
 

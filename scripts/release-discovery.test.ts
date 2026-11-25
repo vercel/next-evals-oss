@@ -3,13 +3,139 @@ import test from 'node:test';
 
 import {
   classifyReleaseRuns,
+  classifyPublishedCanaryRun,
   isMonitoredRelease,
   isVerifiedMeasurementPull,
   selectScheduledVersions,
   sourceBranchesForRelease,
+  resolveTarget,
 } from './release-discovery.js';
 
 const sha = 'a'.repeat(40);
+
+const publishedCanary = {
+  version: '16.5.0-canary.65',
+  sha,
+  run: {
+    id: 123,
+    conclusion: 'failure',
+    event: 'push',
+    head_branch: 'v16.5.0-canary.65',
+    head_sha: sha,
+    html_url: 'https://github.com/vercel/next.js/actions/runs/123',
+  },
+  totalCount: 4,
+  jobs: [
+    { name: 'build', status: 'completed', conclusion: 'success' },
+    { name: 'build-wasm (nodejs)', status: 'completed', conclusion: 'success' },
+    {
+      name: 'Potentially publish release',
+      status: 'completed',
+      conclusion: 'failure',
+    },
+    {
+      name: 'Un-draft GitHub release',
+      status: 'completed',
+      conclusion: 'skipped',
+    },
+  ],
+};
+
+test('published canaries retain their exact tag run when only publication failed', async () => {
+  const expected = {
+    kind: 'canary',
+    sourceRunUrl: publishedCanary.run.html_url,
+  };
+  assert.deepEqual(classifyPublishedCanaryRun(publishedCanary), expected);
+  const requests: string[] = [];
+  const target = await resolveTarget(
+    {
+      async get<T>(path: string): Promise<T> {
+        requests.push(path);
+        if (path.includes('/git/ref/tags/'))
+          return { object: { sha, type: 'commit' } } as T;
+        if (path.includes('/workflows/build_and_deploy.yml/runs?'))
+          return { workflow_runs: [publishedCanary.run] } as T;
+        assert.equal(
+          path,
+          '/repos/vercel/next.js/actions/runs/123/jobs?per_page=100',
+        );
+        return {
+          total_count: publishedCanary.totalCount,
+          jobs: publishedCanary.jobs,
+        } as T;
+      },
+    },
+    publishedCanary.version,
+  );
+  assert.deepEqual(target, {
+    ...expected,
+    version: publishedCanary.version,
+    ref: `v${publishedCanary.version}`,
+    sha,
+  });
+  assert.equal(requests.length, 3);
+});
+
+test('a published canary still requires complete successful build jobs', () => {
+  for (const jobs of [
+    publishedCanary.jobs.filter((job) => job.name !== 'build'),
+    publishedCanary.jobs.map((job) =>
+      job.name === 'build' ? { ...job, conclusion: 'failure' } : job,
+    ),
+    publishedCanary.jobs.map((job) =>
+      job.name === 'build-wasm (nodejs)'
+        ? { ...job, conclusion: 'failure' }
+        : job,
+    ),
+    publishedCanary.jobs.map((job) =>
+      job.name === 'build-wasm (nodejs)'
+        ? { ...job, status: 'in_progress', conclusion: null }
+        : job,
+    ),
+    publishedCanary.jobs.map((job) =>
+      job.name === 'Potentially publish release'
+        ? { ...job, conclusion: 'cancelled' }
+        : job,
+    ),
+  ]) {
+    assert.equal(
+      classifyPublishedCanaryRun({
+        ...publishedCanary,
+        jobs,
+        totalCount: jobs.length,
+      }),
+      undefined,
+    );
+  }
+  assert.equal(
+    classifyPublishedCanaryRun({ ...publishedCanary, totalCount: 101 }),
+    undefined,
+  );
+});
+
+test('the publication fallback never accepts another version, commit, event, or stable release', () => {
+  for (const run of [
+    { ...publishedCanary.run, head_sha: 'b'.repeat(40) },
+    { ...publishedCanary.run, head_branch: 'canary' },
+    { ...publishedCanary.run, head_branch: 'v16.5.0-canary.64' },
+    { ...publishedCanary.run, event: 'workflow_dispatch' },
+    { ...publishedCanary.run, conclusion: 'cancelled' },
+  ]) {
+    assert.equal(
+      classifyPublishedCanaryRun({ ...publishedCanary, run }),
+      undefined,
+    );
+  }
+  assert.equal(
+    classifyPublishedCanaryRun({
+      ...publishedCanary,
+      version: '16.4.6',
+      run: { ...publishedCanary.run, head_branch: 'v16.4.6' },
+    }),
+    undefined,
+  );
+});
 
 function sourceDiscoveryClient(options: {
   parentCount?: number;
