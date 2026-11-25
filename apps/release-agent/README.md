@@ -9,7 +9,9 @@ The summary asks maintainers to review and merge the PR to retain the run.
 Three thread replies contain findings to investigate, full task results, and
 model results. Without a comparable previous run, the report says regressions
 could not be determined. The workflow supplies changes against the latest
-compatible earlier measurement merged into `main`. Open and closed unmerged
+compatible earlier stable measurement merged into `main`, falling back to an
+earlier canary when necessary. Comparisons can cross minor releases and
+stable/canary tracks; report replay can select an exact baseline. Open and closed unmerged
 PRs are not baselines. Routine infrastructure retries stay out of the summary.
 
 The root also reports estimated coding cost increases or savings against that

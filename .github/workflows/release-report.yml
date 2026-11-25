@@ -6,6 +6,10 @@ on:
         description: Existing open measurement PR to report again (no coding trials)
         required: true
         type: string
+      baselineVersion:
+        description: Optional exact earlier stable/canary baseline; defaults to the latest compatible stable release
+        required: false
+        type: string
 concurrency:
   group: release-report-${{ inputs.measurementPr }}
   cancel-in-progress: false
@@ -37,6 +41,7 @@ jobs:
       - name: Recalculate against current merged history
         env:
           RELEASE_BASELINE_ROOT: ${{ github.workspace }}/measurements/releases
+          RELEASE_BASELINE_VERSION: ${{ inputs.baselineVersion }}
         run: pnpm tsx scripts/release-automation.ts agent-notification
       - name: Verify the regenerated evidence
         run: node scripts/assert-no-secrets.mjs "$AGENT_PAYLOAD_PATH"

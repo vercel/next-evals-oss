@@ -23,9 +23,10 @@ The renderer removes the separators and posts the replies under the root.
 ## Root message
 
 State the supplied release kind (release, backport or canary) and major.minor
-line explicitly. A backport run compares with an earlier compatible measurement
-on that same line. If unavailable, explain `comparison.note`, naming the line;
-do not imply that measurements on other lines do not exist.
+line explicitly. Use the supplied compatible baseline, including comparisons
+across minor releases or from a stable release to a canary. Name both versions;
+do not impose a same-minor or same-track restriction. If unavailable, explain
+`comparison.note` without implying that no earlier measurements exist.
 
 - Title: `Next.js <version> · regression run complete`.
 - Start with the release kind, models measured, and a link to `measurementUrl`
