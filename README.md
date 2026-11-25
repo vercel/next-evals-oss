@@ -315,6 +315,13 @@ build-and-deploy run, and source branch before any model job starts. Existing
 verified automation-authored measurement pull requests are skipped unless a
 maintainer explicitly requests a forced manual rerun.
 
+For an already-published canary, discovery also accepts a completed tag workflow
+whose build succeeded and whose only failed job is workspace publication. A
+sibling package can fail publication after `next` itself is available. The tag
+and commit must still match exactly, every job must have finished, and missing
+or failed builds are rejected. Stable-release discovery still requires a fully
+successful tag workflow. The measurement retains the original tag-run link.
+
 Scheduled and manual release runs use GPT-6 Sol (high), with and without
 AGENTS.md, on the same published suite and grader overrides as model-registration
 runs: currently 28 published tasks and 56 scored attempts per release. The model
