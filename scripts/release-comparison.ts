@@ -44,8 +44,12 @@ export async function comparisonInputs(
   const overrides = JSON.parse(
     await readFile(join(root, 'eval-grader-overrides.json'), 'utf8'),
   );
-  const judgeHelper = await readFile(join(root,
-    'node_modules/@vercel/agent-eval/dist/lib/agents/eval-helper.mjs'));
+  const judgeHelper = await readFile(
+    join(
+      root,
+      'node_modules/@vercel/agent-eval/dist/lib/agents/eval-helper.mjs',
+    ),
+  );
   return {
     executionKey: hash.digest('hex'),
     configurationKey: configuration.digest('hex'),
@@ -208,6 +212,14 @@ function versionOrder(version: string): number[] | undefined {
     : undefined;
 }
 
+function compareVersions(left: number[], right: number[]): number {
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index])
+      return left[index] < right[index] ? -1 : 1;
+  }
+  return 0;
+}
+
 // Read only the merged main checkout. Unreviewed, closed, and open PR branches
 // are never fetched or used as a baseline.
 export async function loadReleaseComparison(
@@ -215,16 +227,20 @@ export async function loadReleaseComparison(
   current: ExportedReleaseData,
   report: ReleaseReport,
   excludedEvals: readonly string[] = [],
+  baselineVersion?: string,
 ): Promise<ReleaseComparison> {
   const excluded = new Set(excludedEvals);
   const target = current.metadata.evaluationTarget;
-  const releaseLine = target?.version.match(/^(\d+\.\d+)\./)?.[1];
+  if (baselineVersion && !versionOrder(baselineVersion))
+    throw new Error('Baseline must be an exact stable or canary version');
   const rejected: string[] = [];
   const unavailable = () => ({
     available: false as const,
     note: rejected.length
       ? `Earlier measurements exist but none matched: ${rejected.slice(0, 4).join('; ')}. No release regression or cost delta was calculated.`
-      : `No reviewed earlier ${releaseLine ? `Next.js ${releaseLine}.x` : 'release-line'} pass@1 measurement was found. Other release lines are not used as baselines.`,
+      : baselineVersion
+        ? `No compatible reviewed pass@1 measurement for requested baseline ${baselineVersion} was found.`
+        : `No compatible reviewed earlier Next.js ${target?.version.split('.')[0] ?? ''}.x pass@1 measurement was found. Stable releases and canaries on earlier minor lines are eligible.`,
   });
   if (
     !target ||
@@ -250,9 +266,8 @@ export async function loadReleaseComparison(
     if (
       !prior ||
       prior[0] !== order[0] ||
-      prior[1] !== order[1] ||
-      version.includes('-canary.') !== target.version.includes('-canary.') ||
-      !(prior[2] < order[2] || (prior[2] === order[2] && prior[3] < order[3]))
+      (baselineVersion && version !== baselineVersion) ||
+      compareVersions(prior, order) >= 0
     )
       continue;
     for (const run of await readdir(join(root, version))) {
@@ -270,25 +285,45 @@ export async function loadReleaseComparison(
           previous.suiteRef !== target.suiteRef ||
           !Number.isFinite(Date.parse(previous.evaluatedAt))
         ) {
-          rejected.push(`${version}/${run}: release metadata or suite revision differs`);
+          rejected.push(
+            `${version}/${run}: release metadata or suite revision differs`,
+          );
           continue;
         }
         const before = previous.comparisonInputs;
         const after = target.comparisonInputs;
         let changedEvals: string[] = [];
         if (before && after) {
-          const beforeKey = before.configurationKey ?? before.executionKey;
+          // Older retained runs predate the separate configuration/judge hashes.
+          // As in report replay, only an exact full comparison key AND locked
+          // execution fingerprint can establish the same original inputs.
+          const exactLegacyBaseline =
+            !before.configurationKey &&
+            !before.gradingRuntimeKey &&
+            previous.comparisonKey === target.comparisonKey &&
+            /^[a-f0-9]{64}$/.test(before.executionKey) &&
+            before.executionKey === after.executionKey;
+          const beforeKey =
+            before.configurationKey ??
+            (exactLegacyBaseline ? after.configurationKey : undefined) ??
+            before.executionKey;
           const afterKey = after.configurationKey ?? after.executionKey;
           if (!/^[a-f0-9]{64}$/.test(beforeKey) || beforeKey !== afterKey) {
-            rejected.push(`${version}/${run}: model or setup configuration differs, or legacy configuration metadata is missing`);
+            rejected.push(
+              `${version}/${run}: model or setup configuration differs, or legacy configuration metadata is missing`,
+            );
             continue;
           }
-          const sameGradingRuntime = before.gradingRuntimeKey || after.gradingRuntimeKey
-            ? /^[a-f0-9]{64}$/.test(before.gradingRuntimeKey ?? '') &&
-              before.gradingRuntimeKey === after.gradingRuntimeKey
-            : before.executionKey === after.executionKey;
+          const sameGradingRuntime =
+            exactLegacyBaseline ||
+            (before.gradingRuntimeKey || after.gradingRuntimeKey
+              ? /^[a-f0-9]{64}$/.test(before.gradingRuntimeKey ?? '') &&
+                before.gradingRuntimeKey === after.gradingRuntimeKey
+              : before.executionKey === after.executionKey);
           if (!sameGradingRuntime) {
-            rejected.push(`${version}/${run}: judge runtime changed or its historical fingerprint is missing`);
+            rejected.push(
+              `${version}/${run}: judge runtime changed or its historical fingerprint is missing`,
+            );
             continue;
           }
           changedEvals = [
@@ -302,7 +337,9 @@ export async function loadReleaseComparison(
         } else if (
           !matchesComparisonKey(previous, target.comparisonKey, excluded)
         ) {
-          rejected.push(`${version}/${run}: legacy comparison metadata differs`);
+          rejected.push(
+            `${version}/${run}: legacy comparison metadata differs`,
+          );
           continue;
         }
         const comparisonExcluded = new Set([...excluded, ...changedEvals]);
@@ -323,14 +360,19 @@ export async function loadReleaseComparison(
           (error as NodeJS.ErrnoException).code !== 'ENOENT'
         )
           throw error;
-        rejected.push(`${version}/${run}: incomplete or invalid pass@1 evidence`);
+        rejected.push(
+          `${version}/${run}: incomplete or invalid pass@1 evidence`,
+        );
       }
     }
   }
   candidates.sort(
     (a, b) =>
-      b.order[2] - a.order[2] ||
-      b.order[3] - a.order[3] ||
+      Number(a.data.metadata.evaluationTarget!.version.includes('-canary.')) -
+        Number(
+          b.data.metadata.evaluationTarget!.version.includes('-canary.'),
+        ) ||
+      compareVersions(b.order, a.order) ||
       Date.parse(b.data.metadata.evaluationTarget!.evaluatedAt) -
         Date.parse(a.data.metadata.evaluationTarget!.evaluatedAt),
   );
@@ -364,8 +406,11 @@ export async function loadReleaseComparison(
     regressions,
     improvements,
     changedEvals: baseline.changedEvals,
-    costs: compareReleaseCosts(previousCells, cells(current, comparisonExcluded)),
-    note: 'Same release line, suite revision, model/harness settings, setup and pass@1 conditions. Runner dependency upgrades are retained in provenance. Judge runtime fingerprints must match; legacy runs without them require matching execution fingerprints. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.',
+    costs: compareReleaseCosts(
+      previousCells,
+      cells(current, comparisonExcluded),
+    ),
+    note: `Next.js ${previous.version} → ${target.version}; release lines and stable/canary tracks may differ. Suite revision, model/harness settings, setup and pass@1 conditions match. Runner dependency upgrades are retained in provenance. Judge runtime fingerprints must match; legacy baselines without separate hashes require identical full comparison and locked-execution fingerprints. Tasks with changed grader or companion-file pins are excluded and listed in changedEvals. Pass→fail changes are regression candidates; confirmations are reported separately. Remote model or CLI updates can still affect results, so this comparison alone does not establish a framework cause.`,
   };
 }
 

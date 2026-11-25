@@ -46,7 +46,7 @@ const diagnostics = {
   experiments: [],
 };
 
-test('missing baseline names the requested line despite history on other lines', async (t) => {
+test('missing baseline identifies the supported major despite history on other majors', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'release-lines-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const dir = join(root, '16.4.5/123');
@@ -63,8 +63,8 @@ test('missing baseline names the requested line despite history on other lines',
     buildReleaseReport(current, diagnostics),
   );
   assert.equal(comparison.available, false);
-  assert.match(comparison.note, /15\.5\.x/);
-  assert.match(comparison.note, /Other release lines/);
+  assert.match(comparison.note, /15\.x/);
+  assert.match(comparison.note, /earlier minor lines are eligible/);
 });
 
 test('first reviewed run becomes usable; both condition changes reach the Slack payload', async (t) => {
@@ -188,7 +188,6 @@ test('incompatible, incomplete, same-version, invalid-date, and unrelated releas
     '16.4.5',
     '16.5.0',
     '15.4.2',
-    '16.4.3-canary.1',
   ]) {
     const dir = join(root, version, '123');
     await mkdir(dir, { recursive: true });
@@ -201,6 +200,128 @@ test('incompatible, incomplete, same-version, invalid-date, and unrelated releas
     (await loadReleaseComparison(root, current, report)).available,
     false,
   );
+});
+
+test('cross-minor comparisons prefer a compatible stable release and support an exact baseline', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-cross-minor-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const version of ['16.3.9', '16.4.6', '16.5.0-canary.64']) {
+    const directory = join(root, version, '1');
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      join(directory, 'measurement.json'),
+      JSON.stringify(measurement(version)),
+    );
+  }
+  const current = measurement('16.5.0-canary.65');
+  const report = buildReleaseReport(current, diagnostics);
+  const automatic = await loadReleaseComparison(root, current, report);
+  assert.ok(automatic.available);
+  assert.equal(automatic.baseline.version, '16.4.6');
+  for (const version of ['16.3.9', '16.4.6', '16.5.0-canary.64']) {
+    const selected = await loadReleaseComparison(
+      root,
+      current,
+      report,
+      [],
+      version,
+    );
+    assert.ok(selected.available);
+    assert.equal(selected.baseline.version, version);
+  }
+  const missing = await loadReleaseComparison(
+    root,
+    current,
+    report,
+    [],
+    '16.4.5',
+  );
+  assert.equal(missing.available, false);
+  assert.match(missing.note, /requested baseline 16\.4\.5/);
+  await assert.rejects(
+    () => loadReleaseComparison(root, current, report, [], 'latest'),
+    /exact stable or canary/,
+  );
+  await rm(join(root, '16.3.9'), { recursive: true });
+  await rm(join(root, '16.4.6'), { recursive: true });
+  const fallback = await loadReleaseComparison(root, current, report);
+  assert.ok(fallback.available);
+  assert.equal(fallback.baseline.version, '16.5.0-canary.64');
+  const stable = measurement('16.5.0');
+  const canaryToStable = await loadReleaseComparison(
+    root,
+    stable,
+    buildReleaseReport(stable, diagnostics),
+  );
+  assert.ok(canaryToStable.available);
+  assert.equal(canaryToStable.baseline.version, '16.5.0-canary.64');
+});
+
+test('cross-minor baselines retain all suite, model, grading and pass@1 compatibility gates', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-cross-minor-gates-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const directory = join(root, '16.4.6', '1');
+  await mkdir(directory, { recursive: true });
+  const old = measurement('16.4.6');
+  const current = measurement('16.5.0-canary.65');
+  const compare = () =>
+    loadReleaseComparison(
+      root,
+      current,
+      buildReleaseReport(current, diagnostics),
+    );
+  for (const mutate of [
+    (data: ExportedReleaseData) => {
+      data.metadata.evaluationTarget!.suiteRef = 'd'.repeat(40);
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.experiments[0].modelName = 'Other';
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.evaluationTarget!.comparisonKey = 'e'.repeat(64);
+    },
+    (data: ExportedReleaseData) => {
+      data.metadata.measurement!.metric = 'pass@4';
+    },
+  ]) {
+    const incompatible = structuredClone(old);
+    mutate(incompatible);
+    await writeFile(
+      join(directory, 'measurement.json'),
+      JSON.stringify(incompatible),
+    );
+    assert.equal((await compare()).available, false);
+  }
+});
+
+test('a legacy baseline can use separate current hashes only with its exact comparison and execution fingerprints', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'release-legacy-current-hashes-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const directory = join(root, '16.4.6', '1');
+  await mkdir(directory, { recursive: true });
+  const old = measurement('16.4.6');
+  old.metadata.evaluationTarget!.comparisonInputs = {
+    executionKey: 'a'.repeat(64),
+    graders: {},
+  };
+  await writeFile(join(directory, 'measurement.json'), JSON.stringify(old));
+  const current = structuredClone(old);
+  current.metadata.evaluationTarget!.version = '16.5.0-canary.65';
+  const inputs = current.metadata.evaluationTarget!.comparisonInputs!;
+  inputs.configurationKey = 'b'.repeat(64);
+  inputs.gradingRuntimeKey = 'c'.repeat(64);
+  const compare = () =>
+    loadReleaseComparison(
+      root,
+      current,
+      buildReleaseReport(current, diagnostics),
+    );
+  assert.equal((await compare()).available, true);
+  inputs.executionKey = 'd'.repeat(64);
+  assert.equal((await compare()).available, false);
+  inputs.executionKey = 'a'.repeat(64);
+  current.metadata.evaluationTarget!.comparisonKey = 'e'.repeat(64);
+  assert.equal((await compare()).available, false);
 });
 
 test('latest earlier compatible version wins and improvements are condition-specific', async (t) => {

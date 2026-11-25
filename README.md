@@ -335,14 +335,16 @@ that revision and a comparison key covering experiment configs, setup helpers,
 the suite sync script, and the locked runner dependencies.
 
 To rebuild a report from saved trials, dispatch [Rebuild a release report](.github/workflows/release-report.yml)
-with the existing measurement PR number. It uses current merged history, saves
+with the existing measurement PR number and optional exact `baselineVersion`. It uses current merged history, saves
 `report.json` on that same PR and posts a new Slack thread without coding-model calls.
 Original measurements, confirmations and traces stay unchanged.
 
-Future reports compare against the latest compatible earlier version retained
-in a measurement PR **merged into main**. The same major/minor release line,
-stable/canary track, suite revision, model/harness settings, setup, tasks, and
-pass@1 conditions must match. Open or closed unmerged measurement PRs are not
+Future reports prefer the latest compatible earlier stable release retained
+in a measurement PR **merged into main**, falling back to an earlier compatible
+canary when no stable baseline qualifies. An explicit report-replay baseline
+selects only that version. Comparisons may cross minor releases and stable/canary
+tracks within the same major. Suite revision, model/harness settings, setup,
+tasks, and pass@1 conditions must match. Open or closed unmerged measurement PRs are not
 baselines. The first matching measurement becomes a baseline after review and
 merge. Runner dependency upgrades, including `agent-eval`, remain recorded but do not
 block comparisons. Changes to model settings, guidance or task setup still do. Pass→fail and fail→pass changes are reported separately for Base and
