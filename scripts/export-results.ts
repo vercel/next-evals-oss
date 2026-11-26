@@ -57,6 +57,7 @@ interface AgentResult {
 // variant → base experiment (same agent harness). Hoisted to module scope so
 // both cost pricing (per eval) and the docs-impact merge resolve the same base.
 const AGENTS_MD_PAIRS: Record<string, string> = {
+  'claude-sonnet-5.5--agents-md': 'claude-sonnet-5.5',
   'pixel-canary--agents-md': 'pixel-canary',
   'claude-fable-5.1--agents-md': 'claude-fable-5.1',
   'claude-fable-5--agents-md': 'claude-fable-5',
@@ -166,6 +167,8 @@ interface ExportedData {
 const TIER_1 = new Set<string>(TIER_ONE_EXPERIMENTS);
 
 const MODEL_NAMES: Record<string, string> = {
+  'claude-sonnet-5.5': 'Claude Sonnet 5.5 (high)',
+  'claude-sonnet-5.5--agents-md': 'claude-sonnet-5.5',
   'pixel-canary': 'Pixel Canary',
   'pixel-canary--agents-md': 'Pixel Canary + AGENTS.md',
   'claude-fable-5.1': 'Claude Fable 5.1 (high)',
